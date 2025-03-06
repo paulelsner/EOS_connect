@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EOS connect board</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: rgb(54, 54, 54);
+            color: lightgray;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .top-boxes,
+        .bottom-boxes {
+            display: flex;
+        }
+
+        .top-boxes {
+            height: 20%;
+        }
+
+        .top-box {
+            flex: 1;
+            margin: 10px;
+            padding: 10px;
+            background-color: rgb(78, 78, 78);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            font-size: 0.93em;
+        }
+
+        .bottom-boxes {
+            height: 80%;
+        }
+
+        .left-box {
+            width: 75%;
+            margin: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            background-color: rgb(78, 78, 78);
+        }
+
+        .right-box {
+            width: 24%;
+            margin: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            background-color: rgb(78, 78, 78);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: rgb(114, 114, 114);
+            ;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .header_notification {
+            background-color: rgb(58, 58, 58);
+            color: white;
+            padding: 4px;
+            text-align: center;
+            border-radius: 5px;
+            font-size: 0.65em;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        .content {
+            padding: 10px;
+            flex: 1;
+            overflow: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 0 5px 0 5px;
+            text-align: left;
+        }
+        th {
+            text-align:center;
+        }
+
+        /* Media Queries for Smartphones */
+        @media (max-width: 768px) {
+            .top-boxes {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .top-box {
+                min-height: 150px;
+                font-size: 0.73em;
+            }
+
+            .bottom-boxes {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .left-box,
+            .right-box {
+                width: auto;
+                height: auto;
+            }
+        }
+
+        .table {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table-header, .table-body {
+            display: table-row-group;
+        }
+
+        .table-row {
+            display: table-row;
+        }
+
+        .table-cell {
+            display: table-cell;
+            padding: 1px 5px;
+            text-align: left;
+            margin: 2px;
+            border-radius: 20px;
+        }
+
+        .table-cell.rounded {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="top-boxes">
+            <div class="top-box">
+                <div class="header"><i class="fa-solid fa-battery-full"></i> Recent Charges
+                    <span class="header_notification" id="timestamp_battery">01.01.2025 00:00:00</span>
+                </div>
+                <div class="content">
+                    <canvas id="batteryChart" style="width: 100%; height: 100%;"></canvas>
+                </div>
+            </div>
+            <div class="top-box">
+                <div class="header"><i class="fa-solid fa-battery-full"></i></i> Last Charge</div>
+                <div class="content">
+                    <table style="width: 100%; text-align: left;padding-top: 10px;">
+                        <tr>
+                            <th style="text-align: left;"></th>
+                            <th style="text-align: center;"></th>
+                        </tr>
+                        <tr>
+                            <td>Time</td>
+                            <td colspan="2" style="text-align: right;" id="last_charge_time">... last charge time</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3">
+                                <hr>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Avg Price</td>
+                            <td colspan="2" style="text-align: right;" id="last_charge_avg_price">... kWh</td>
+                        </tr>
+                        <tr>
+                            <td>Energy Amount</td>
+                            <td colspan="2" style="text-align: right;" id="last_charge_amount">... kWh</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="top-box">
+                <div class="header"><i class="fa-solid fa-battery-full"></i></i> Next Charge</div>
+                <div class="content">
+                    <table style="width: 100%; text-align: left;padding-top: 10px;">
+                        <tr>
+                            <th style="text-align: left;"></th>
+                            <th style="text-align: center;"></th>
+                        </tr>
+                        <tr>
+                            <td>Planned Time</td>
+                            <td colspan="2" style="text-align: right;" id="next_charge_time">... next charge time</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3">
+                                <hr>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Avg Price</td>
+                            <td colspan="2" style="text-align: right;" id="next_charge_avg_price">... kWh</td>
+                        </tr>
+                        <tr>
+                            <td>Needed Energy Next Day</td>
+                            <td colspan="2" style="text-align: right;" id="next_charge_amount">... kWh</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="top-box">
+                <div class="header"><i class="fa-solid fa-plug-circle-bolt"></i> Current Power</div>
+                <div class="content">
+                    <table style="width: 100%; text-align: left;padding-top: 10px;">
+                        <tr>
+                            <th style="text-align: left;"></th>
+                            <th style="text-align: center;"></th>
+                            <th style="text-align: center;"></th>
+                        </tr>
+                        <tr>
+                            <td>current</td>
+                            <td style="text-align: left;"></td>
+                            <td style="text-align: center;">Price</td>
+                            <td style="text-align: right;" id="current_price">0.30 €</td>
+                        </tr>
+                        <tr>
+                            <td colspan="4">
+                                <hr>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Grid</td>
+                            <td class="valueChange" style="text-align: right;" id="current_grid_power">500 W</td>
+                            <td style="text-align: center;">Price</td>
+                            <td class="valueChange" style="text-align: right;" id="current_grid_price">0.30 €</td>
+                        </tr>
+                        <tr>
+                            <td>Inverter</td>
+                            <td class="valueChange" style="text-align: right;" id="current_inverter_power">500 W</td>
+                            <td style="text-align: center;">Price</td>
+                            <td class="valueChange" style="text-align: right;" id="current_inverter_price"></td>
+                        </tr>
+                        <tr>
+                            <td>PV Garden</td>
+                            <td class="valueChange" style="text-align: right;" id="current_pv_garden_power">500 W</td>
+                            <td style="text-align: center;">Price</td>
+                            <td class="valueChange" style="text-align: right;" id="current_pv_garden_price"></td>
+                        </tr>
+                        <tr>
+                            <td>Load</td>
+                            <td class="valueChange" style="text-align: right;" id="current_load_power">500 W</td>
+                            <td style="text-align: center;">Price</td>
+                            <td class="valueChange" style="text-align: right;" id="current_load_price">0.30 €</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="bottom-boxes">
+            <div class="left-box">
+                <div class="header"><i class="fa-solid fa-chart-column"></i> Energy Consumption
+                    <span class="header_notification" id="timestamp_today">01.01.2025 00:00:00</span>
+                    <span class="header_notification" id="timestamp_history" style="display: none;">01.01.2025
+                        00:00:00</span>
+                </div>
+                <div class="content">
+                    <canvas id="energyChart"></canvas>
+                </div>
+            </div>
+            <div class="right-box">
+                <div class="header"><i class="fa-solid fa-calendar-days"></i><span id="load_schedule_header"> Schedule next 24 hours</span></div>
+                <div class="content">
+                    <div id="discharge_scheduler" class="table">
+                        <div class="table-header">
+                            <div class="table-row">
+                                <div class="table-cell">time</div>
+                                <div class="table-cell">Discharge</div>
+                                <div class="table-cell">AC Charge</div>
+                                <div class="table-cell">Price</div>
+                                <div class="table-cell">Expense</div>
+                            </div>
+                        </div>
+                        <div class="table-body">
+                            <div class="table-row">
+                                <div class="table-cell">Data 1</div>
+                                <div class="table-cell">Data 2</div>
+                                <div class="table-cell">Data 3</div>
+                                <div class="table-cell">Data 4</div>
+                                <div class="table-cell">Data 5</div>
+                            </div>
+                            <div class="table-row">
+                                <div class="table-cell">Data 5</div>
+                                <div class="table-cell">Data 6</div>
+                                <div class="table-cell">Data 7</div>
+                                <div class="table-cell">Data 8</div>
+                                <div class="table-cell">Data 9</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+
+        async function fetchCurrentGridPower() {
+            const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Grid_Power');
+            let data = await response.json();
+            data = data.state.split(' ')[0];
+            data = parseFloat(data).toFixed(0);
+            return data;
+        }
+        async function fetchCurrentInverterPower() {
+            const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Inverter_Power');
+            let data = await response.json();
+            data = data.state.split(' ')[0];
+            data = parseFloat(data).toFixed(0);
+            return data;
+        }
+        async function fetchCurrentSolarPower() {
+            const response = await fetch('http://192.168.1.30:8080/rest/items/inverterGrid_P');
+            let data = await response.json();
+            data = data.state.split(' ')[0];
+            data = parseFloat(data).toFixed(0);
+            return data;
+        }
+        async function fetchCurrentLoadPower() {
+            const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Load_Power');
+            let data = await response.json();
+            data = data.state.split(' ')[0];
+            data = parseFloat(data).toFixed(0) * -1;
+            return data;
+        }
+
+        function lastCharge(data) {
+            // *************** last charge ****************
+            // timestamp last charge
+            const lastChargeEntry = data["energyBatteryChargeDischargeJSON"].chargeHours.length - 1;
+            const lastChargeEntryEnd = data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry].length - 1;
+
+            // 2025-01-19T17:00+01:00[Europe/Berlin] => to timestamp
+            var lastChargeTimeStart = new Date(data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry][0].hour.replace('[Europe/Berlin]', ''));
+            var lastChargeTimeEnd = new Date(data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry][lastChargeEntryEnd].hour.replace('[Europe/Berlin]', ''));
+            lastChargeTimeEnd.setHours(lastChargeTimeEnd.getHours() + 1);
+
+            document.getElementById('last_charge_time').innerHTML = "" + lastChargeTimeStart.toLocaleString() + " - " + lastChargeTimeEnd.toLocaleString();
+            document.getElementById('last_charge_amount').innerText = (data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry].reduce((sum, hourData) => sum + (hourData.energy * -1), 0)).toFixed(3) + " kWh";
+
+            const chargeDuration = (lastChargeTimeEnd - lastChargeTimeStart) / (1000 * 60 * 60);
+            lastChargeAvgPrice = data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry].reduce((sum, hourData) => sum + (hourData.price), 0) / chargeDuration;
+            document.getElementById('last_charge_avg_price').innerText = lastChargeAvgPrice.toFixed(4) + " €/kWh";
+        }
+
+        async function displayCurrentValues(data) {
+            // *************** display current values ****************
+            let currentGridPower = parseFloat(await fetchCurrentGridPower());
+            let currentInverterPower = parseFloat(await fetchCurrentInverterPower());
+            let currentSolarPower = parseFloat(await fetchCurrentSolarPower());
+            //let currentLoadPower = await fetchCurrentLoadPower();            
+            let currentLoadPower = currentGridPower + currentInverterPower + currentSolarPower
+
+            const currentPriceCent = parseFloat(data["energyPricesJSON"].priceToday[new Date().getHours()]) * 100;
+            const currentGridPriceCent = currentGridPower / currentLoadPower * currentPriceCent;
+            const lastChargeAvgPriceCent = lastChargeAvgPrice * 100;
+            const priceBatteryDischargeCent = currentInverterPower / currentLoadPower * lastChargeAvgPriceCent;
+            let resultingPriceCent = currentGridPriceCent + priceBatteryDischargeCent;
+
+            document.getElementById('current_grid_power').innerText = currentGridPower + " W";
+            document.getElementById('current_inverter_power').innerText = currentInverterPower + " W";
+            document.getElementById('current_pv_garden_power').innerText = currentSolarPower + " W";
+            document.getElementById('current_load_power').innerText = currentLoadPower + " W";
+
+            document.getElementById('current_price').innerText = currentPriceCent.toFixed(1) + " ct";
+            document.getElementById('current_grid_price').innerText = currentGridPriceCent.toFixed(1) + " ct";
+            document.getElementById('current_inverter_price').innerText = priceBatteryDischargeCent.toFixed(1) + " ct";
+            document.getElementById('current_pv_garden_price').innerText = "0.0 ct";
+            document.getElementById('current_load_price').innerText = resultingPriceCent.toFixed(1) + " ct";
+        }
+
+        let chartInstance = null;
+        let batteryChartInstance = null;
+
+        function isMobile() {
+            return window.innerWidth <= 768;
+        }
+
+        function updateLegendVisibility() {
+            if (chartInstance) {
+                chartInstance.options.plugins.legend.display = !isMobile();
+                chartInstance.update();
+            }
+        }
+        window.addEventListener('resize', updateLegendVisibility);
+        updateLegendVisibility();
+
+        async function fetchChartData(filename) {
+            const response = await fetch('json/' + filename + '?nocache=' + new Date().getTime());
+            const data = await response.json();
+            return data;
+        }
+
+        function updateChart(data_request, data_response) {
+            const currentHour = new Date().getHours();
+
+            chartInstance.data.labels = Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length }, (_, i) => `${(currentHour + i) % 24}:00`);
+            chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"];
+            chartInstance.data.datasets[1].data = data_request["ems"]["pv_prognose_wh"].slice(currentHour).concat(data_request["ems"]["pv_prognose_wh"].slice(24, 48));
+            chartInstance.data.datasets[2].data = data_response["result"]["Netzbezug_Wh_pro_Stunde"];
+            chartInstance.data.datasets[3].data = data_response["result"]["akku_soc_pro_stunde"];
+            chartInstance.data.datasets[4].data = data_response["result"]["Kosten_Euro_pro_Stunde"].slice(0, data_response["result"]["Kosten_Euro_pro_Stunde"].length);
+            chartInstance.data.datasets[5].data = data_response["result"]["Electricity_price"].map(value => value * 1000).slice(0, data_response["result"]["Electricity_price"].length);
+            chartInstance.data.datasets[6].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));
+            chartInstance.data.datasets[7].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48));
+            chartInstance.update('none'); // Update without animation
+        }
+
+        function createChart(data_request, data_response) {
+            console.log(data_response["result"]["Last_Wh_pro_Stunde"].length);
+            const ctx = document.getElementById('energyChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length }, (_, i) => {
+                        const currentHour = new Date().getHours();
+                        return `${(currentHour + i) % 24}:00`;
+                    }),
+                    datasets: [
+                        {
+                            label: 'Load',
+                            data: data_response["result"]["Last_Wh_pro_Stunde"],
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'PV forecast',
+                            data: data_request["ems"]["pv_prognose_wh"].slice(new Date().getHours()).concat(data_request["ems"]["pv_prognose_wh"].slice(24, 48)),
+                            backgroundColor: '#FFA500',
+                            borderColor: '#FF991C',
+                            borderWidth: 1,
+                            stack: 'combined'
+                        },
+                        {
+                            label: 'Grid',
+                            data: data_response["result"]["Netzbezug_Wh_pro_Stunde"],
+                            backgroundColor: 'rgba(128, 128, 128, 0.6)',
+                            borderColor: 'rgba(211, 211, 211, 1)',
+                            borderWidth: 1,
+                            stack: 'combined'
+                        },
+                        {
+                            label: 'Akku SOC',
+                            data: data_response["result"]["akku_soc_pro_stunde"],
+                            type: 'line',
+                            backgroundColor: 'blue',
+                            borderColor: 'lightblue',
+                            borderWidth: 1,
+                            yAxisID: 'y2'
+                        },
+                        {
+                            label: 'Summerized Expense Grid',
+                            data: data_response["result"]["Kosten_Euro_pro_Stunde"].slice(0, data_response["result"]["Kosten_Euro_pro_Stunde"].length),
+                            type: 'line',
+                            borderColor: 'lightgreen',
+                            backgroundColor: 'green',
+                            borderWidth: 1,
+                            yAxisID: 'y1',
+                            stepped: true,
+                            hidden: true // Deactivated by default
+                        },
+                        {
+                            label: 'Electricity Price',
+                            data: data_response["result"]["Electricity_price"].map(value => value * 1000).slice(0, data_response["result"]["Electricity_price"].length),
+                            type: 'line',
+                            borderColor: 'rgba(255, 69, 0, 0.8)', // red
+                            backgroundColor: 'rgba(255, 165, 0, 0.2)', // light orange
+                            borderWidth: 1,
+                            yAxisID: 'y1',
+                            stepped: true
+                        },
+                        {
+                            label: 'Discharge Allowed',
+                            data: data_response["discharge_allowed"].slice(new Date().getHours()).concat(data_response["discharge_allowed"].slice(24, 48)),
+                            type: 'line',
+                            borderColor: 'lightblue', // light blue
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)', // light blue with transparency
+                            borderWidth: 0,
+                            fill: true,
+                            yAxisID: 'y3'
+                        },
+                        {
+                            label: 'AC Charge',
+                            data: data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)),
+                            type: 'bar',
+                            borderColor: 'lighthred',
+                            backgroundColor: 'red', // violet
+                            borderWidth: 1,
+                            yAxisID: 'y3',
+                            barPercentage: 0.5,
+                            categoryPercentage: 0.5,
+                            hidden: true // Deactivated by default
+                        }
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Energy Consumption (Wh)',
+                                color: 'lightgray'
+                            },
+                            grid: {
+                                color: 'rgb(54, 54, 54)'
+                            },
+                            ticks: {
+                                color: 'lightgray'
+                            }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Price (€)',
+                                color: 'lightgray'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: 'lightgray',
+                                callback: function (value) {
+                                    return value.toFixed(2);
+                                }
+                            }
+                        },
+                        y2: {
+                            beginAtZero: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Akku SOC (%)',
+                                color: 'darkgray'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: 'darkgray',
+                                callback: function (value) {
+                                    return value.toFixed(2);
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgb(54, 54, 54)'
+                            },
+                            ticks: {
+                                color: 'lightgray',
+                                font: {
+                                    size: 10 // Small font size for x-axis labels
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: !isMobile(),
+                            labels: {
+                                color: 'lightgray'
+                            }
+                        }
+                    },
+                }
+            });
+
+        }
+
+        function showBatteryCharge(data_request, data_response) {
+            console.log("------- showBatteryCharge -------");
+            var discharge_allowed = data_response["discharge_allowed"];
+            var ac_charge = data_response["ac_charge"];
+            var priceData = data_response["result"]["Electricity_price"];
+            var expenseData = data_response["result"]["Kosten_Euro_pro_Stunde"];
+
+            // clear all entries in div discharge_scheduler
+            var tableBody = document.querySelector("#discharge_scheduler .table-body");
+            tableBody.innerHTML = '';
+
+            priceData.forEach((value, index) => {
+                if (index > 23) return;
+
+                if (index % 4 === 0 && index !== 0) {
+                    var row = document.createElement('div');
+                    row.className = 'table-row';
+                    var cell = document.createElement('div');
+                    cell.className = 'table-cell';
+                    cell.innerHTML = "<hr style='border-color: darkgrey;'>";
+                    cell.colSpan = 5;
+                    row.appendChild(cell);
+                    tableBody.appendChild(row);
+                }
+
+                var row = document.createElement('div');
+                row.className = 'table-row';
+
+                var cell1 = document.createElement('div');
+                cell1.className = 'table-cell';
+                cell1.innerHTML = ((index + new Date().getHours()) % 24) + ":00";
+                cell1.style.textAlign = "right";
+                row.appendChild(cell1);
+
+                var cell2 = document.createElement('div');
+                cell2.className = 'table-cell';
+                cell2.style.backgroundColor = discharge_allowed[(index + new Date().getHours())] ? "grey" : "";
+                row.appendChild(cell2);
+
+                var cell3 = document.createElement('div');
+                cell3.className = 'table-cell';
+                cell3.innerText = ac_charge[(index + new Date().getHours())] === 0 ? "" : ac_charge[(index + new Date().getHours())].toFixed(3);
+                cell3.style.textAlign = "center";
+                cell3.style.backgroundColor = ac_charge[(index + new Date().getHours())] ? "darkred" : "";
+                row.appendChild(cell3);
+
+                var cell4 = document.createElement('div');
+                cell4.className = 'table-cell';
+                cell4.innerHTML = (priceData[index] * 100000).toFixed(1);
+                cell4.style.textAlign = "center";
+                row.appendChild(cell4);
+
+                var cell5 = document.createElement('div');
+                cell5.className = 'table-cell';
+                cell5.innerHTML = (expenseData[index]).toFixed(2) + " €";
+                cell5.style.textAlign = "center";
+                row.appendChild(cell5);
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        // function to observe changed values of doc elements from class "valueChange" and animate the change
+        Array.from(document.getElementsByClassName("valueChange")).forEach(function (element) {
+            const observer = new MutationObserver(function (mutationsList, observer) {
+                const elem = mutationsList[0].target;
+                // elem.classList.add("animateValue");
+                elem.style.color = "lightgreen"; //"#2196f3";
+                //elem.style.fontSize = "95%";
+                setTimeout(function () {
+                    elem.style.color = "inherit";// "#eee";
+                    //  elem.style.fontSize = "100%";
+                }, 1000);
+
+            });
+            observer.observe(element, { characterData: false, childList: true, attributes: false });
+        });
+
+        async function init() {
+            // base chart
+            const data_request = await fetchChartData("optimize_request.json");
+            const data_response = await fetchChartData("optimize_response.json");            
+            if (chartInstance){ // && batteryChartInstance) {
+                updateChart(data_request,data_response);
+            } else {
+                createChart(data_request,data_response);
+            }
+            // timestamps for chart - 2025-02-21T08:04:00.939977
+            const timestamp = new Date(data_response.timestamp);
+            const formattedTimestamp = timestamp.toLocaleString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('timestamp_today').innerText = formattedTimestamp;
+            //document.getElementById('timestamp_history').innerText = data["energyHistoricConsumptionJSON"].timestamp;
+            //document.getElementById('timestamp_battery').innerHTML = data["energyBatteryChargeDischargeJSON"].timestamp;
+            
+            //lastCharge(data);
+            showBatteryCharge(data_request,data_response);
+            //await displayCurrentValues(data);
+        }
+
+        init();
+        setInterval(init, 5000);
+    </script>
+</body>
+
+</html>

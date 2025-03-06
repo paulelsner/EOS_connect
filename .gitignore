@@ -1,0 +1,5 @@
+/.mypy_cache
+/.vscode
+/src/__pycache__
+src/config.yaml.bak
+src/config.yaml

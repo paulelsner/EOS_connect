@@ -2,6 +2,10 @@
 
 This project is designed to fetch energy data from OpenHAB, process it, and create a load profile. It includes functionalities for interacting with APIs, managing configurations, and handling energy data.
 
+Finally to request an optimization through EOS https://github.com/Akkudoktor-EOS and get the feedback and display this on dynamic webpage.
+
+current usage with commit https://github.com/Akkudoktor-EOS/EOS/tree/e22388b7537af545a53d6cebef35d98a7ee30e1b approved (old API)
+
 ## Project Structure
 
 ```

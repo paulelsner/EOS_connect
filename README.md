@@ -1,21 +1,32 @@
-# EOS Connect Energy Data Processing
+# EOS Connect
 
-This project is designed to fetch energy data from OpenHAB, process it, and create a load profile. It includes functionalities for interacting with APIs, managing configurations, and handling energy data.
+Request optimization at an [EOS](https://github.com/Akkudoktor-EOS) and handle the response to display the result on a dynamic webpage.
 
-Finally to request an optimization through EOS https://github.com/Akkudoktor-EOS and get the feedback and display this on dynamic webpage.
+Currently, the project is designed to fetch energy data from OpenHAB, process it, and create a load profile. It includes functionalities for interacting with the Tibber API and PV forecast API, managing configurations, and handling energy data.
 
-current usage with commit https://github.com/Akkudoktor-EOS/EOS/tree/e22388b7537af545a53d6cebef35d98a7ee30e1b approved (old API)
+Next step:
+Using the feedback to interactively control a FRONIUS inverter and battery charging system.
+
+*Hint: current usage approved with commit https://github.com/Akkudoktor-EOS/EOS/tree/e22388b7537af545a53d6cebef35d98a7ee30e1b (old API)*
 
 ## Project Structure
 
 ```
 EOS_connect
 ├── src
-│   ├── eos_optimize_request.py  # Main logic for fetching and processing energy data
-├── Dockerfile                     # Docker configuration for the project
-├── docker-compose.yml             # Docker Compose configuration for multi-container setup
-├── requirements.txt               # Python dependencies for the project
-└── README.md                      # Project documentation
+│   ├── json
+│   │  ├── optimize_request.json    # will be created/ rewritten with every new optimization request
+│   │  ├── optimize_response.json   # will be created/ rewritten after the feedback of EOS
+│   ├── web
+│   │  ├── index.html               # served webpage to dynamically showing the current state and response from EOS
+│   ├── eos_connect.py              # Main logic for fetching and processing energy data
+│   ├── config.py                   # config handling
+│   ├── config.yaml                 # config file - default will be created with first start
+│   ├── CONFIG_README.md            # config documentation
+├── Dockerfile                      # Docker configuration for the project
+├── docker-compose.yml              # Docker Compose configuration for multi-container setup
+├── requirements.txt                # Python dependencies for the project
+└── README.md                       # Project documentation
 ```
 
 ## Requirements
@@ -34,7 +45,7 @@ To run this project, you need to have the following installed:
    cd EOS_connect
    ```
 
-2. Install the required Python packages:
+2. Install the required Python packages (for local usage):
    ```
    pip install -r requirements.txt
    ```
@@ -57,12 +68,16 @@ To run this project, you need to have the following installed:
 
 If you prefer to run the application locally without Docker, you can execute the following command:
 ```
-python src/eos_optimize_request.py
+python src/eos_connect.py
 ```
+
+## Configuration
+
+Configuration is described here [CONFIG_README](src\CONFIG_README.md)
 
 ## Usage
 
-The application will start fetching energy data from OpenHAB and processing it according to the defined logic in `src/eos_optimize_request.py`. You can access the web interface at `http://localhost:8081`.
+The application will start fetching energy data from OpenHAB and processing it according to the defined logic in `src/eos_connect.py`. You can access the web interface at `http://localhost:8081`.
 
 ## Contributing
 

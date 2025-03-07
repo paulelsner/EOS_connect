@@ -73,7 +73,7 @@ python src/eos_connect.py
 
 ## Configuration
 
-Configuration is described here [CONFIG_README](src\CONFIG_README.md)
+Configuration is described here [CONFIG_README](src/CONFIG_README.md)
 
 ## Usage
 

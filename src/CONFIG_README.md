@@ -19,6 +19,16 @@ This document provides an overview of the configuration settings for the applica
 - **price.source**: Data source for electricity price. Possible values: `tibber`, `akkudoktor`.
 - **price.token**: Token for electricity price.
 
+### Battery Configuration
+- **battery.source**: Data source for battery SOC. Possible values: openhab, homeassistant, default.
+- **battery.url**: URL for battery SOC.
+- **battery.capacity_wh**: Battery capacity in Wh.
+- **battery.charge_efficiency**: Efficiency for charging the battery.
+- **battery.discharge_efficiency**: Efficiency for discharging the battery.
+- **battery.max_charge_power_w**: Maximum charging power in W.
+- **battery.min_soc_percentage**: Minimum state of charge percentage.
+- **battery.max_soc_percentage**: Maximum state of charge percentage.
+
 ### PV Forecast Configuration
 
 The `pv_forecast` section allows you to define multiple PV forecast entries, each distinguished by a user-given name. Below is an example of a default PV forecast configuration:
@@ -65,9 +75,9 @@ If the configuration file does not exist, the application will create one with d
 ## Full Config Example
 
 ```yaml
-load:
-  source: openhab  # Data source for load power - openhab or homeassistant
-  url: http://192.168.1.30:8080/rest/persistence/items/Fronius_Load_Power  # URL for load power data
+oad:
+  source: default  # Data source for load power - openhab or homeassistant
+  url: http://<ip>:8080/rest/persistence/items/<load_item>  # URL for load power data
 
 eos:
   server: 192.168.1.94  # Default EOS server address
@@ -76,6 +86,16 @@ eos:
 price:
   source: tibber  # Data source for electricity price
   token: tibberBearerToken  # Token for electricity price
+
+battery:
+  source: default  # Data source for battery SOC - openhab, homeassistant, default
+  url: http://<ip>:8080:8080/rest/items/<soc_item>/state  # URL for battery SOC
+  capacity_wh: 11059  # Battery capacity in Wh
+  charge_efficiency: 0.88  # Efficiency for charging the battery
+  discharge_efficiency: 0.88  # Efficiency for discharging the battery
+  max_charge_power_w: 5000  # Maximum charging power in W
+  min_soc_percentage: 5  # Minimum state of charge percentage
+  max_soc_percentage: 100  # Maximum state of charge percentage
 
 pv_forecast:
   roof_west:

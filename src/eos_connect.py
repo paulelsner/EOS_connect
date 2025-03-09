@@ -23,7 +23,7 @@ EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
 
 ###################################################################################################
 ###################################################################################################
-LOGLEVEL = logging.DEBUG
+LOGLEVEL = logging.INFO
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter(
     "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"

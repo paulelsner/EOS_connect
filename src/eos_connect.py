@@ -23,7 +23,7 @@ EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
 
 ###################################################################################################
 ###################################################################################################
-LOGLEVEL = logging.INFO
+LOGLEVEL = logging.DEBUG
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter(
     "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"
@@ -66,6 +66,7 @@ EOS_API_PUT_LOAD_SERIES = {
 EOS_API_OPTIMIZE = f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/optimize"
 
 EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
+AKKUDOKTOR_API_PRICES = "https://api.akkudoktor.net/prices"
 TIBBER_API = "https://api.tibber.com/v1-beta/gql"
 
 
@@ -125,7 +126,90 @@ def eos_set_optimize_request(payload, timeout=120):
 # getting data
 
 
-def get_prices_for_today_and_tomorrow(tgt_duration, start_time=None):
+def get_prices(tgt_duration, start_time=None):
+    """
+    Retrieve prices based on the target duration and optional start time.
+
+    This function fetches prices from different sources based on the configuration.
+    It supports fetching prices from 'tibber' and 'default' sources.
+
+    Args:
+        tgt_duration (int): The target duration for which prices are to be fetched.
+        start_time (datetime, optional): The start time from which prices are to be fetched.
+        Defaults to None.
+
+    Returns:
+        list: A list of prices for the specified duration and start time. Returns an empty list
+        if the price source is not supported.
+    """
+    if config_manager.config["price"]["source"] == "tibber":
+        return get_prices_from_tibber(tgt_duration, start_time)
+    if config_manager.config["price"]["source"] == "default":
+        return get_prices_from_akkudoktor(tgt_duration, start_time)
+    logger.error("[PRICES] Price source currently not supported.")
+    return []
+
+
+def get_prices_from_akkudoktor(tgt_duration, start_time=None):
+    """
+    Fetches and processes electricity prices for today and tomorrow.
+
+    This function retrieves electricity prices for today and tomorrow from an API,
+    processes the prices, and returns a list of prices for the specified duration starting
+    from the specified start time. If tomorrow's prices are not available, today's prices are
+    repeated for tomorrow.
+
+    Args:
+        tgt_duration (int): The target duration in hours for which the prices are needed.
+        start_time (datetime, optional): The start time for fetching prices. Defaults to None.
+
+    Returns:
+        list: A list of electricity prices for the specified duration starting
+              from the specified start time.
+    """
+    if config_manager.config["price"]["source"] != "default":
+        logger.error(
+            "[PRICES] Price source %s currently not supported.",
+            config_manager.config["price"]["source"],
+        )
+        return []
+    logger.debug("[PRICES] Fetching prices from akkudoktor ...")
+    if start_time is None:
+        start_time = datetime.now(time_zone).replace(minute=0, second=0, microsecond=0)
+    current_hour = start_time.hour
+    request_url = (
+        AKKUDOKTOR_API_PRICES
+        + "?start="
+        + start_time.strftime("%Y-%m-%d")
+        + "&end="
+        + (start_time + timedelta(days=1)).strftime("%Y-%m-%d")
+    )
+    logger.debug("[PRICES] Requesting prices from akkudoktor: %s", request_url)
+    response = requests.get(request_url, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+
+    prices = []
+    for price in data["values"]:
+        prices.append(round(price["marketpriceEurocentPerKWh"] / 100000, 9))
+        # logger.debug(
+        #     "[Main] day 1 - price for %s -> %s", price["marketpriceEurocentPerKWh"],
+        #       price["start"]
+        # )
+
+    if start_time is None:
+        start_time = datetime.now(time_zone).replace(minute=0, second=0, microsecond=0)
+    current_hour = start_time.hour
+    extended_prices = prices[current_hour : current_hour + tgt_duration]
+
+    if len(extended_prices) < tgt_duration:
+        remaining_hours = tgt_duration - len(extended_prices)
+        extended_prices.extend(prices[:remaining_hours])
+    logger.info("[PRICES] Prices from AKKUDOKTOR fetched successfully.")
+    return prices
+
+
+def get_prices_from_tibber(tgt_duration, start_time=None):
     """
     Fetches and processes electricity prices for today and tomorrow.
 
@@ -142,7 +226,7 @@ def get_prices_for_today_and_tomorrow(tgt_duration, start_time=None):
         list: A list of electricity prices for the specified duration starting
               from the specified start time.
     """
-    # logger.info("[PRICES] Prices fetching started")
+    logger.debug("[PRICES] Prices fetching from TIBBER started")
     if config_manager.config["price"]["source"] != "tibber":
         logger.error("[PRICES] Price source currently not supported.")
         return []
@@ -173,8 +257,16 @@ def get_prices_for_today_and_tomorrow(tgt_duration, start_time=None):
     response = requests.post(
         TIBBER_API, headers=headers, json={"query": query}, timeout=10
     )
+
     response.raise_for_status()
     data = response.json()
+    if "errors" in data and data["errors"] is not None:
+        logger.error(
+            "[PRICES] Error fetching prices - tibber API response: %s",
+            data["errors"][0]["message"],
+        )
+        return []
+
     today_prices = json.dumps(
         data["data"]["viewer"]["homes"][0]["currentSubscription"]["priceInfo"]["today"]
     )
@@ -190,15 +282,15 @@ def get_prices_for_today_and_tomorrow(tgt_duration, start_time=None):
 
     for price in today_prices_json:
         prices.append(round(price["total"] / 1000, 9))
-        logger.debug(
-            "[Main] day 1 - price for %s -> %s", price["startsAt"], price["total"]
-        )
+        # logger.debug(
+        #     "[Main] day 1 - price for %s -> %s", price["startsAt"], price["total"]
+        # )
     if tomorrow_prices_json:
         for price in tomorrow_prices_json:
             prices.append(round(price["total"] / 1000, 9))
-            logger.debug(
-                "[Main] day 2 - price for %s -> %s", price["startsAt"], price["total"]
-            )
+            # logger.debug(
+            #     "[Main] day 2 - price for %s -> %s", price["startsAt"], price["total"]
+            # )
     else:
         prices.extend(prices[:24])  # Repeat today's prices for tomorrow
 
@@ -210,7 +302,7 @@ def get_prices_for_today_and_tomorrow(tgt_duration, start_time=None):
     if len(extended_prices) < tgt_duration:
         remaining_hours = tgt_duration - len(extended_prices)
         extended_prices.extend(prices[:remaining_hours])
-    logger.info("[PRICES] Prices fetched successfully.")
+    logger.info("[PRICES] Prices from TIBBER fetched successfully.")
     return extended_prices
 
 
@@ -253,7 +345,6 @@ def get_pv_forecast(tgt_value="power", pv_config_name="default", tgt_duration=24
     if pv_config_name not in config_manager.config["pv_forecast"]:
         # take the first entry if the config name is not found
         pv_config_name = list(config_manager.config["pv_forecast"].keys())[0]
-        # print("pv_config_name not found in config, using first pv config entry: " + pv_config_name)
 
     forecast_request_payload = create_forecast_request(pv_config_name)
     # print(forecast_request_payload)
@@ -307,10 +398,10 @@ def battery_get_current_soc():
     """
     # default value for start SOC = 5
     if config_manager.config["battery"]["source"] == "default":
-        logger.debug("[BATTERY] Battery source set default with SOC = 5%")
+        logger.debug("[BATTERY] Battery source set to default with start SOC = 5%")
         return 5
     if config_manager.config["battery"]["source"] == "homeassistant":
-        logger.error("[BATTERY] Battery source currently not supported. Using default.")
+        logger.info("[BATTERY] Battery source currently not supported. Using default.")
         return 5
     if config_manager.config["battery"]["source"] != "openhab":
         logger.error("[BATTERY] Battery source currently not supported. Using default.")
@@ -381,7 +472,9 @@ def create_dataframe(profile):
             df.loc[date, "Household"] = energy
     return df
 
+
 # get load data from url persistance source
+
 
 def fetch_energy_data_from_openhab(openhab_item_url, start_time, end_time):
     """
@@ -393,6 +486,7 @@ def fetch_energy_data_from_openhab(openhab_item_url, start_time, end_time):
     response = requests.get(openhab_item_url, params=params, timeout=10)
     response.raise_for_status()
     return response.json()
+
 
 def process_energy_data(data):
     """
@@ -406,6 +500,7 @@ def process_energy_data(data):
         return round(total_energy / count, 4)
     return 0
 
+
 def create_load_profile_from_last_days(tgt_duration, start_time=None):
     """
     Creates a load profile for energy consumption over the last `tgt_duration` hours.
@@ -418,7 +513,7 @@ def create_load_profile_from_last_days(tgt_duration, start_time=None):
 
     """
     if config_manager.config["load"]["source"] == "default":
-        logger.error("[LOAD] using load source default")
+        logger.info("[LOAD] using load source default")
         default_profile = [
             200.0,
             200.0,
@@ -467,12 +562,15 @@ def create_load_profile_from_last_days(tgt_duration, start_time=None):
             300.0,
             300.0,
             300.0,
-            200.0
+            200.0,
         ]
         return default_profile[:tgt_duration]
 
     if config_manager.config["load"]["source"] != "openhab":
-        logger.error("[LOAD] Load source currently not supported.")
+        logger.error(
+            "[LOAD] Load source '%s' currently not supported. Using default.",
+            config_manager.config["load"]["source"],
+        )
         return []
 
     logger.info("[LOAD] Creating load profile from openhab ...")
@@ -515,6 +613,7 @@ def create_load_profile_from_last_days(tgt_duration, start_time=None):
     logger.info("[LOAD] Load profile created successfully.")
     return load_profile
 
+
 # summarize all date
 
 
@@ -540,7 +639,7 @@ def create_optimize_request(api_version="new"):
                 ),
             ),
             "pv_prognose_wh": get_summerized_pv_forecast(EOS_TGT_DURATION),
-            "strompreis_euro_pro_wh": get_prices_for_today_and_tomorrow(
+            "strompreis_euro_pro_wh": get_prices(
                 EOS_TGT_DURATION,
                 datetime.now(time_zone).replace(
                     hour=0, minute=0, second=0, microsecond=0
@@ -551,22 +650,40 @@ def create_optimize_request(api_version="new"):
     def get_pv_akku_data(api_version="new"):
         if api_version != "new":
             return {
-                "kapazitaet_wh": 11059,
-                "lade_effizienz": 0.88,
-                "entlade_effizienz": 0.88,
-                "max_ladeleistung_w": 5000,
+                "kapazitaet_wh": config_manager.config["battery"]["capacity_wh"],
+                "lade_effizienz": config_manager.config["battery"]["charge_efficiency"],
+                "entlade_effizienz": config_manager.config["battery"][
+                    "discharge_efficiency"
+                ],
+                "max_ladeleistung_w": config_manager.config["battery"][
+                    "max_charge_power_w"
+                ],
                 "start_soc_prozent": battery_get_current_soc(),
-                "min_soc_prozent": 5,
-                "max_soc_prozent": 100,
+                "min_soc_prozent": config_manager.config["battery"][
+                    "min_soc_percentage"
+                ],
+                "max_soc_prozent": config_manager.config["battery"][
+                    "max_soc_percentage"
+                ],
             }
         return {
-            "capacity_wh": 11059,
-            "charging_efficiency": 0.88,
-            "discharging_efficiency": 0.88,
-            "max_charge_power_w": 5000,
+            "capacity_wh": config_manager.config["battery"]["capacity_wh"],
+            "charging_efficiency": config_manager.config["battery"][
+                "charge_efficiency"
+            ],
+            "discharging_efficiency": config_manager.config["battery"][
+                "discharge_efficiency"
+            ],
+            "max_charge_power_w": config_manager.config["battery"][
+                "max_charge_power_w"
+            ],
             "initial_soc_percentage": battery_get_current_soc(),
-            "min_soc_percentage": 0,
-            "max_soc_percentage": 100,
+            "min_soc_percentage": config_manager.config["battery"][
+                "min_soc_percentage"
+            ],
+            "max_soc_percentage": config_manager.config["battery"][
+                "max_soc_percentage"
+            ],
         }
 
     def get_wechselrichter_data(api_version="new"):
@@ -626,6 +743,7 @@ def create_optimize_request(api_version="new"):
     return payload
 
 
+# web server
 app = Flask(__name__)
 
 
@@ -657,10 +775,24 @@ def get_optimize_response():
     """
     Returns the content of the 'optimize_response.json' file as a JSON response.
     """
-    with open(
-        base_path + "/json/optimize_response.json", "r", encoding="utf-8"
-    ) as json_file:
-        return json_file.read()
+    try:
+        with open(
+            base_path + "/json/optimize_response.json", "r", encoding="utf-8"
+        ) as json_file:
+            return json_file.read()
+    except FileNotFoundError:
+        default_response = {
+            "ac_charge": [],
+            "dc_charge": [],
+            "discharge_allowed": [],
+            "eautocharge_hours_float": None,
+            "result": {},
+            "eauto_obj": {},
+            "start_solution": [],
+            "washingstart": 0,
+            "timestamp": datetime.now(time_zone).isoformat(),
+        }
+        return json.dumps(default_response)
 
 
 if __name__ == "__main__":
@@ -682,8 +814,10 @@ if __name__ == "__main__":
     # # persist and update config
     # eos_save_config_to_config_file()
 
-    # print(get_prices_for_today_and_tomorrow(EOS_TGT_DURATION,
-    # datetime.now(time_zone).replace(hour=0, minute=0, second=0, microsecond=0)))
+    # print(get_prices(
+    #         EOS_TGT_DURATION,
+    #         datetime.now(time_zone).replace(hour=0, minute=0, second=0, microsecond=0),
+    #     ))
 
     # test = get_summerized_pv_forecast(EOS_TGT_DURATION)
     # print(test)

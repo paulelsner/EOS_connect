@@ -1,7 +1,7 @@
 /.mypy_cache
 /.vscode
 /src/__pycache__
-src/config.yaml.bak
+src/config.bak.yaml
 src/config.yaml
 src/json/optimize_request.json
 src/json/optimize_response.json

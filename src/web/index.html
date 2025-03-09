@@ -427,17 +427,19 @@
             chartInstance.data.labels = Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length }, (_, i) => `${(currentHour + i) % 24}:00`);
             chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"];
             chartInstance.data.datasets[1].data = data_request["ems"]["pv_prognose_wh"].slice(currentHour).concat(data_request["ems"]["pv_prognose_wh"].slice(24, 48));
-            chartInstance.data.datasets[2].data = data_response["result"]["Netzbezug_Wh_pro_Stunde"];
-            chartInstance.data.datasets[3].data = data_response["result"]["akku_soc_pro_stunde"];
-            chartInstance.data.datasets[4].data = data_response["result"]["Kosten_Euro_pro_Stunde"].slice(0, data_response["result"]["Kosten_Euro_pro_Stunde"].length);
-            chartInstance.data.datasets[5].data = data_response["result"]["Electricity_price"].map(value => value * 1000).slice(0, data_response["result"]["Electricity_price"].length);
-            chartInstance.data.datasets[6].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));
-            chartInstance.data.datasets[7].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48));
+            chartInstance.data.datasets[2].data = data_response["result"]["Netzbezug_Wh_pro_Stunde"].map((value, index) => {
+                const acChargeValue = data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
+                return value - acChargeValue[index];
+            });
+            chartInstance.data.datasets[3].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
+            chartInstance.data.datasets[4].data = data_response["result"]["akku_soc_pro_stunde"];
+            chartInstance.data.datasets[5].data = data_response["result"]["Kosten_Euro_pro_Stunde"].slice(0, data_response["result"]["Kosten_Euro_pro_Stunde"].length);
+            chartInstance.data.datasets[6].data = data_response["result"]["Electricity_price"].map(value => value * 1000).slice(0, data_response["result"]["Electricity_price"].length);
+            chartInstance.data.datasets[7].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));            
             chartInstance.update('none'); // Update without animation
         }
 
         function createChart(data_request, data_response) {
-            console.log(data_response["result"]["Last_Wh_pro_Stunde"].length);
             const ctx = document.getElementById('energyChart').getContext('2d');
             chartInstance = new Chart(ctx, {
                 type: 'bar',
@@ -464,9 +466,21 @@
                         },
                         {
                             label: 'Grid',
-                            data: data_response["result"]["Netzbezug_Wh_pro_Stunde"],
+                            data: data_response["result"]["Netzbezug_Wh_pro_Stunde"].map((value, index) => {
+                                const acChargeValue = data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
+                                return value - acChargeValue[index];
+                            }),
                             backgroundColor: 'rgba(128, 128, 128, 0.6)',
                             borderColor: 'rgba(211, 211, 211, 1)',
+                            borderWidth: 1,
+                            stack: 'combined'
+                        },
+                        {
+                            // data_request["pv_akku"]["max_ladeleistung_w"] * data_response["ac_charge"] = energy to charge
+                            label: 'AC Charge',
+                            data: data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]),
+                            backgroundColor: 'red', // violet
+                            borderColor: 'lightred',                            
                             borderWidth: 1,
                             stack: 'combined'
                         },
@@ -509,18 +523,6 @@
                             borderWidth: 0,
                             fill: true,
                             yAxisID: 'y3'
-                        },
-                        {
-                            label: 'AC Charge',
-                            data: data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)),
-                            type: 'bar',
-                            borderColor: 'lighthred',
-                            backgroundColor: 'red', // violet
-                            borderWidth: 1,
-                            yAxisID: 'y3',
-                            barPercentage: 0.5,
-                            categoryPercentage: 0.5,
-                            hidden: true // Deactivated by default
                         }
                     ]
                 },
@@ -576,6 +578,25 @@
                                 }
                             }
                         },
+                        y3: {
+                            beginAtZero: true,
+                            position: 'right',
+                            display: false,  // Hide y3 axis
+                            title: {
+                                display: true,
+                                text: 'AC Charge',
+                                color: 'darkgray'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: 'darkgray',
+                                callback: function (value) {
+                                    return value.toFixed(2);
+                                }
+                            }
+                        },
                         x: {
                             grid: {
                                 color: 'rgb(54, 54, 54)'
@@ -605,6 +626,7 @@
             console.log("------- showBatteryCharge -------");
             var discharge_allowed = data_response["discharge_allowed"];
             var ac_charge = data_response["ac_charge"];
+            ac_charge = ac_charge.map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
             var priceData = data_response["result"]["Electricity_price"];
             var expenseData = data_response["result"]["Kosten_Euro_pro_Stunde"];
 
@@ -642,14 +664,14 @@
 
                 var cell3 = document.createElement('div');
                 cell3.className = 'table-cell';
-                cell3.innerText = ac_charge[(index + new Date().getHours())] === 0 ? "" : ac_charge[(index + new Date().getHours())].toFixed(3);
+                cell3.innerText = ac_charge[(index + new Date().getHours())] === 0 ? "" : ac_charge[(index + new Date().getHours())].toFixed(0) + " Wh";
                 cell3.style.textAlign = "center";
                 cell3.style.backgroundColor = ac_charge[(index + new Date().getHours())] ? "darkred" : "";
                 row.appendChild(cell3);
 
                 var cell4 = document.createElement('div');
                 cell4.className = 'table-cell';
-                cell4.innerHTML = (priceData[index] * 100000).toFixed(1);
+                cell4.innerHTML = (priceData[index] * 100000).toFixed(1) + " ct/kWh";
                 cell4.style.textAlign = "center";
                 row.appendChild(cell4);
 

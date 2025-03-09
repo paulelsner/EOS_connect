@@ -9,9 +9,9 @@ import time
 import logging
 import json
 from threading import Thread
+import sched
 import pytz
 import requests
-import sched
 import pandas as pd
 import numpy as np
 from flask import Flask, render_template_string
@@ -65,15 +65,6 @@ EOS_API_PUT_LOAD_SERIES = {
 }  # ?name=Household
 EOS_API_OPTIMIZE = f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/optimize"
 
-# EOS_API_GET_PV_FORECAST = (
-#     "https://api.akkudoktor.net/forecast?lat=" + str(config_manager.config["pv_forecast"]["lat"]) +
-#     "&lon=" + str(config_manager.config["pv_forecast"]["lon"]) +
-#     "&azimuth=" + str(config_manager.config["pv_forecast"]["azimuth"]) +
-#     "&tilt=" + str(config_manager.config["pv_forecast"]["tilt"]) +
-#     "&power=" + str(config_manager.config["pv_forecast"]["power"]) +
-#     "&powerInverter=" + str(config_manager.config["pv_forecast"]["powerInverter"]) +
-#     "&inverterEfficiency=" + str(config_manager.config["pv_forecast"]["inverterEfficiency"])
-# )
 EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
 TIBBER_API = "https://api.tibber.com/v1-beta/gql"
 
@@ -116,7 +107,7 @@ def send_measurement_to_eos(dataframe):
         )
 
 
-def eos_set_optimize_request(payload, timeout=90):
+def eos_set_optimize_request(payload, timeout=120):
     """
     Send the optimize request to the EOS server.
     """
@@ -132,27 +123,6 @@ def eos_set_optimize_request(payload, timeout=90):
 
 
 # getting data
-
-
-def get_data_from_web_service_direct(item):
-    """
-    Fetches the state of a specified item from a web service.
-
-    Args:
-        item (str): The name of the item to fetch from the web service.
-
-    Returns:
-        str: The state of the specified item.
-
-    Raises:
-        requests.exceptions.RequestException: If there is an issue with the HTTP request.
-        KeyError: If the 'state' key is not found in the response JSON.
-    """
-    url = "http://192.168.1.30:8080/rest/items/" + item
-    logger.debug("[Main] Fetching data from %s", url)
-    response = requests.get(url, timeout=10)
-    data = response.json()
-    return data["state"]
 
 
 def get_prices_for_today_and_tomorrow(tgt_duration, start_time=None):
@@ -213,8 +183,7 @@ def get_prices_for_today_and_tomorrow(tgt_duration, start_time=None):
             "tomorrow"
         ]
     )
-    # today_prices = get_data_from_web_service_direct("TibberAPITodayPrices")
-    # tomorrow_prices = get_data_from_web_service_direct("TibberAPITomorrowPrices")
+
     today_prices_json = json.loads(today_prices)
     tomorrow_prices_json = json.loads(tomorrow_prices)
     prices = []
@@ -251,7 +220,9 @@ def create_forecast_request(pv_config_name):
     """
     horizont_string = ""
     if config_manager.config["pv_forecast"][pv_config_name]["horizont"] != "":
-        horizont_string = "&horizont=" + str(config_manager.config["pv_forecast"][pv_config_name]["horizont"])
+        horizont_string = "&horizont=" + str(
+            config_manager.config["pv_forecast"][pv_config_name]["horizont"]
+        )
     return (
         EOS_API_GET_PV_FORECAST
         + "?lat="
@@ -282,7 +253,7 @@ def get_pv_forecast(tgt_value="power", pv_config_name="default", tgt_duration=24
     if pv_config_name not in config_manager.config["pv_forecast"]:
         # take the first entry if the config name is not found
         pv_config_name = list(config_manager.config["pv_forecast"].keys())[0]
-        print("pv_config_name not found in config, using default: " + pv_config_name)
+        # print("pv_config_name not found in config, using first pv config entry: " + pv_config_name)
 
     forecast_request_payload = create_forecast_request(pv_config_name)
     # print(forecast_request_payload)
@@ -321,8 +292,8 @@ def get_summerized_pv_forecast(tgt_duration=24):
     for config_entry in config_manager.config["pv_forecast"]:
         # logger.debug("[FORECAST] fetching forecast for %s", config_entry)
         forecast = get_pv_forecast("power", config_entry, tgt_duration)
-        print("values for " + config_entry+ " -> ")
-        print(forecast)
+        # print("values for " + config_entry+ " -> ")
+        # print(forecast)
         if not forecast_values:
             forecast_values = forecast
         else:
@@ -334,7 +305,17 @@ def battery_get_current_soc():
     """
     Fetch the current state of charge (SOC) of the battery from OpenHAB.
     """
-    url = "http://192.168.1.30:8080/rest/items/Fronius_Inverter_SOC"
+    # default value for start SOC = 5
+    if config_manager.config["battery"]["source"] == "default":
+        logger.debug("[BATTERY] Battery source set default with SOC = 5%")
+        return 5
+    if config_manager.config["battery"]["source"] == "homeassistant":
+        logger.error("[BATTERY] Battery source currently not supported. Using default.")
+        return 5
+    if config_manager.config["battery"]["source"] != "openhab":
+        logger.error("[BATTERY] Battery source currently not supported. Using default.")
+        return 5
+    url = config_manager.config["battery"]["url"]
     response = requests.get(url, timeout=6)
     response.raise_for_status()
     data = response.json()
@@ -400,11 +381,9 @@ def create_dataframe(profile):
             df.loc[date, "Household"] = energy
     return df
 
-
 # get load data from url persistance source
 
-
-def fetch_energy_data(openhab_item_url, start_time, end_time):
+def fetch_energy_data_from_openhab(openhab_item_url, start_time, end_time):
     """
     Fetch energy data from the specified OpenHAB item URL within the given time range.
     """
@@ -414,7 +393,6 @@ def fetch_energy_data(openhab_item_url, start_time, end_time):
     response = requests.get(openhab_item_url, params=params, timeout=10)
     response.raise_for_status()
     return response.json()
-
 
 def process_energy_data(data):
     """
@@ -428,7 +406,6 @@ def process_energy_data(data):
         return round(total_energy / count, 4)
     return 0
 
-
 def create_load_profile_from_last_days(tgt_duration, start_time=None):
     """
     Creates a load profile for energy consumption over the last `tgt_duration` hours.
@@ -440,10 +417,65 @@ def create_load_profile_from_last_days(tgt_duration, start_time=None):
     for each hour.
 
     """
+    if config_manager.config["load"]["source"] == "default":
+        logger.error("[LOAD] using load source default")
+        default_profile = [
+            200.0,
+            200.0,
+            200.0,
+            200.0,
+            200.0,
+            200.0,
+            300.0,
+            300.0,
+            300.0,
+            300.0,
+            300.0,
+            400.0,
+            400.0,
+            400.0,
+            300.0,
+            300.0,
+            200.0,
+            300.0,
+            400.0,
+            400.0,
+            300.0,
+            300.0,
+            300.0,
+            200.0,
+            200.0,
+            200.0,
+            200.0,
+            200.0,
+            200.0,
+            200.0,
+            300.0,
+            300.0,
+            300.0,
+            300.0,
+            300.0,
+            400.0,
+            400.0,
+            400.0,
+            300.0,
+            300.0,
+            200.0,
+            300.0,
+            400.0,
+            400.0,
+            300.0,
+            300.0,
+            300.0,
+            200.0
+        ]
+        return default_profile[:tgt_duration]
+
     if config_manager.config["load"]["source"] != "openhab":
         logger.error("[LOAD] Load source currently not supported.")
         return []
-    logger.info("[LOAD] Creating load profile...")
+
+    logger.info("[LOAD] Creating load profile from openhab ...")
     current_time = datetime.now(time_zone).replace(minute=0, second=0, microsecond=0)
     if start_time is None:
         start_time = current_time.replace(
@@ -461,7 +493,7 @@ def create_load_profile_from_last_days(tgt_duration, start_time=None):
         next_hour = current_hour + timedelta(hours=1)
         # logger.debug("[LOAD] Fetching data for %s to %s",current_hour, next_hour)
 
-        energy_data = fetch_energy_data(
+        energy_data = fetch_energy_data_from_openhab(
             config_manager.config["load"]["url"], current_hour, next_hour
         )
         energy = process_energy_data(energy_data) * -1
@@ -470,6 +502,7 @@ def create_load_profile_from_last_days(tgt_duration, start_time=None):
             continue
 
         energy_sum = energy
+        # easy workaround to prevent car charging energy data in the standard load profile
         if energy_sum > 10800:
             energy_sum = energy_sum - 10800
         elif energy_sum > 9200:
@@ -481,7 +514,6 @@ def create_load_profile_from_last_days(tgt_duration, start_time=None):
         current_hour += timedelta(hours=1)
     logger.info("[LOAD] Load profile created successfully.")
     return load_profile
-
 
 # summarize all date
 
@@ -573,7 +605,9 @@ def create_optimize_request(api_version="new"):
             "inverter": get_wechselrichter_data(api_version),
             "eauto": get_eauto_data(api_version),
             "dishwasher": get_dishwasher_data(),
-            "temperature_forecast": get_pv_forecast(tgt_value="temperature", tgt_duration=EOS_TGT_DURATION),
+            "temperature_forecast": get_pv_forecast(
+                tgt_value="temperature", tgt_duration=EOS_TGT_DURATION
+            ),
             "start_solution": None,
         }
     else:
@@ -583,7 +617,9 @@ def create_optimize_request(api_version="new"):
             "wechselrichter": get_wechselrichter_data(),
             "eauto": get_eauto_data(),
             "dishwasher": get_dishwasher_data(),
-            "temperature_forecast": get_pv_forecast(tgt_value="temperature", tgt_duration=EOS_TGT_DURATION),
+            "temperature_forecast": get_pv_forecast(
+                tgt_value="temperature", tgt_duration=EOS_TGT_DURATION
+            ),
             "start_solution": None,
         }
 
@@ -656,8 +692,17 @@ if __name__ == "__main__":
     # print(forecast)
 
     # json_optimize_input = create_optimize_request("old")
+
     # with open(base_path + "/json/optimize_request.json", "w", encoding="utf-8") as file:
     #     json.dump(json_optimize_input, file, indent=4)
+
+    # optimized_response = eos_set_optimize_request(json_optimize_input)
+    # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
+
+    # with open(
+    #     base_path + "/json/optimize_response.json", "w", encoding="utf-8"
+    # ) as file:
+    #     json.dump(optimized_response, file, indent=4)
 
     # sys.exit()
 

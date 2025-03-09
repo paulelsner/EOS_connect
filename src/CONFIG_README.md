@@ -6,7 +6,7 @@ This document provides an overview of the configuration settings for the applica
 
 ### Load Configuration
 
-- **load.source**: Data source for load power. Possible values: `openhab`, `homeassistant`.
+- **load.source**: Data source for load power. Possible values: `openhab`, `homeassistant`, `default` (default will using a primitive static consumption scheme).
 - **load.url**: URL for load power data.
 
 ### EOS Server Configuration

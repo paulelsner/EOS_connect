@@ -41,8 +41,8 @@ class ConfigManager:
             {
                 "load": CommentedMap(
                     {
-                        "source": "openhab",  # data source for load power
-                        "url": "http://192.168.1.30:8080/rest/persistence/items/Fronius_Load_Power",
+                        "source": "default",  # data source for load power
+                        "url": "http://<ip>:8080/rest/persistence/items/<load_item>",
                     }
                 ),
                 "eos": CommentedMap(
@@ -55,6 +55,12 @@ class ConfigManager:
                     {
                         "source": "tibber",  # data source for electricity price
                         "token": "tibberBearerToken",  # token for electricity price
+                    }
+                ),
+                "battery": CommentedMap(
+                    {
+                        "source": "openhab",  # data source for battery soc
+                        "url": "http://<ip>:8080:8080/rest/items/<soc_item>/state",
                     }
                 ),
                 "pv_forecast": CommentedMap(
@@ -106,7 +112,15 @@ class ConfigManager:
         config["price"].yaml_set_comment_before_after_key(
             "token", before="Token for electricity price"
         )
-
+        
+        config.yaml_set_comment_before_after_key("battery", before="battery configuration")
+        config["load"].yaml_set_comment_before_after_key(
+            "source", before="Data source for battery soc - openhab, homeassistant, default"
+        )
+        config["load"].yaml_set_comment_before_after_key(
+            "url", before="URL for battery soc"
+        )
+        
         config["pv_forecast"].yaml_set_comment_before_after_key(
             "default", before="Default PV forecast configuration"
         )

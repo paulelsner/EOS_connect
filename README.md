@@ -7,7 +7,9 @@ Currently, the project is designed to fetch energy data from OpenHAB, process it
 Next step:
 Using the feedback to interactively control a FRONIUS inverter and battery charging system.
 
-*Hint: current usage approved with commit https://github.com/Akkudoktor-EOS/EOS/tree/e22388b7537af545a53d6cebef35d98a7ee30e1b (old API)*
+*Hint 1: usage approved with latest EOS (new API) - default*
+
+*Hint 2: usage approved with commit https://github.com/Akkudoktor-EOS/EOS/tree/e22388b7537af545a53d6cebef35d98a7ee30e1b (old API) - have to be changed at function create_optimize_request("old")*
 
 ## Project Structure
 

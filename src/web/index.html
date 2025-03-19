@@ -324,6 +324,7 @@
         </div>
     </div>
     <script>
+        let max_charge_power_w = 0;
 
         async function fetchCurrentGridPower() {
             const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Grid_Power');
@@ -428,10 +429,10 @@
             chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"];
             chartInstance.data.datasets[1].data = data_request["ems"]["pv_prognose_wh"].slice(currentHour).concat(data_request["ems"]["pv_prognose_wh"].slice(24, 48));
             chartInstance.data.datasets[2].data = data_response["result"]["Netzbezug_Wh_pro_Stunde"].map((value, index) => {
-                const acChargeValue = data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
+                const acChargeValue = data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * max_charge_power_w);
                 return value - acChargeValue[index];
             });
-            chartInstance.data.datasets[3].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
+            chartInstance.data.datasets[3].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * max_charge_power_w);
             chartInstance.data.datasets[4].data = data_response["result"]["akku_soc_pro_stunde"];
             chartInstance.data.datasets[5].data = data_response["result"]["Kosten_Euro_pro_Stunde"].slice(0, data_response["result"]["Kosten_Euro_pro_Stunde"].length);
             chartInstance.data.datasets[6].data = data_response["result"]["Electricity_price"].map(value => value * 1000).slice(0, data_response["result"]["Electricity_price"].length);
@@ -467,7 +468,7 @@
                         {
                             label: 'Grid',
                             data: data_response["result"]["Netzbezug_Wh_pro_Stunde"].map((value, index) => {
-                                const acChargeValue = data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
+                                const acChargeValue = data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * max_charge_power_w);
                                 return value - acChargeValue[index];
                             }),
                             backgroundColor: 'rgba(128, 128, 128, 0.6)',
@@ -478,9 +479,9 @@
                         {
                             // data_request["pv_akku"]["max_ladeleistung_w"] * data_response["ac_charge"] = energy to charge
                             label: 'AC Charge',
-                            data: data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]),
-                            backgroundColor: 'red', // violet
-                            borderColor: 'lightred',                            
+                            data: data_response["ac_charge"].slice(new Date().getHours()).concat(data_response["ac_charge"].slice(24, 48)).map((value, index) => value * max_charge_power_w),
+                            backgroundColor: 'darkred', // violet
+                            borderColor: 'rgba(255, 0, 0, 0.2)',
                             borderWidth: 1,
                             stack: 'combined'
                         },
@@ -626,7 +627,7 @@
             console.log("------- showBatteryCharge -------");
             var discharge_allowed = data_response["discharge_allowed"];
             var ac_charge = data_response["ac_charge"];
-            ac_charge = ac_charge.map((value, index) => value * data_request["pv_akku"]["max_ladeleistung_w"]);
+            ac_charge = ac_charge.map((value, index) => value * max_charge_power_w);
             var priceData = data_response["result"]["Electricity_price"];
             var expenseData = data_response["result"]["Kosten_Euro_pro_Stunde"];
 
@@ -704,6 +705,8 @@
         async function init() {
             // base chart
             const data_request = await fetchChartData("optimize_request.json");
+            // max_charge_power_w according to optimize_request api version
+            max_charge_power_w = data_request["pv_akku"] && data_request["pv_akku"].hasOwnProperty("max_ladeleistung_w") ? data_request["pv_akku"]["max_ladeleistung_w"] : data_request["pv_akku"] ? data_request["pv_akku"]["max_charge_power_w"] : 0;
             const data_response = await fetchChartData("optimize_response.json");            
             if (chartInstance){ // && batteryChartInstance) {
                 updateChart(data_request,data_response);

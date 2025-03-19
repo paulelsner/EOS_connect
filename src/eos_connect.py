@@ -115,12 +115,20 @@ def eos_set_optimize_request(payload, timeout=120):
     headers = {"accept": "application/json", "Content-Type": "application/json"}
     request_url = EOS_API_OPTIMIZE + "?start_hour=" + str(datetime.now(time_zone).hour)
     logger.info("[OPTIMIZE] request optimization with: %s", request_url)
-    response = requests.post(
-        request_url, headers=headers, json=payload, timeout=timeout
-    )
-    response.raise_for_status()
-    logger.info("[Main] Optimize response retrieved successfully.")
-    return response.json()
+    try:
+        response = requests.post(
+            request_url, headers=headers, json=payload, timeout=timeout
+        )
+        response.raise_for_status()
+        logger.info("[Main] Optimize response retrieved successfully.")
+        return response.json()
+    except requests.exceptions.Timeout:
+        logger.error("[OPTIMIZE] Request timed out after %s seconds", timeout)
+        return {"error": "Request timed out"}
+    except requests.exceptions.RequestException as e:
+        logger.error("[OPTIMIZE] Request failed: %s", e)
+        print(response.json())
+        return {"error": str(e)}
 
 
 # getting data
@@ -185,9 +193,16 @@ def get_prices_from_akkudoktor(tgt_duration, start_time=None):
         + (start_time + timedelta(days=1)).strftime("%Y-%m-%d")
     )
     logger.debug("[PRICES] Requesting prices from akkudoktor: %s", request_url)
-    response = requests.get(request_url, timeout=10)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        response = requests.get(request_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.Timeout:
+        logger.error("[PRICES] Request timed out while fetching prices from akkudoktor.")
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error("[PRICES] Request failed while fetching prices from akkudoktor: %s", e)
+        return []
 
     prices = []
     for price in data["values"]:
@@ -254,9 +269,17 @@ def get_prices_from_tibber(tgt_duration, start_time=None):
         }
     }
     """
-    response = requests.post(
-        TIBBER_API, headers=headers, json={"query": query}, timeout=10
-    )
+    try:
+        response = requests.post(
+            TIBBER_API, headers=headers, json={"query": query}, timeout=10
+        )
+        response.raise_for_status()
+    except requests.exceptions.Timeout:
+        logger.error("[PRICES] Request timed out while fetching prices from Tibber.")
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error("[PRICES] Request failed while fetching prices from Tibber: %s", e)
+        return []
 
     response.raise_for_status()
     data = response.json()
@@ -348,10 +371,17 @@ def get_pv_forecast(tgt_value="power", pv_config_name="default", tgt_duration=24
 
     forecast_request_payload = create_forecast_request(pv_config_name)
     # print(forecast_request_payload)
-    response = requests.get(forecast_request_payload, timeout=10)
-    response.raise_for_status()
-    day_values = response.json()
-    day_values = day_values["values"]
+    try:
+        response = requests.get(forecast_request_payload, timeout=10)
+        response.raise_for_status()
+        day_values = response.json()
+        day_values = day_values["values"]
+    except requests.exceptions.Timeout:
+        logger.error("[FORECAST] Request timed out while fetching PV forecast.")
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error("[FORECAST] Request failed while fetching PV forecast: %s", e)
+        return []
 
     forecast_values = []
     # current_time = datetime.now(time_zone).astimezone()
@@ -407,9 +437,16 @@ def battery_get_current_soc():
         logger.error("[BATTERY] Battery source currently not supported. Using default.")
         return 5
     url = config_manager.config["battery"]["url"]
-    response = requests.get(url, timeout=6)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        response = requests.get(url, timeout=6)
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.Timeout:
+        logger.error("[BATTERY] Request timed out while fetching battery SOC.")
+        return 5  # Default SOC value in case of timeout
+    except requests.exceptions.RequestException as e:
+        logger.error("[BATTERY] Request failed while fetching battery SOC: %s", e)
+        return 5  # Default SOC value in case of request failure
     soc = float(data["state"]) * 100
     return round(soc)
 
@@ -427,9 +464,14 @@ def eos_update_config_from_config_file():
     """
     Update the current configuration from the configuration file on the EOS server.
     """
-    response = requests.post(EOS_API_POST_UPDATE_CONFIG_FROM_CONFIG_FILE, timeout=10)
-    response.raise_for_status()
-    logger.info("[EOS_CONFIG] Config updated from config file successfully.")
+    try:
+        response = requests.post(EOS_API_POST_UPDATE_CONFIG_FROM_CONFIG_FILE, timeout=10)
+        response.raise_for_status()
+        logger.info("[EOS_CONFIG] Config updated from config file successfully.")
+    except requests.exceptions.Timeout:
+        logger.error("[EOS_CONFIG] Request timed out while updating config from config file.")
+    except requests.exceptions.RequestException as e:
+        logger.error("[EOS_CONFIG] Request failed while updating config from config file: %s", e)
 
 
 # function that creates a pandas dataframe with a DateTimeIndex with the given average profile
@@ -483,9 +525,16 @@ def fetch_energy_data_from_openhab(openhab_item_url, start_time, end_time):
     if openhab_item_url == "":
         return {"data": []}
     params = {"starttime": start_time.isoformat(), "endtime": end_time.isoformat()}
-    response = requests.get(openhab_item_url, params=params, timeout=10)
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = requests.get(openhab_item_url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.Timeout:
+        logger.error("[OPENHAB] Request timed out while fetching energy data.")
+        return {"data": []}
+    except requests.exceptions.RequestException as e:
+        logger.error("[OPENHAB] Request failed while fetching energy data: %s", e)
+        return {"data": []}
 
 
 def process_energy_data(data):
@@ -630,16 +679,19 @@ def create_optimize_request(api_version="new"):
 
     def get_ems_data():
         return {
-            "preis_euro_pro_wh_akku": 0.0,
-            "einspeiseverguetung_euro_pro_wh": 0.00000001,
-            "gesamtlast": create_load_profile_from_last_days(
+            "pv_prognose_wh": get_summerized_pv_forecast(EOS_TGT_DURATION),
+            "strompreis_euro_pro_wh": get_prices(
                 EOS_TGT_DURATION,
                 datetime.now(time_zone).replace(
                     hour=0, minute=0, second=0, microsecond=0
                 ),
             ),
-            "pv_prognose_wh": get_summerized_pv_forecast(EOS_TGT_DURATION),
-            "strompreis_euro_pro_wh": get_prices(
+            "einspeiseverguetung_euro_pro_wh": [
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+            ],
+            "preis_euro_pro_wh_akku": 0,
+            "gesamtlast": create_load_profile_from_last_days(
                 EOS_TGT_DURATION,
                 datetime.now(time_zone).replace(
                     hour=0, minute=0, second=0, microsecond=0
@@ -731,7 +783,7 @@ def create_optimize_request(api_version="new"):
         payload = {
             "ems": get_ems_data(),
             "pv_akku": get_pv_akku_data(),
-            "wechselrichter": get_wechselrichter_data(),
+            "inverter": get_wechselrichter_data(),
             "eauto": get_eauto_data(),
             "dishwasher": get_dishwasher_data(),
             "temperature_forecast": get_pv_forecast(
@@ -822,14 +874,7 @@ if __name__ == "__main__":
     # test = get_summerized_pv_forecast(EOS_TGT_DURATION)
     # print(test)
 
-    # forecast = get_pv_forecast("power", "Garage_West", 24)
-    # print(forecast)
-
-    # json_optimize_input = create_optimize_request("old")
-
-    # with open(base_path + "/json/optimize_request.json", "w", encoding="utf-8") as file:
-    #     json.dump(json_optimize_input, file, indent=4)
-
+    # json_optimize_input = create_optimize_request()
     # optimized_response = eos_set_optimize_request(json_optimize_input)
     # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
 
@@ -868,7 +913,7 @@ if __name__ == "__main__":
         def run_optimization_event(sc):
             logger.info("[Main] start new run")
             # create optimize request
-            json_optimize_input = create_optimize_request("old")
+            json_optimize_input = create_optimize_request()
 
             with open(
                 base_path + "/json/optimize_request.json", "w", encoding="utf-8"

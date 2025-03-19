@@ -1,6 +1,7 @@
 # Configuration Guide
 
 This document provides an overview of the configuration settings for the application. The configuration settings are stored in a `config.yaml` file.
+A default config file will be created with the first start, if there is no config.yaml in folder 'src'.
 
 ## Configuration Sections
 
@@ -75,9 +76,9 @@ If the configuration file does not exist, the application will create one with d
 ## Full Config Example
 
 ```yaml
-oad:
-  source: default  # Data source for load power - openhab or homeassistant
-  url: http://<ip>:8080/rest/persistence/items/<load_item>  # URL for load power data
+load:
+  source: default  # Data source for load power - openhab, homeassistant, default
+  url: http://<ip>:8080/rest/persistence/items/<load_item>  # URL for load power data if openhab or homeassistant
 
 eos:
   server: 192.168.1.94  # Default EOS server address
@@ -89,7 +90,7 @@ price:
 
 battery:
   source: default  # Data source for battery SOC - openhab, homeassistant, default
-  url: http://<ip>:8080:8080/rest/items/<soc_item>/state  # URL for battery SOC
+  url: http://<ip>:8080/rest/items/<soc_item>/state  # URL for battery SOC if openhab or homeassistant
   capacity_wh: 11059  # Battery capacity in Wh
   charge_efficiency: 0.88  # Efficiency for charging the battery
   discharge_efficiency: 0.88  # Efficiency for discharging the battery

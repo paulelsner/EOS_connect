@@ -23,7 +23,7 @@ jobs:
       with:
         name: eos_connect_v0.${{github.run_number}}
         path: |
-          eos_connect_v0.${{github.run_number}}.tar
+          eos_connect_v0.${{github.run_number}}
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
@@ -33,4 +33,4 @@ jobs:
         prerelease: false
         title: "eos_connect dockerimage v0.${{github.run_number}}"
         files: |
-          eos_connect_v0.${{github.run_number}}.tar
+          eos_connect_v0.${{github.run_number}}

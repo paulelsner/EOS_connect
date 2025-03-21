@@ -15,20 +15,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag eos_connect_v0.$(date +%s)
+      run: docker build . --file Dockerfile --tag eos_connect_v0.${{github.run_number}}
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: eos_connect_v0.$(date +%s)
+        name: eos_connect_v0.${{github.run_number}}
         path: |
-          docker.io/library/eos_connect_v0.$(date +%s)
+          docker.io/library/eos_connect_v0.${{github.run_number}}
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        #automatic_release_tag: "v0.":$(date +%s)
+        automatic_release_tag: "v0.${{github.run_number}}"
         draft: true
         prerelease: false
-        title: "eos_connect dockerimage v0.$(date +%s)"
+        title: "eos_connect dockerimage v0.${{github.run_number}}"
         files: |
-          docker.io/library/eos_connect_v0.$(date +%s)
+          docker.io/library/eos_connect_v0.${{github.run_number}}

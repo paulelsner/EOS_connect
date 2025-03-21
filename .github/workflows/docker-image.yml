@@ -16,12 +16,14 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag eos_connect_v0.${{github.run_number}}
+    - name: Save Docker image to file
+      run: docker save eos_connect_v0.${{github.run_number}} -o eos_connect_v0.${{github.run_number}}
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: eos_connect_v0.${{github.run_number}}
         path: |
-          docker.io/library/eos_connect_v0.${{github.run_number}}
+          eos_connect_v0.${{github.run_number}}.tar
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
@@ -31,4 +33,4 @@ jobs:
         prerelease: false
         title: "eos_connect dockerimage v0.${{github.run_number}}"
         files: |
-          docker.io/library/eos_connect_v0.${{github.run_number}}
+          eos_connect_v0.${{github.run_number}}.tar

@@ -1,21 +1,35 @@
 # EOS Connect
 
-Request optimization at an [EOS](https://github.com/Akkudoktor-EOS) and handle the response to display the result on a dynamic webpage.
+EOS Connect is a tool designed to optimize energy usage by interacting with the EOS system. It fetches energy data, processes it, and displays the results dynamically on a webpage.
 
-Currently, the project is designed to fetch energy data from OpenHAB, process it, and create a load profile. It includes functionalities for interacting with the Tibber API and PV forecast API, managing configurations, and handling energy data.
+## Features
+* Fetches energy data from OpenHAB or HomeAssistant.
+* Processes data to create a load profile.
+* Interacts with the Tibber API and PV forecast API.
+* Manages configurations via a user-friendly config.yaml file.
+* Displays results dynamically on a webpage.
+* Future plans include controlling FRONIUS inverters and battery charging systems interactively.
 
-Next step:
-Using the feedback to interactively control a FRONIUS inverter and battery charging system.
+## Current Status
+This project is in its early stages and is actively being developed and enhanced.
 
-*Hint 1: usage approved with latest EOS (new API) - default*
+### Compatibility Notes:
 
-*Hint 2: usage approved with commit https://github.com/Akkudoktor-EOS/EOS/tree/e22388b7537af545a53d6cebef35d98a7ee30e1b (old API) - have to be changed at function create_optimize_request("old")*
+* Hint 1: Compatible with the latest EOS (new API) by default.
+* Hint 2: For older EOS versions [EOS commit e22388b](https://github.com/Akkudoktor-EOS/EOS/tree/e22388b7537af545a53d6cebef35d98a7ee30e1b), modify the create_optimize_request("old") function.
+
+## Webpage Example
+
+![webpage screenshot](screenshot.PNG)
 
 ## Project Structure
 
 ```
 EOS_connect
+├── doc                             # aditional documentation stuff
 ├── src
+│   ├── interfaces                  # needed interface modules for the different sources
+│   │  ├── load_interface.py        # handles getting load history for openhab and homeassistant
 │   ├── json
 │   │  ├── optimize_request.json    # will be created/ rewritten with every new optimization request
 │   │  ├── optimize_response.json   # will be created/ rewritten after the feedback of EOS
@@ -65,6 +79,12 @@ To run this project, you need to have the following installed:
    ```
    docker-compose up
    ```
+
+or download the latest image at [latest release](https://github.com/ohAnd/eos_connect/releases/latest) and load to your docker environment
+
+[![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/ohand/eos_connect/latest/total)](https://github.com/ohAnd/eos_connect/releases/latest)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ohand/eos_connect/docker-image.yml)
+
 
 ### Running Locally
 

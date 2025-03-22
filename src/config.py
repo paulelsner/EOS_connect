@@ -43,6 +43,8 @@ class ConfigManager:
                     {
                         "source": "default",  # data source for load power
                         "url": "http://<ip>:8080/rest/persistence/items/<load_item>",
+                        "load_sensor": "Load_Power",  # item / entity for load power data
+                        "access_token": "abc123",  # access token for homeassistant
                     }
                 ),
                 "eos": CommentedMap(
@@ -96,7 +98,13 @@ class ConfigManager:
             "source", before="Data source for load power - openhab, homeassistant, default"
         )
         config["load"].yaml_set_comment_before_after_key(
-            "url", before="URL for load power data"
+            "url", before="URL for openhab or homeassistant"
+        )
+        config["load"].yaml_set_comment_before_after_key(
+            "load_sensor", before="item / entity for load power data"
+        )
+        config["load"].yaml_set_comment_before_after_key(
+            "access_token", before="access token for homeassistant (optional)"
         )
         # eos configuration
         config.yaml_set_comment_before_after_key(

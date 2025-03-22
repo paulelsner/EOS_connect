@@ -8,7 +8,9 @@ A default config file will be created with the first start, if there is no confi
 ### Load Configuration
 
 - **load.source**: Data source for load power. Possible values: `openhab`, `homeassistant`, `default` (default will using a primitive static consumption scheme).
-- **load.url**: URL for load power data.
+- **load.url**: URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
+- **load.load_sensor**: item / entity name for load power data (openhab item/ homeassitant sensor) - HINT: expected as persisted negative values
+- **load.access_token**: access token for homeassistant (optional)
 
 ### EOS Server Configuration
 
@@ -78,7 +80,9 @@ If the configuration file does not exist, the application will create one with d
 ```yaml
 load:
   source: default  # Data source for load power - openhab, homeassistant, default
-  url: http://<ip>:8080/rest/persistence/items/<load_item>  # URL for load power data if openhab or homeassistant
+  url: http://<ip>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
+  load_sensor: sensor.load_power # item / entity name for load power data (openhab item/ homeassitant sensor)
+  access_token: 123456abcd # access token for homeassistant (optional)
 
 eos:
   server: 192.168.1.94  # Default EOS server address

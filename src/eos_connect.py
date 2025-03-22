@@ -17,6 +17,7 @@ import numpy as np
 from flask import Flask, render_template_string
 from gevent.pywsgi import WSGIServer
 from config import ConfigManager
+from interfaces.load_interface import LoadInterface
 
 EOS_TGT_DURATION = 48
 EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
@@ -44,6 +45,15 @@ config_manager = ConfigManager(current_dir)
 time_zone = pytz.timezone(config_manager.config["time_zone"])
 EOS_SERVER = config_manager.config["eos"]["server"]
 EOS_SERVER_PORT = config_manager.config["eos"]["port"]
+
+# intialize the load interface
+load_interface = LoadInterface(
+    config_manager.config.get("load", {}).get("source", ""),
+    config_manager.config.get("load", {}).get("url", ""),
+    config_manager.config.get("load", {}).get("load_sensor", ""),
+    config_manager.config.get("load", {}).get("access_token", ""),
+    time_zone,
+)
 
 # *** EOS API URLs ***
 
@@ -108,7 +118,7 @@ def send_measurement_to_eos(dataframe):
         )
 
 
-def eos_set_optimize_request(payload, timeout=120):
+def eos_set_optimize_request(payload, timeout=180):
     """
     Send the optimize request to the EOS server.
     """
@@ -116,11 +126,19 @@ def eos_set_optimize_request(payload, timeout=120):
     request_url = EOS_API_OPTIMIZE + "?start_hour=" + str(datetime.now(time_zone).hour)
     logger.info("[OPTIMIZE] request optimization with: %s", request_url)
     try:
+        start_time = time.time()
         response = requests.post(
             request_url, headers=headers, json=payload, timeout=timeout
         )
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        minutes, seconds = divmod(elapsed_time, 60)
+        logger.info(
+            "[OPTIMIZE] Optimize response retrieved successfully in %d min %.2f sec",
+            int(minutes),
+            seconds,
+        )
         response.raise_for_status()
-        logger.info("[Main] Optimize response retrieved successfully.")
         return response.json()
     except requests.exceptions.Timeout:
         logger.error("[OPTIMIZE] Request timed out after %s seconds", timeout)
@@ -132,8 +150,6 @@ def eos_set_optimize_request(payload, timeout=120):
 
 
 # getting data
-
-
 def get_prices(tgt_duration, start_time=None):
     """
     Retrieve prices based on the target duration and optional start time.
@@ -198,10 +214,14 @@ def get_prices_from_akkudoktor(tgt_duration, start_time=None):
         response.raise_for_status()
         data = response.json()
     except requests.exceptions.Timeout:
-        logger.error("[PRICES] Request timed out while fetching prices from akkudoktor.")
+        logger.error(
+            "[PRICES] Request timed out while fetching prices from akkudoktor."
+        )
         return []
     except requests.exceptions.RequestException as e:
-        logger.error("[PRICES] Request failed while fetching prices from akkudoktor: %s", e)
+        logger.error(
+            "[PRICES] Request failed while fetching prices from akkudoktor: %s", e
+        )
         return []
 
     prices = []
@@ -465,13 +485,19 @@ def eos_update_config_from_config_file():
     Update the current configuration from the configuration file on the EOS server.
     """
     try:
-        response = requests.post(EOS_API_POST_UPDATE_CONFIG_FROM_CONFIG_FILE, timeout=10)
+        response = requests.post(
+            EOS_API_POST_UPDATE_CONFIG_FROM_CONFIG_FILE, timeout=10
+        )
         response.raise_for_status()
         logger.info("[EOS_CONFIG] Config updated from config file successfully.")
     except requests.exceptions.Timeout:
-        logger.error("[EOS_CONFIG] Request timed out while updating config from config file.")
+        logger.error(
+            "[EOS_CONFIG] Request timed out while updating config from config file."
+        )
     except requests.exceptions.RequestException as e:
-        logger.error("[EOS_CONFIG] Request failed while updating config from config file: %s", e)
+        logger.error(
+            "[EOS_CONFIG] Request failed while updating config from config file: %s", e
+        )
 
 
 # function that creates a pandas dataframe with a DateTimeIndex with the given average profile
@@ -515,157 +541,7 @@ def create_dataframe(profile):
     return df
 
 
-# get load data from url persistance source
-
-
-def fetch_energy_data_from_openhab(openhab_item_url, start_time, end_time):
-    """
-    Fetch energy data from the specified OpenHAB item URL within the given time range.
-    """
-    if openhab_item_url == "":
-        return {"data": []}
-    params = {"starttime": start_time.isoformat(), "endtime": end_time.isoformat()}
-    try:
-        response = requests.get(openhab_item_url, params=params, timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.Timeout:
-        logger.error("[OPENHAB] Request timed out while fetching energy data.")
-        return {"data": []}
-    except requests.exceptions.RequestException as e:
-        logger.error("[OPENHAB] Request failed while fetching energy data: %s", e)
-        return {"data": []}
-
-
-def process_energy_data(data):
-    """
-    Processes energy data to calculate the average energy consumption.
-    """
-    total_energy = 0
-    count = len(data["data"])
-    for data_entry in data["data"]:
-        total_energy += float(data_entry["state"])
-    if count > 0:
-        return round(total_energy / count, 4)
-    return 0
-
-
-def create_load_profile_from_last_days(tgt_duration, start_time=None):
-    """
-    Creates a load profile for energy consumption over the last `tgt_duration` hours.
-
-    The function calculates the energy consumption for each hour from the current hour
-    going back `tgt_duration` hours. It fetches energy data for base load and additional loads,
-    processes the data, and sums the energy values. If the total energy for an hour is zero,
-    it skips that hour. The resulting load profile is a list of energy consumption values
-    for each hour.
-
-    """
-    if config_manager.config["load"]["source"] == "default":
-        logger.info("[LOAD] using load source default")
-        default_profile = [
-            200.0,
-            200.0,
-            200.0,
-            200.0,
-            200.0,
-            200.0,
-            300.0,
-            300.0,
-            300.0,
-            300.0,
-            300.0,
-            400.0,
-            400.0,
-            400.0,
-            300.0,
-            300.0,
-            200.0,
-            300.0,
-            400.0,
-            400.0,
-            300.0,
-            300.0,
-            300.0,
-            200.0,
-            200.0,
-            200.0,
-            200.0,
-            200.0,
-            200.0,
-            200.0,
-            300.0,
-            300.0,
-            300.0,
-            300.0,
-            300.0,
-            400.0,
-            400.0,
-            400.0,
-            300.0,
-            300.0,
-            200.0,
-            300.0,
-            400.0,
-            400.0,
-            300.0,
-            300.0,
-            300.0,
-            200.0,
-        ]
-        return default_profile[:tgt_duration]
-
-    if config_manager.config["load"]["source"] != "openhab":
-        logger.error(
-            "[LOAD] Load source '%s' currently not supported. Using default.",
-            config_manager.config["load"]["source"],
-        )
-        return []
-
-    logger.info("[LOAD] Creating load profile from openhab ...")
-    current_time = datetime.now(time_zone).replace(minute=0, second=0, microsecond=0)
-    if start_time is None:
-        start_time = current_time.replace(
-            hour=0, minute=0, second=0, microsecond=0
-        ) - timedelta(hours=tgt_duration)
-        end_time = start_time + timedelta(hours=tgt_duration)
-    else:
-        start_time = current_time - timedelta(hours=tgt_duration)
-        end_time = current_time
-
-    load_profile = []
-    current_hour = start_time
-
-    while current_hour < end_time:
-        next_hour = current_hour + timedelta(hours=1)
-        # logger.debug("[LOAD] Fetching data for %s to %s",current_hour, next_hour)
-
-        energy_data = fetch_energy_data_from_openhab(
-            config_manager.config["load"]["url"], current_hour, next_hour
-        )
-        energy = process_energy_data(energy_data) * -1
-        if energy == 0:
-            current_hour += timedelta(hours=1)
-            continue
-
-        energy_sum = energy
-        # easy workaround to prevent car charging energy data in the standard load profile
-        if energy_sum > 10800:
-            energy_sum = energy_sum - 10800
-        elif energy_sum > 9200:
-            energy_sum = energy_sum - 9200
-
-        load_profile.append(energy_sum)
-        logger.debug("[LOAD] Energy for %s: %s", current_hour, energy_sum)
-
-        current_hour += timedelta(hours=1)
-    logger.info("[LOAD] Load profile created successfully.")
-    return load_profile
-
-
 # summarize all date
-
-
 def create_optimize_request(api_version="new"):
     """
     Creates an optimization request payload for energy management systems.
@@ -687,11 +563,63 @@ def create_optimize_request(api_version="new"):
                 ),
             ),
             "einspeiseverguetung_euro_pro_wh": [
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
             ],
             "preis_euro_pro_wh_akku": 0,
-            "gesamtlast": create_load_profile_from_last_days(
+            # "gesamtlast": get_load_profile(
+            #     EOS_TGT_DURATION,
+            #     datetime.now(time_zone).replace(
+            #         hour=0, minute=0, second=0, microsecond=0
+            #     ),
+            # ),
+            "gesamtlast": load_interface.get_load_profile(
                 EOS_TGT_DURATION,
                 datetime.now(time_zone).replace(
                     hour=0, minute=0, second=0, microsecond=0
@@ -871,8 +799,11 @@ if __name__ == "__main__":
     #         datetime.now(time_zone).replace(hour=0, minute=0, second=0, microsecond=0),
     #     ))
 
-    # test = get_summerized_pv_forecast(EOS_TGT_DURATION)
-    # print(test)
+    # print(load_interface.get_load_profile(
+    #             EOS_TGT_DURATION,
+    #             datetime.now(time_zone).replace(hour=0, minute=0, second=0, microsecond=0)
+    #             )
+    # )
 
     # json_optimize_input = create_optimize_request()
     # optimized_response = eos_set_optimize_request(json_optimize_input)

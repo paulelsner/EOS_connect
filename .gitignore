@@ -5,3 +5,4 @@ src/config.bak.yaml
 src/config.yaml
 src/json/optimize_request.json
 src/json/optimize_response.json
+src/interfaces/__pycache__

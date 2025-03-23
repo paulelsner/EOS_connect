@@ -8,7 +8,7 @@ import logging
 import requests
 
 logger = logging.getLogger("__main__")
-logger.info("[LOAD interface] loading module ")
+logger.info("[LOAD-IF] loading module ")
 
 class LoadInterface:
     """
@@ -38,10 +38,10 @@ class LoadInterface:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.Timeout:
-            logger.error("[OPENHAB] Request timed out while fetching energy data.")
+            logger.error("[LOAD-IF] OPENHAB - Request timed out while fetching energy data.")
             return {"data": []}
         except requests.exceptions.RequestException as e:
-            logger.error("[OPENHAB] Request failed while fetching energy data: %s", e)
+            logger.error("[LOAD-IF] OPENHAB - Request failed while fetching energy data: %s", e)
             return {"data": []}
 
     def fetch_historical_energy_data_from_homeassistant(self, entity_id, start_time, end_time):
@@ -75,22 +75,37 @@ class LoadInterface:
         # print(f'HA Request - End time: {end_time}')
 
         # Make the API request
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
 
-        # Check if the request was successful
-        if response.status_code == 200:
-            historical_data = response.json()
-            # Extract only 'state' and 'last_updated' from the historical data
-            filtered_data = [
-                {"state": entry["state"], "last_updated": entry["last_updated"]}
-                for sublist in historical_data
-                for entry in sublist
-            ]
-            # filtered_data = [entry["state"] for sublist in historical_data for entry in sublist]
-            return filtered_data
-        logger.error('Failed to retrieve historical data: %s', response.status_code)
-        logger.error(response.text)
-        return []
+            # Check if the request was successful
+            if response.status_code == 200:
+                historical_data = response.json()
+                # Extract only 'state' and 'last_updated' from the historical data
+                filtered_data = [
+                    {"state": entry["state"], "last_updated": entry["last_updated"]}
+                    for sublist in historical_data
+                    for entry in sublist
+                ]
+                return filtered_data
+            logger.error(
+                '[LOAD-IF] HOMEASSISTANT - Failed to retrieve historical data: %s',
+                response.status_code
+            )
+            logger.error(response.text)
+            return []
+        except requests.exceptions.Timeout:
+            logger.error(
+                ("[LOAD-IF] HOMEASSISTANT - Request timed out ",
+                "while fetching historical energy data.")
+            )
+            return []
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                ("[LOAD-IF] HOMEASSISTANT - Request failed ",
+                "while fetching historical energy data: %s"),
+                e)
+            return []
 
     def process_energy_data(self, data):
         """
@@ -99,6 +114,11 @@ class LoadInterface:
         total_energy = 0
         count = len(data["data"])
         for data_entry in data["data"]:
+            try:
+                float(data_entry["state"])
+            except ValueError:
+                count -= 1
+                continue
             total_energy += float(data_entry["state"]) * -1
         if count > 0:
             # print(f'Total energy: {round(total_energy / count, 4)}')
@@ -116,7 +136,7 @@ class LoadInterface:
         for each hour.
 
         """
-        logger.info("[LOAD] Creating load profile from openhab ...")
+        logger.info("[LOAD-IF] Creating load profile from openhab ...")
         current_time = datetime.now(self.time_zone).replace(minute=0, second=0, microsecond=0)
         if start_time is None:
             start_time = current_time.replace(
@@ -137,7 +157,7 @@ class LoadInterface:
             energy_data = self.fetch_energy_data_from_openhab(
                 self.url, current_hour, next_hour
             )
-            energy = self.process_energy_data(energy_data) * -1
+            energy = self.process_energy_data(energy_data)
             if energy == 0:
                 current_hour += timedelta(hours=1)
                 continue
@@ -150,10 +170,10 @@ class LoadInterface:
                 energy_sum = energy_sum - 9200
 
             load_profile.append(energy_sum)
-            logger.debug("[LOAD] Energy for %s: %s", current_hour, energy_sum)
+            logger.debug("[LOAD-IF] Energy for %s: %s", current_hour, energy_sum)
 
             current_hour += timedelta(hours=1)
-        logger.info("[LOAD] Load profile created successfully.")
+        logger.info("[LOAD-IF] Load profile created successfully.")
         return load_profile
 
     def create_load_profile_homeassistant_from_last_days(self, tgt_duration, start_time=None):
@@ -198,7 +218,6 @@ class LoadInterface:
             energy_data = self.fetch_historical_energy_data_from_homeassistant(
                 self.load_sensor, current_hour, next_hour
             )
-            # print(f'HA Energy data: {energy_data}')
             energy = self.process_energy_data({"data": energy_data})
             if energy == 0:
                 current_hour += timedelta(hours=1)
@@ -212,10 +231,10 @@ class LoadInterface:
                 energy_sum = energy_sum - 9200
 
             load_profile.append(energy_sum)
-            logger.debug("[LOAD] Energy for %s: %s", current_hour, energy_sum)
+            logger.debug("[LOAD-IF] Energy for %s: %s", current_hour, energy_sum)
 
             current_hour += timedelta(hours=1)
-        logger.info("[LOAD] Load profile created successfully.")
+        logger.info("[LOAD-IF] Load profile created successfully.")
         return load_profile
 
     def get_load_profile(self, tgt_duration, start_time=None):
@@ -237,12 +256,12 @@ class LoadInterface:
             list: A list of energy consumption values for the specified duration.
         """
         if self.src == "default":
-            logger.info("[LOAD] Using load source default")
+            logger.info("[LOAD-IF] Using load source default")
             default_profile = [
                 200.0, # 0:00 - 1:00 -- day 1
                 200.0, # 1:00 - 2:00
                 200.0, # 2:00 - 3:00
-                200.0, # 3:00 - 4:00 
+                200.0, # 3:00 - 4:00
                 200.0, # 4:00 - 5:00
                 300.0, # 5:00 - 6:00
                 350.0, # 6:00 - 7:00
@@ -266,7 +285,7 @@ class LoadInterface:
                 200.0, # 0:00 - 1:00 -- day 2
                 200.0, # 1:00 - 2:00
                 200.0, # 2:00 - 3:00
-                200.0, # 3:00 - 4:00 
+                200.0, # 3:00 - 4:00
                 200.0, # 4:00 - 5:00
                 300.0, # 5:00 - 6:00
                 350.0, # 6:00 - 7:00
@@ -296,7 +315,7 @@ class LoadInterface:
             # logger.info("[LOAD] Using load source homeassistant")
             return self.create_load_profile_homeassistant_from_last_days(tgt_duration, start_time)
         logger.error(
-            "[LOAD] Load source '%s' currently not supported. Using default.",
+            "[LOAD-IF] Load source '%s' currently not supported. Using default.",
             self.src,
         )
         return []

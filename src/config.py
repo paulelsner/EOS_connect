@@ -42,7 +42,7 @@ class ConfigManager:
                 "load": CommentedMap(
                     {
                         "source": "default",  # data source for load power
-                        "url": "http://<ip>:8080/rest/persistence/items/<load_item>",
+                        "url": "http://<ip>:8080", # URL for openhab or homeassistant
                         "load_sensor": "Load_Power",  # item / entity for load power data
                         "access_token": "abc123",  # access token for homeassistant
                     }
@@ -62,7 +62,9 @@ class ConfigManager:
                 "battery": CommentedMap(
                     {
                         "source": "default",  # data source for battery soc
-                        "url": "http://<ip>:8080:8080/rest/items/<soc_item>/state",
+                        "url": "http://<ip>:8080", # URL for openhab or homeassistant
+                        "soc_sensor": "battery_SOC",  # item / entity for battery SOC data
+                        "access_token": "abc123",  # access token for homeassistant
                         "capacity_wh": 11059,
                         "charge_efficiency": 0.88,
                         "discharge_efficiency": 0.88,
@@ -132,7 +134,13 @@ class ConfigManager:
             "source", before="Data source for battery soc - openhab, homeassistant, default"
         )
         config["battery"].yaml_set_comment_before_after_key(
-            "url", before="URL for battery soc"
+            "url", before="URL for openhab or homeassistant"
+        )
+        config["battery"].yaml_set_comment_before_after_key(
+            "soc_sensor", before="item / entity for battery SOC data"
+        )
+        config["battery"].yaml_set_comment_before_after_key(
+            "access_token", before="access token for homeassistant (optional)"
         )
         config["battery"].yaml_set_comment_before_after_key(
             "capacity_wh", before="battery cpaacity in Wh"

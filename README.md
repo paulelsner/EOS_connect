@@ -3,7 +3,7 @@
 EOS Connect is a tool designed to optimize energy usage by interacting with the EOS system. It fetches energy data, processes it, and displays the results dynamically on a webpage.
 
 ## Features
-* Fetches energy data from OpenHAB or HomeAssistant.
+* Fetches energy or battery data from OpenHAB or HomeAssistant.
 * Processes data to create a load profile.
 * Interacts with the Tibber API and PV forecast API.
 * Manages configurations via a user-friendly config.yaml file.
@@ -20,7 +20,7 @@ This project is in its early stages and is actively being developed and enhanced
 
 ## Webpage Example
 
-![webpage screenshot](screenshot.PNG)
+![webpage screenshot](doc/screenshot.PNG)
 
 ## Project Structure
 

@@ -9,7 +9,7 @@ A default config file will be created with the first start, if there is no confi
 
 - **load.source**: Data source for load power. Possible values: `openhab`, `homeassistant`, `default` (default will using a primitive static consumption scheme).
 - **load.url**: URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
-- **load.load_sensor**: item / entity name for load power data (openhab item/ homeassitant sensor) - HINT: expected as persisted negative values
+- **load.load_sensor**: item / entity name for load power data (openhab item/ homeassistant sensor) - HINT: for Home Assistant expected as persisted negative values
 - **load.access_token**: access token for homeassistant (optional)
 
 ### EOS Server Configuration
@@ -23,8 +23,11 @@ A default config file will be created with the first start, if there is no confi
 - **price.token**: Token for electricity price.
 
 ### Battery Configuration
-- **battery.source**: Data source for battery SOC. Possible values: openhab, homeassistant, default.
-- **battery.url**: URL for battery SOC.
+- **battery.source**: Data source for battery SOC. Possible values: openhab, homeassistant, default (static data).
+- **battery.url**: URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
+- **battery.soc_sensor**: item / entity name for soc_sensor (openhab item/ homeassistant sensor)
+- **battery.access_token**: access token for homeassistant (optional)
+- 
 - **battery.capacity_wh**: Battery capacity in Wh.
 - **battery.charge_efficiency**: Efficiency for charging the battery.
 - **battery.discharge_efficiency**: Efficiency for discharging the battery.
@@ -79,7 +82,7 @@ If the configuration file does not exist, the application will create one with d
 
 ```yaml
 load:
-  source: default  # Data source for load power - openhab, homeassistant, default
+  source: default  # Data source for load power - openhab, homeassistant, default (static data)
   url: http://<ip>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
   load_sensor: sensor.load_power # item / entity name for load power data (openhab item/ homeassitant sensor)
   access_token: 123456abcd # access token for homeassistant (optional)
@@ -93,8 +96,10 @@ price:
   token: tibberBearerToken  # Token for electricity price
 
 battery:
-  source: default  # Data source for battery SOC - openhab, homeassistant, default
-  url: http://<ip>:8080/rest/items/<soc_item>/state  # URL for battery SOC if openhab or homeassistant
+  source: default  # Data source for battery SOC - openhab, homeassistant, default (static data)
+  url: http://<ip>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
+  load.load_sensor: sensor.battery_soc
+  load.access_token: 123456abcd # access token for homeassistant (optional)
   capacity_wh: 11059  # Battery capacity in Wh
   charge_efficiency: 0.88  # Efficiency for charging the battery
   discharge_efficiency: 0.88  # Efficiency for discharging the battery

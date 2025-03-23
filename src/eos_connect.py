@@ -18,6 +18,7 @@ from flask import Flask, render_template_string
 from gevent.pywsgi import WSGIServer
 from config import ConfigManager
 from interfaces.load_interface import LoadInterface
+from interfaces.battery_interface import BatteryInterface
 
 EOS_TGT_DURATION = 48
 EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
@@ -53,6 +54,13 @@ load_interface = LoadInterface(
     config_manager.config.get("load", {}).get("load_sensor", ""),
     config_manager.config.get("load", {}).get("access_token", ""),
     time_zone,
+)
+
+battery_interface = BatteryInterface(
+    config_manager.config.get("battery", {}).get("source", ""),
+    config_manager.config.get("battery", {}).get("url", ""),
+    config_manager.config.get("battery", {}).get("soc_sensor", ""),
+    config_manager.config.get("battery", {}).get("access_token", ""),
 )
 
 # *** EOS API URLs ***
@@ -442,35 +450,6 @@ def get_summerized_pv_forecast(tgt_duration=24):
     return forecast_values
 
 
-def battery_get_current_soc():
-    """
-    Fetch the current state of charge (SOC) of the battery from OpenHAB.
-    """
-    # default value for start SOC = 5
-    if config_manager.config["battery"]["source"] == "default":
-        logger.debug("[BATTERY] Battery source set to default with start SOC = 5%")
-        return 5
-    if config_manager.config["battery"]["source"] == "homeassistant":
-        logger.info("[BATTERY] Battery source currently not supported. Using default.")
-        return 5
-    if config_manager.config["battery"]["source"] != "openhab":
-        logger.error("[BATTERY] Battery source currently not supported. Using default.")
-        return 5
-    url = config_manager.config["battery"]["url"]
-    try:
-        response = requests.get(url, timeout=6)
-        response.raise_for_status()
-        data = response.json()
-    except requests.exceptions.Timeout:
-        logger.error("[BATTERY] Request timed out while fetching battery SOC.")
-        return 5  # Default SOC value in case of timeout
-    except requests.exceptions.RequestException as e:
-        logger.error("[BATTERY] Request failed while fetching battery SOC: %s", e)
-        return 5  # Default SOC value in case of request failure
-    soc = float(data["state"]) * 100
-    return round(soc)
-
-
 def eos_save_config_to_config_file():
     """
     Save the current configuration to the configuration file on the EOS server.
@@ -613,12 +592,6 @@ def create_optimize_request(api_version="new"):
                 0,
             ],
             "preis_euro_pro_wh_akku": 0,
-            # "gesamtlast": get_load_profile(
-            #     EOS_TGT_DURATION,
-            #     datetime.now(time_zone).replace(
-            #         hour=0, minute=0, second=0, microsecond=0
-            #     ),
-            # ),
             "gesamtlast": load_interface.get_load_profile(
                 EOS_TGT_DURATION,
                 datetime.now(time_zone).replace(
@@ -638,7 +611,7 @@ def create_optimize_request(api_version="new"):
                 "max_ladeleistung_w": config_manager.config["battery"][
                     "max_charge_power_w"
                 ],
-                "start_soc_prozent": battery_get_current_soc(),
+                "start_soc_prozent": battery_interface.battery_get_current_soc(),
                 "min_soc_prozent": config_manager.config["battery"][
                     "min_soc_percentage"
                 ],
@@ -657,7 +630,7 @@ def create_optimize_request(api_version="new"):
             "max_charge_power_w": config_manager.config["battery"][
                 "max_charge_power_w"
             ],
-            "initial_soc_percentage": battery_get_current_soc(),
+            "initial_soc_percentage": battery_interface.battery_get_current_soc(),
             "min_soc_percentage": config_manager.config["battery"][
                 "min_soc_percentage"
             ],
@@ -794,10 +767,6 @@ if __name__ == "__main__":
     # # persist and update config
     # eos_save_config_to_config_file()
 
-    # print(get_prices(
-    #         EOS_TGT_DURATION,
-    #         datetime.now(time_zone).replace(hour=0, minute=0, second=0, microsecond=0),
-    #     ))
 
     # print(load_interface.get_load_profile(
     #             EOS_TGT_DURATION,
@@ -808,11 +777,6 @@ if __name__ == "__main__":
     # json_optimize_input = create_optimize_request()
     # optimized_response = eos_set_optimize_request(json_optimize_input)
     # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
-
-    # with open(
-    #     base_path + "/json/optimize_response.json", "w", encoding="utf-8"
-    # ) as file:
-    #     json.dump(optimized_response, file, indent=4)
 
     # sys.exit()
 

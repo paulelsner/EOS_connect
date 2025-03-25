@@ -120,7 +120,7 @@ class ConfigManager:
             "port", before="port for EOS server - default: 8503"
         )
         config["eos"].yaml_set_comment_before_after_key(
-            "timeout", before="Default timeout for EOS optimize request - default: 180"
+            "timeout", before="timeout for EOS optimize request in seconds - default: 180"
         )
         # price configuration
         config.yaml_set_comment_before_after_key(

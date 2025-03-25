@@ -14,8 +14,9 @@ A default config file will be created with the first start, if there is no confi
 
 ### EOS Server Configuration
 
-- **eos.server**: Default EOS server address.
-- **eos.port**: Default port for EOS server.
+- **eos.server**: EOS server address.
+- **eos.port**: port for EOS server.
+- **timeout**: timeout for EOS optimize request in seconds
 
 ### Electricity Price Configuration
 
@@ -88,8 +89,9 @@ load:
   access_token: 123456abcd # access token for homeassistant (optional)
 
 eos:
-  server: 192.168.1.94  # Default EOS server address
-  port: 8503  # Default port for EOS server
+  server: 192.168.1.94  # EOS server address
+  port: 8503  # port for EOS server
+  timeout: 180 # timeout for EOS optimize request in seconds
 
 price:
   source: tibber  # Data source for electricity price

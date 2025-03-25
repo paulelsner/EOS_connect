@@ -749,6 +749,16 @@ def get_optimize_response():
 
 
 if __name__ == "__main__":
+    try:
+        tz = os.environ['TZ']
+        logger.info("[MAIN] host system time zone is %s", tz)
+    except KeyError:
+        logger.info(
+            "[MAIN] host system time zone was not set. Setting to %s",
+            config_manager.config['time_zone']
+        )
+        os.environ['TZ'] = config_manager.config['time_zone']
+
     # initial config
     # set_config_value("latitude", 48.812)
     # set_config_value("longitude", 8.907)

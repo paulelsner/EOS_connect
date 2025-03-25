@@ -99,7 +99,7 @@ Configuration is described here [CONFIG_README](src/CONFIG_README.md)
 
 ## Usage
 
-The application will start fetching energy data from OpenHAB and processing it according to the defined logic in `src/eos_connect.py`. You can access the web interface at `http://localhost:8081`.
+The application will start fetching energy data from OpenHAB or HomeAssistant and processing it according to the defined logic in `src/eos_connect.py`. You can access the web interface at `http://localhost:8081`.
 
 ## Contributing
 

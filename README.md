@@ -2,6 +2,25 @@
 
 EOS Connect is a tool designed to optimize energy usage by interacting with the EOS system. It fetches energy data, processes it, and displays the results dynamically on a webpage.
 
+- [EOS Connect](#eos-connect)
+  - [Features](#features)
+  - [Current Status](#current-status)
+    - [Compatibility Notes:](#compatibility-notes)
+  - [Webpage Example](#webpage-example)
+  - [Project Structure](#project-structure)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Running the Application](#running-the-application)
+    - [Using Docker](#using-docker)
+    - [Running Locally](#running-locally)
+  - [Configuration](#configuration)
+  - [Usage](#usage)
+  - [Contributing](#contributing)
+  - [License](#license)
+
+
+
+
 ## Features
 * Fetches energy or battery data from OpenHAB or HomeAssistant.
 * Processes data to create a load profile.

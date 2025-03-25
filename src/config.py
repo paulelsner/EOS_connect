@@ -51,6 +51,7 @@ class ConfigManager:
                     {
                         "server": "192.168.1.94",  # Default EOS server address
                         "port": 8503,  # Default port for EOS server
+                        "timeout": 180,  # Default timeout for EOS optimize request
                     }
                 ),
                 "price": CommentedMap(
@@ -117,6 +118,9 @@ class ConfigManager:
         )
         config["eos"].yaml_set_comment_before_after_key(
             "port", before="port for EOS server - default: 8503"
+        )
+        config["eos"].yaml_set_comment_before_after_key(
+            "timeout", before="Default timeout for EOS optimize request - default: 180"
         )
         # price configuration
         config.yaml_set_comment_before_after_key(
@@ -216,6 +220,7 @@ class ConfigManager:
         if os.path.exists(self.config_file):
             with open(self.config_file, "r", encoding="utf-8") as f:
                 self.config.update(self.yaml.load(f))
+            self.check_eos_timeout_and_refreshtime()
         else:
             self.write_config()
             print("Config file not found. Created a new one with default values.")
@@ -231,3 +236,17 @@ class ConfigManager:
         logger.info("[Config] writing config file")
         with open(self.config_file, "w", encoding="utf-8") as config_file_handle:
             self.yaml.dump(self.config, config_file_handle)
+
+    def check_eos_timeout_and_refreshtime(self):
+        """
+        Check if the eos timeout is smaller than the refresh time
+        """
+        eos_timeout_seconds = self.config["eos"]["timeout"]
+        refresh_time_seconds = self.config["refresh_time"] * 60
+
+        if eos_timeout_seconds > refresh_time_seconds:
+            logger.error(
+            ("[Config] EOS timeout (%s s) is greater than the refresh time (%s s)."
+            " Please adjust the settings."), eos_timeout_seconds, refresh_time_seconds
+            )
+            sys.exit(0)

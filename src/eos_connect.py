@@ -132,7 +132,7 @@ def eos_set_optimize_request(payload, timeout=180):
     """
     headers = {"accept": "application/json", "Content-Type": "application/json"}
     request_url = EOS_API_OPTIMIZE + "?start_hour=" + str(datetime.now(time_zone).hour)
-    logger.info("[OPTIMIZE] request optimization with: %s", request_url)
+    logger.info("[OPTIMIZE] request optimization with: %s - and with timeout: %s", request_url, timeout)
     try:
         start_time = time.time()
         response = requests.post(
@@ -825,7 +825,7 @@ if __name__ == "__main__":
             ) as file:
                 json.dump(json_optimize_input, file, indent=4)
 
-            optimized_response = eos_set_optimize_request(json_optimize_input)
+            optimized_response = eos_set_optimize_request(json_optimize_input, config_manager.config["eos"]["timeout"])
             optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
 
             with open(

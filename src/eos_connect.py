@@ -72,6 +72,7 @@ load_interface = LoadInterface(
     config_manager.config.get("load", {}).get("source", ""),
     config_manager.config.get("load", {}).get("url", ""),
     config_manager.config.get("load", {}).get("load_sensor", ""),
+    #config_manager.config.get("load", {}).get("wallbox_sensor", ""),
     config_manager.config.get("load", {}).get("access_token", ""),
     time_zone,
 )
@@ -864,12 +865,11 @@ if __name__ == "__main__":
             minutes, seconds = divmod(sleeptime, 60)
             logger.info(
                 "[Main] Next optimization at %s. Sleeping for %d min %.0f seconds\n",
-                next_eval.strftime("%H:%M:%S"),
+                next_eval.astimezone(time_zone).strftime("%H:%M:%S"),
                 minutes,
                 seconds,
             )
             scheduler.enter(sleeptime, 1, run_optimization_event, (sc,))
-
         scheduler.enter(0, 1, run_optimization_event, (scheduler,))
         scheduler.run()
 

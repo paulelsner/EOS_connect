@@ -24,6 +24,19 @@ EOS_TGT_DURATION = 48
 EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
 
 ###################################################################################################
+# Custom formatter to use the configured timezone
+class TimezoneFormatter(logging.Formatter):
+    """
+    A custom logging formatter that formats log timestamps according to a specified timezone.
+    """
+    def __init__(self, fmt=None, datefmt=None, tz=None):
+        super().__init__(fmt, datefmt)
+        self.tz = tz
+
+    def formatTime(self, record, datefmt=None):
+        # Convert the record's timestamp to the configured timezone
+        record_time = datetime.fromtimestamp(record.created, self.tz)
+        return record_time.strftime(datefmt or self.default_time_format)
 ###################################################################################################
 LOGLEVEL = logging.INFO
 logger = logging.getLogger(__name__)
@@ -31,6 +44,7 @@ formatter = logging.Formatter(
     "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"
 )
 streamhandler = logging.StreamHandler(sys.stdout)
+
 streamhandler.setFormatter(formatter)
 logger.addHandler(streamhandler)
 logger.setLevel(LOGLEVEL)
@@ -44,6 +58,12 @@ else:
     current_dir = base_path
 config_manager = ConfigManager(current_dir)
 time_zone = pytz.timezone(config_manager.config["time_zone"])
+formatter = TimezoneFormatter(
+    "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S", tz=time_zone
+)
+streamhandler.setFormatter(formatter)
+logger.info("[Main] set time zone to %s", config_manager.config["time_zone"])
+
 EOS_SERVER = config_manager.config["eos"]["server"]
 EOS_SERVER_PORT = config_manager.config["eos"]["port"]
 
@@ -425,10 +445,15 @@ def get_pv_forecast(tgt_value="power", pv_config_name="default", tgt_duration=24
             entry_time = datetime.fromisoformat(forecast["datetime"]).astimezone()
             if current_time <= entry_time < end_time:
                 forecast_values.append(forecast.get(tgt_value, 0))
+    request_type = "PV forecast"
+    pv_config_name = "for " + pv_config_name
+    if tgt_value == "temperature":
+        request_type = "Temperature forecast"
+        pv_config_name = ""
     logger.info(
-        "[FORECAST] forecast fetched successfully for %s (%s)",
+        "[FORECAST] %s fetched successfully %s",
+        request_type,
         pv_config_name,
-        tgt_value,
     )
     return forecast_values
 
@@ -749,15 +774,6 @@ def get_optimize_response():
 
 
 if __name__ == "__main__":
-    try:
-        tz = os.environ['TZ']
-        logger.info("[MAIN] host system time zone is %s", tz)
-    except KeyError:
-        logger.info(
-            "[MAIN] host system time zone was not set. Setting to %s",
-            config_manager.config['time_zone']
-        )
-        os.environ['TZ'] = config_manager.config['time_zone']
 
     # initial config
     # set_config_value("latitude", 48.812)

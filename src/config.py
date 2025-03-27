@@ -44,6 +44,7 @@ class ConfigManager:
                         "source": "default",  # data source for load power
                         "url": "http://<ip>:8080", # URL for openhab or homeassistant
                         "load_sensor": "Load_Power",  # item / entity for load power data
+                        "car_charge_load_sensor": "Wallbox_Power",  # item / entity wallbox power
                         "access_token": "abc123",  # access token for homeassistant
                     }
                 ),
@@ -93,6 +94,7 @@ class ConfigManager:
                 "refresh_time": 3,  # Default refresh time in minutes
                 "time_zone": "Europe/Berlin",  # Add default time zone
                 "eos_connect_web_port": 8081,  # Default port for EOS connect server
+                "log_level": "info",  # Default log level
             }
         )
         # load configuration
@@ -105,6 +107,9 @@ class ConfigManager:
         )
         config["load"].yaml_set_comment_before_after_key(
             "load_sensor", before="item / entity for load power data"
+        )
+        config["load"].yaml_set_comment_before_after_key(
+            "car_charge_load_sensor", before="item / entity for wallbox power data"
         )
         config["load"].yaml_set_comment_before_after_key(
             "access_token", before="access token for homeassistant (optional)"
@@ -207,7 +212,10 @@ class ConfigManager:
         config.yaml_set_comment_before_after_key(
             "eos_connect_web_port", before="Default port for EOS connect server"
         )
-
+        # loglevel configuration
+        config.yaml_set_comment_before_after_key(
+            "log_level", before="Log level for the application : debug, info, warning, error"
+        )
         return config
 
     def load_config(self):

@@ -38,7 +38,7 @@ class TimezoneFormatter(logging.Formatter):
         record_time = datetime.fromtimestamp(record.created, self.tz)
         return record_time.strftime(datefmt or self.default_time_format)
 ###################################################################################################
-LOGLEVEL = logging.INFO
+LOGLEVEL = logging.DEBUG # start before reading the config file
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter(
     "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"
@@ -58,11 +58,18 @@ else:
     current_dir = base_path
 config_manager = ConfigManager(current_dir)
 time_zone = pytz.timezone(config_manager.config["time_zone"])
+
+LOGLEVEL = config_manager.config["log_level"].upper()
+logger.setLevel(LOGLEVEL)
 formatter = TimezoneFormatter(
     "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S", tz=time_zone
 )
 streamhandler.setFormatter(formatter)
-logger.info("[Main] set time zone to %s", config_manager.config["time_zone"])
+logger.info(
+    "[Main] set user defined time zone to %s and loglevel to %s",
+    config_manager.config["time_zone"],
+    LOGLEVEL
+)
 
 EOS_SERVER = config_manager.config["eos"]["server"]
 EOS_SERVER_PORT = config_manager.config["eos"]["port"]
@@ -72,7 +79,7 @@ load_interface = LoadInterface(
     config_manager.config.get("load", {}).get("source", ""),
     config_manager.config.get("load", {}).get("url", ""),
     config_manager.config.get("load", {}).get("load_sensor", ""),
-    #config_manager.config.get("load", {}).get("wallbox_sensor", ""),
+    config_manager.config.get("load", {}).get("car_charge_load_sensor", ""),
     config_manager.config.get("load", {}).get("access_token", ""),
     time_zone,
 )
@@ -153,7 +160,8 @@ def eos_set_optimize_request(payload, timeout=180):
     """
     headers = {"accept": "application/json", "Content-Type": "application/json"}
     request_url = EOS_API_OPTIMIZE + "?start_hour=" + str(datetime.now(time_zone).hour)
-    logger.info("[OPTIMIZE] request optimization with: %s - and with timeout: %s", request_url, timeout)
+    logger.info(
+        "[OPTIMIZE] request optimization with: %s - and with timeout: %s", request_url, timeout)
     try:
         start_time = time.time()
         response = requests.post(
@@ -842,7 +850,9 @@ if __name__ == "__main__":
             ) as file:
                 json.dump(json_optimize_input, file, indent=4)
 
-            optimized_response = eos_set_optimize_request(json_optimize_input, config_manager.config["eos"]["timeout"])
+            optimized_response = eos_set_optimize_request(
+                json_optimize_input, config_manager.config["eos"]["timeout"]
+            )
             optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
 
             with open(

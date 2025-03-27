@@ -48,7 +48,8 @@ EOS_connect
 ├── doc                             # aditional documentation stuff
 ├── src
 │   ├── interfaces                  # needed interface modules for the different sources
-│   │  ├── load_interface.py        # handles getting load history for openhab and homeassistant
+│   │  ├── load_interface.py        # handles getting load history from openhab and homeassistant
+│   │  ├── battery_interface.py     # handles getting soc data from openhab and homeassistant
 │   ├── json
 │   │  ├── optimize_request.json    # will be created/ rewritten with every new optimization request
 │   │  ├── optimize_response.json   # will be created/ rewritten after the feedback of EOS

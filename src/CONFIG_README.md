@@ -10,6 +10,7 @@ A default config file will be created with the first start, if there is no confi
 - **load.source**: Data source for load power. Possible values: `openhab`, `homeassistant`, `default` (default will using a primitive static consumption scheme).
 - **load.url**: URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
 - **load.load_sensor**: item / entity name for load power data (openhab item/ homeassistant sensor) - HINT: for Home Assistant expected as persisted negative values
+- **load.car_charge_load_sensor**: item / entity for wallbox power data
 - **load.access_token**: access token for homeassistant (optional)
 
 ### EOS Server Configuration
@@ -74,6 +75,8 @@ Feel free to add more PV forecast entries under the pv_forecast section by provi
 
 **eos_connect_web_port**: Default port for EOS connect server.
 
+**log_level**: loglevel: debug, info, warning, error.
+
 ## Notes
 Ensure that the config.yaml file is located in the same directory as the application.
 
@@ -86,6 +89,7 @@ load:
   source: default  # Data source for load power - openhab, homeassistant, default (static data)
   url: http://<ip>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
   load_sensor: sensor.load_power # item / entity name for load power data (openhab item/ homeassitant sensor)
+  car_charge_load_sensor: sensor.car_charge_load_sensor # item / entity for wallbox power data
   access_token: 123456abcd # access token for homeassistant (optional)
 
 eos:
@@ -132,4 +136,5 @@ pv_forecast:
 refresh_time: 3  # Default refresh time in minutes
 time_zone: Europe/Berlin  # Default time zone
 eos_connect_web_port: 8081  # Default port for EOS connect server
+log_level: info # loglevel: debug, info, warning, error
 ```

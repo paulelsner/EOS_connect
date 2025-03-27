@@ -224,8 +224,8 @@ class LoadInterface:
         load_profile = []
         current_hour = start_time
 
-        current_hour = datetime.strptime("18.03.2025 11:00", "%d.%m.%Y %H:%M")
-        end_time = current_hour + timedelta(hours=tgt_duration)
+        # current_hour = datetime.strptime("18.03.2025 11:00", "%d.%m.%Y %H:%M")
+        # end_time = current_hour + timedelta(hours=tgt_duration)
 
         # check car load data for W or kW
         car_load_data = self.fetch_historical_energy_data_from_homeassistant(

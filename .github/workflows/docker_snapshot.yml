@@ -1,4 +1,4 @@
-name: Nightly Build and Push
+name: Snapshot Build and Push
 # This workflow builds and pushes a Docker image to GitHub Container Registry
 # and optionally to Docker Hub.
 # It runs nightly at 2 AM UTC and can also be triggered manually.
@@ -28,8 +28,8 @@ jobs:
       - name: Build image
         run: docker build -t ghcr.io/${{ env.owner }}/eos_connect:snapshot .
 
-      - name: Tag image as latest
-        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:snapshot-${{ github.run_number }}
+      - name: Tag image with snapshot version
+        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:snapshot-v0.0.${{ github.run_number }}
 
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -37,8 +37,8 @@ jobs:
       - name: Push Docker image to GitHub Container Registry
         run: docker push ghcr.io/${{ env.owner }}/eos_connect:snapshot
 
-      - name: Push Docker image with latest tag
-        run: docker push ghcr.io/${{ env.owner }}/eos_connect:snapshot-${{ github.run_number }}
+      - name: Push Docker image with snapshot version tag
+        run: docker push ghcr.io/${{ env.owner }}/eos_connect:snapshot-v0.0.${{ github.run_number }}
 
 #      - name: Log in to Docker Hub
 #        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin

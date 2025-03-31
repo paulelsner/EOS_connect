@@ -273,7 +273,7 @@ class LoadInterface:
 
             load_profile.append(energy_sum)
             logger.debug(
-                "[LOAD-IF] Energy for %s: %s W (car load: %s W)",
+                "[LOAD-IF] Energy for %s: %s Wh (car load: %s Wh)",
                 current_hour,
                 round(energy,1),
                 round(car_load_energy,1)

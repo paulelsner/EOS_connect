@@ -26,18 +26,24 @@ jobs:
       - name: Build image
         run: docker build -t ghcr.io/${{ env.owner }}/eos_connect:nightly .
 
+      - name: Set GH_TOKEN environment variable
+        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
       - name: Delete previous nightly image
         run: |
-          previous_tag=$(gh api -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          previous_tag=$(gh api -H "Authorization: token $GH_TOKEN" \
             /repos/${{ github.repository }}/packages/container/eos_connect/versions \
             | jq -r '.[] | select(.metadata.container.tags[] | contains("nightly")) | .id' | tail -n 1)
           if [ -n "$previous_tag" ]; then
-            gh api -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            gh api -X DELETE -H "Authorization: token $GH_TOKEN" \
               /repos/${{ github.repository }}/packages/container/eos_connect/versions/$previous_tag
           fi
 
+      - name: Set timestamp for tagging
+        run: echo "TIMESTAMP=$(date +%Y%m%d%H%M)" >> $GITHUB_ENV
+
       - name: Tag image with timestamp
-        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:nightly ghcr.io/${{ env.owner }}/eos_connect:nightly-$(date +%Y%m%d%H%M)
+        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:nightly ghcr.io/${{ env.owner }}/eos_connect:nightly-${{ env.TIMESTAMP }}
 
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -46,7 +52,7 @@ jobs:
         run: docker push ghcr.io/${{ env.owner }}/eos_connect:nightly
 
       - name: Push Docker image with timestamp tag
-        run: docker push ghcr.io/${{ env.owner }}/eos_connect:nightly-$(date +%Y%m%d%H%M)
+        run: docker push ghcr.io/${{ env.owner }}/eos_connect:nightly-${{ env.TIMESTAMP }}
 
 #      - name: Log in to Docker Hub
 #        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin

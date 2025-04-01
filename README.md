@@ -9,10 +9,12 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
   - [Webpage Example](#webpage-example)
   - [Project Structure](#project-structure)
   - [Requirements](#requirements)
-  - [Installation](#installation)
+  - [Installation and Running](#installation-and-running)
   - [Running the Application](#running-the-application)
     - [Using Docker](#using-docker)
-    - [Running Locally](#running-locally)
+    - [Local](#local)
+      - [Installation](#installation)
+      - [Running Locally](#running-locally)
   - [Configuration](#configuration)
   - [Usage](#usage)
   - [Contributing](#contributing)
@@ -73,8 +75,24 @@ To run this project, you need to have the following installed:
 - Docker
 - Docker Compose
 
-## Installation
+## Installation and Running
 
+## Running the Application
+
+### Using Docker
+
+Pull existing latest snapshot and run the application in background using Docker Compose:
+   ```
+   docker-compose up -d
+   ```
+
+
+[![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/ohand/eos_connect/latest/total)](https://github.com/ohAnd/eos_connect/releases/latest)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ohand/eos_connect/docker-image.yml)
+
+### Local
+
+#### Installation
 1. Clone the repository:
    ```
    git clone <repository-url>
@@ -85,30 +103,9 @@ To run this project, you need to have the following installed:
    ```
    pip install -r requirements.txt
    ```
+#### Running Locally
 
-## Running the Application
-
-### Using Docker
-
-1. Build the Docker image:
-   ```
-   docker build -t eos_connect .
-   ```
-
-2. Run the application using Docker Compose:
-   ```
-   docker-compose up
-   ```
-
-or download the latest image at [latest release](https://github.com/ohAnd/eos_connect/releases/latest) and load to your docker environment
-
-[![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/ohand/eos_connect/latest/total)](https://github.com/ohAnd/eos_connect/releases/latest)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ohand/eos_connect/docker-image.yml)
-
-
-### Running Locally
-
-If you prefer to run the application locally without Docker, you can execute the following command:
+Run the application locally without Docker, you can execute the following command:
 ```
 python src/eos_connect.py
 ```
@@ -119,7 +116,7 @@ Configuration is described here [CONFIG_README](src/CONFIG_README.md)
 
 ## Usage
 
-The application will start fetching energy data from OpenHAB or HomeAssistant and processing it according to the defined logic in `src/eos_connect.py`. You can access the web interface at `http://localhost:8081`.
+The application will start fetching energy data from OpenHAB or HomeAssistant and processing it according to the defined logic in `src/eos_connect.py`. You can access the web interface at `http://localhost:8081`. For local usage the port is configurable see [CONFIG_README](src/CONFIG_README.md). For docker usage change the mapped port in docker-compose.yml.
 
 ## Contributing
 

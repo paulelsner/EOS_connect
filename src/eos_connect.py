@@ -182,7 +182,6 @@ def eos_set_optimize_request(payload, timeout=180):
         return {"error": "Request timed out"}
     except requests.exceptions.RequestException as e:
         logger.error("[OPTIMIZE] Request failed: %s", e)
-        print(response.json())
         return {"error": str(e)}
 
 

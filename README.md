@@ -81,13 +81,14 @@ To run this project, you need to have the following installed:
 
 ### Using Docker
 
-Pull existing latest snapshot and run the application in background using Docker Compose:
+Pull existing latest snapshot and run the application in the background using Docker Compose (`--pull always` ensures the latest image is pulled):
    ```
-   docker-compose up -d
+   docker-compose up --pull always -d
    ```
+[![latest](https://ghcr-badge.egpl.dev/ohand/eos_connect/latest_tag?color=%2344cc11&ignore=latest&label=latest+version&trim=)](https://github.com/ohAnd/EOS_connect/pkgs/container/eos_connect)
 
+[![image tags](https://ghcr-badge.egpl.dev/ohand/eos_connect/tags?color=%2344cc11&ignore=latest&n=3&label=latest+image+tags&trim=)](https://github.com/ohAnd/EOS_connect/pkgs/container/eos_connect)
 
-[![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/ohand/eos_connect/latest/total)](https://github.com/ohAnd/eos_connect/releases/latest)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ohand/eos_connect/docker-image.yml)
 
 ### Local

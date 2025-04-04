@@ -91,8 +91,8 @@ class BatteryInterface:
                 ),
                 e,soc
             )
-            return soc  # Default SOC value in case of request failure      
-        
+            return soc  # Default SOC value in case of request failure
+
 
     def fetch_soc_data_from_homeassistant(self):
         """

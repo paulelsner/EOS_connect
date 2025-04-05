@@ -84,14 +84,25 @@ class ConfigManager:
                             "lon": 8.5,  # Longitude for PV forecast @ Akkudoktor API
                             "azimuth": 90.0,  # Azimuth for PV forecast @ Akkudoktor API
                             "tilt": 30.0,  # Tilt for PV forecast @ Akkudoktor API
-                            "power": 4600,  # Power for PV forecast @ Akkudoktor API
-                            "powerInverter": 5000,  # Power Inverter for PV forecast @ Akkudoktor API
+                            "power": 4600,  # Power of PV system in Wp
+                            "powerInverter": 5000,  # Inverter Power 
                             "inverterEfficiency": 0.9,  # Inverter Efficiency for
                             # PV forecast @ Akkudoktor API
                             "horizont": "10,20,10,15",  # Horizont to calculate shading
                         }
                     )
                 ],
+                "inverter": CommentedMap(
+                    {
+                        "type": "fronius_gen24",
+                        "address": "192.168.1.12",
+                        "user": "customer",
+                        "password": "abc123",
+                        "max_grid_charge_rate": 5000,
+                        "max_pv_charge_rate": 5000,
+                        "max_bat_discharge_rate": 5000
+                    }
+                ),
                 "refresh_time": 3,  # Default refresh time in minutes
                 "time_zone": "Europe/Berlin",  # Add default time zone
                 "eos_connect_web_port": 8081,  # Default port for EOS connect server
@@ -172,7 +183,8 @@ class ConfigManager:
         )
         # pv forecast configuration
         config.yaml_set_comment_before_after_key(
-            "pv_forecast", before="List of PV forecast configurations. Add multiple entries as needed."
+            "pv_forecast", before="List of PV forecast configurations."+
+            " Add multiple entries as needed."
         )
         for index, pv_config in enumerate(config["pv_forecast"]):
             config["pv_forecast"][index].yaml_set_comment_before_after_key(
@@ -197,8 +209,34 @@ class ConfigManager:
             "inverterEfficiency", before="Inverter Efficiency for PV forecast @ Akkudoktor API"
             )
             config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "horizont", before="Horizont to calculate shading up to 360 values to describe shading situation for your PV."
+            "horizont", before="Horizont to calculate shading up to 360 values to describe" +
+            " shading situation for your PV."
             )
+        # inverter configuration
+        config.yaml_set_comment_before_after_key(
+            "inverter", before="Inverter configuration"
+        )
+        config["inverter"].yaml_set_comment_before_after_key(
+            "type", before="Type of inverter - fronius_gen24, fronius_solar_api"
+        )
+        config["inverter"].yaml_set_comment_before_after_key(
+            "address", before="Address of the inverter"
+        )
+        config["inverter"].yaml_set_comment_before_after_key(
+            "user", before="Username for the inverter"
+        )
+        config["inverter"].yaml_set_comment_before_after_key(
+            "password", before="Password for the inverter"
+        )
+        config["inverter"].yaml_set_comment_before_after_key(
+            "max_grid_charge_rate", before="Max grid charge rate in W"
+        )
+        config["inverter"].yaml_set_comment_before_after_key(
+            "max_pv_charge_rate", before="Max PV charge rate in W"
+        )
+        config["inverter"].yaml_set_comment_before_after_key(
+            "max_bat_discharge_rate", before="Max battery discharge rate in W"
+        )
         # refresh time configuration
         config.yaml_set_comment_before_after_key(
             "refresh_time", before="Default refresh time in minutes"

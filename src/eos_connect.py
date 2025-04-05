@@ -14,11 +14,13 @@ import pytz
 import requests
 import pandas as pd
 import numpy as np
-from flask import Flask, render_template_string
+from flask import Flask, Response, render_template_string
 from gevent.pywsgi import WSGIServer
 from config import ConfigManager
+from interfaces.base_control import BaseControl
 from interfaces.load_interface import LoadInterface
 from interfaces.battery_interface import BatteryInterface
+from interfaces.inverter_fronius import FroniusWR
 
 EOS_TGT_DURATION = 48
 EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
@@ -73,6 +75,19 @@ logger.info(
 
 EOS_SERVER = config_manager.config["eos"]["server"]
 EOS_SERVER_PORT = config_manager.config["eos"]["port"]
+
+# initialize base control
+base_control = BaseControl(config_manager.config)
+# initialize the inverter interface
+inverter_config = {
+    "address": config_manager.config["inverter"]["address"],
+    "max_grid_charge_rate": config_manager.config["inverter"]["max_grid_charge_rate"],
+    "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
+    "user": config_manager.config["inverter"]["user"],
+    "password": config_manager.config["inverter"]["password"],
+}
+
+inverter_interface = FroniusWR(inverter_config)
 
 # intialize the load interface
 load_interface = LoadInterface(
@@ -748,10 +763,91 @@ def create_optimize_request(api_version="new"):
 
     return payload
 
+def getting_control_data_from_eos(optimized_response_in):
+    """
+    Process the optimized response from EOS and update the load interface.
+
+    Args:
+        optimized_response (dict): The optimized response from EOS containing control data.
+    """
+    current_hour = datetime.now(time_zone).hour
+    if "ac_charge" in optimized_response_in:
+        ac_charge_demand = optimized_response_in["ac_charge"]
+        # getting entry for current hour
+        ac_charge_demand = ac_charge_demand[current_hour]
+        ac_charge_demand = ac_charge_demand * config_manager.config["battery"]["max_charge_power_w"]
+        base_control.set_current_ac_charge_demand(ac_charge_demand)
+        logger.debug(
+            "[Main] AC charge demand for current hour %s:00 -> %s Wh -" +
+            " based on max charge power %s W",
+            current_hour,
+            ac_charge_demand,
+            config_manager.config["battery"]["max_charge_power_w"]
+        )
+    if "dc_charge" in optimized_response_in:
+        dc_charge_demand = optimized_response_in["dc_charge"]
+        # getting entry for current hour
+        dc_charge_demand = dc_charge_demand[current_hour]
+        dc_charge_demand = dc_charge_demand * config_manager.config["battery"]["max_charge_power_w"]
+        base_control.set_current_dc_charge_demand(dc_charge_demand)
+        logger.debug(
+            "[Main] DC charge demand for current hour %s:00 -> %s Wh -" +
+            " based on max charge power %s W",
+            current_hour,
+            dc_charge_demand,
+            config_manager.config["battery"]["max_charge_power_w"]
+        )
+    if "discharge_allowed" in optimized_response_in:
+        discharge_allowed = optimized_response_in["discharge_allowed"]
+        # getting entry for current hour
+        discharge_allowed = discharge_allowed[current_hour]
+        base_control.set_current_discharge_allowed(discharge_allowed)
+        logger.debug(
+            "[Main] Discharge allowed for current hour %s: %s",
+            current_hour,
+            discharge_allowed
+        )
+    # if "eauto_obj" in optimized_response_in:
+    #     eauto_obj = optimized_response_in["eauto_obj"]
+    else:
+        logger.error("[Main] No control data in optimized response")
+
+def change_control_state():
+    """
+    Adjusts the control state of the inverter based on the current overall state.
+
+    This function checks the current overall state of the inverter and logs the
+    corresponding action. The possible states and their actions are:
+    - MODE_CHARGE_FROM_GRID (state 0): Logs that the inverter is set to charge 
+      from the grid with the specified AC charge demand.
+    - MODE_AVOID_DISCHARGE (state 1): Logs that the inverter is set to avoid discharge.
+    - MODE_DISCHARGE_ALLOWED (state 2): Logs that the inverter is set to allow discharge.
+    - Uninitialized state (state < 0): Logs a warning indicating that the inverter 
+      mode is not initialized yet.
+
+    Returns:
+        bool: Always returns True.
+    """
+    # getting the current state of the inverter
+    # MODE_CHARGE_FROM_GRID
+    if base_control.get_current_overall_state() == 0:
+        inverter_interface.set_mode_force_charge(base_control.get_current_ac_charge_demand())
+        logger.info("[Main] Inverter mode set to charge from grid with %s W",
+                    base_control.get_current_ac_charge_demand())
+    # MODE_AVOID_DISCHARGE
+    elif base_control.get_current_overall_state() == 1:
+        inverter_interface.set_mode_avoid_discharge()
+        logger.info("[Main] Inverter mode set to avoid discharge")
+    # MODE_DISCHARGE_ALLOWED
+    elif base_control.get_current_overall_state() == 2:
+        inverter_interface.set_mode_allow_discharge()
+        logger.info("[Main] Inverter mode set to allow discharge")
+    elif base_control.get_current_overall_state() < 0:
+        logger.warning("[Main] Inverter mode not initialized yet")
+    return True
 
 # web server
 app = Flask(__name__)
-
 
 @app.route("/", methods=["GET"])
 def main_page():
@@ -774,7 +870,10 @@ def get_optimize_request():
         with open(
             base_path + "/json/optimize_request.json", "r", encoding="utf-8"
         ) as json_file:
-            return json_file.read()
+            return Response(
+                json_file.read(),
+                content_type="application/json"
+            )
     except FileNotFoundError as e:
         logger.error("[Main] File not found error while reading optimize_request.json: %s", e)
         return json.dumps({"error": "optimize_request.json file not found"})
@@ -807,8 +906,29 @@ def get_optimize_response():
             "washingstart": 0,
             "timestamp": datetime.now(time_zone).isoformat(),
         }
-        return json.dumps(default_response)
+        return Response(
+            json.dumps(default_response),
+            content_type="application/json"
+        )
 
+@app.route("/json/current_controls.json", methods=["GET"])
+def serve_current_demands():
+    """
+    Returns the current demands for AC and DC charging as a JSON response.
+    """
+    current_ac_charge_demand = base_control.get_current_ac_charge_demand()
+    current_dc_charge_demand = base_control.get_current_dc_charge_demand()
+    current_discharge_allowed = base_control.get_current_discharge_allowed()
+    response_data = {
+        "current_ac_charge_demand": current_ac_charge_demand,
+        "current_dc_charge_demand": current_dc_charge_demand,
+        "current_discharge_allowed": current_discharge_allowed,
+        "timestamp": datetime.now(time_zone).isoformat(),    
+    }
+    return Response(
+        json.dumps(response_data),
+        content_type="application/json"
+    )
 
 if __name__ == "__main__":
 
@@ -830,18 +950,11 @@ if __name__ == "__main__":
     # # persist and update config
     # eos_save_config_to_config_file()
 
-
-    # print(load_interface.get_load_profile(
-    #             EOS_TGT_DURATION,
-    #             datetime.now(time_zone).replace(hour=0, minute=0, second=0, microsecond=0)
-    #             )
-    # )
-
-    # json_optimize_input = create_optimize_request()
-    # optimized_response = eos_set_optimize_request(json_optimize_input)
-    # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
-
-    # get_summerized_pv_forecast(24)
+    # capa = inverter_interface.get_capacity()
+    # logger.info("[Main] Inverter capacity: %s", capa)
+    # # inverter_interface.set_mode_avoid_discharge()
+    # # time.sleep(30)
+    # inverter_interface.shutdown()
 
     # sys.exit()
 
@@ -889,6 +1002,10 @@ if __name__ == "__main__":
                 base_path + "/json/optimize_response.json", "w", encoding="utf-8"
             ) as file:
                 json.dump(optimized_response, file, indent=4)
+            # +++++++++
+            getting_control_data_from_eos(optimized_response)
+            change_control_state()
+            # +++++++++
 
             loop_now = datetime.now(time_zone).astimezone()
             # reset base to full minutes on the clock
@@ -921,6 +1038,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("[Main] Shutting down server")
         http_server.stop()
+        # restore the old config
+        inverter_interface.shutdown()
         optimization_thread.join(timeout=10)
         if optimization_thread.is_alive():
             logger.warning(

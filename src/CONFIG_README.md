@@ -81,6 +81,16 @@ Each PV forecast entry can have the following parameters:
 
 Feel free to add more PV forecast entries under the pv_forecast section by providing a unique name for each entry.
 
+### Inverter Configuration Settings
+
+- **inverter.type**: default: fronius_gen24 - currently not used
+- **inverter.address**: address of the inverter - e.g. 192.168.1.12
+- **inverter.user**: username in local portal e.g. customer
+- **inverter.password**: password for local portal
+- **inverter.max_grid_charge_rate**: e.g. 5000 in Watts
+- **inverter.max_pv_charge_rate**: e.g. 5000 in Watts
+- **inverter.max_bat_discharge_rate**: e.g. 5000 in Watts
+
 ### Other Configuration Settings
 
 **refresh_time**: Default refresh time in minutes.
@@ -146,6 +156,15 @@ pv_forecast:
     powerInverter: 800  # Power Inverter for PV forecast @ Akkudoktor API
     inverterEfficiency: 0.9  # Inverter Efficiency for PV forecast @ Akkudoktor API
     horizont: ""  # Horizont to calculate shading up to 360 values to describe shading situation for your PV
+
+inverter:
+  type: fronius_gen24
+  address: 192.168.1.12
+  user: customer
+  password: abc123
+  max_grid_charge_rate: 5000
+  max_pv_charge_rate: 5000
+  max_bat_discharge_rate: 5000
 
 refresh_time: 3  # Default refresh time in minutes
 time_zone: Europe/Berlin  # Default time zone

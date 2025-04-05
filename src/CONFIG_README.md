@@ -43,7 +43,7 @@ The `pv_forecast` section allows you to define multiple PV forecast entries, eac
 
 ```yaml
 pv_forecast:
-  default:
+  - name: default
     lat: 47.5
     lon: 8.5
     azimuth: 10.0
@@ -52,6 +52,20 @@ pv_forecast:
     powerInverter: 5000
     inverterEfficiency: 0.9
     horizont: "10,20,10,15"
+```
+
+ATTENTION (2025-04-05): incompatible change from 
+
+```yaml
+pv_forecast:
+  default:
+    lat: 47.5
+```
+to
+```yaml
+pv_forecast:
+  - name: default
+    lat: 47.5
 ```
 
 Each PV forecast entry can have the following parameters:
@@ -114,7 +128,7 @@ battery:
   max_soc_percentage: 100  # Maximum state of charge percentage
 
 pv_forecast:
-  roof_west:
+  - name: roof_west
     lat: 47.5  # Latitude for PV forecast @ Akkudoktor API
     lon: 8.5  # Longitude for PV forecast @ Akkudoktor API
     azimuth: 90.0  # Azimuth for PV forecast @ Akkudoktor API
@@ -123,7 +137,7 @@ pv_forecast:
     powerInverter: 5000  # Power Inverter for PV forecast @ Akkudoktor API
     inverterEfficiency: 0.9  # Inverter Efficiency for PV forecast @ Akkudoktor API
     horizont: "10,20,10,15"  # Horizont to calculate shading up to 360 values to describe shading situation for your PV
-  garden_south:
+  - name: garden_south
     lat: 47.5  # Latitude for PV forecast @ Akkudoktor API
     lon: 8.5  # Longitude for PV forecast @ Akkudoktor API
     azimuth: 0.0  # Azimuth for PV forecast @ Akkudoktor API

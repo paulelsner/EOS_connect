@@ -75,22 +75,23 @@ class ConfigManager:
                         "max_soc_percentage": 100,
                     }
                 ),
-                "pv_forecast": CommentedMap(
-                    {
-                        "default": CommentedMap(
-                            {
-                                "lat": 47.5,
-                                "lon": 8.5,
-                                "azimuth": 10.0,
-                                "tilt": 30.0,
-                                "power": 4600,
-                                "powerInverter": 5000,
-                                "inverterEfficiency": 0.9,
-                                "horizont": "10,20,10,15",
-                            }
-                        )
-                    }
-                ),
+                "pv_forecast": [
+                    CommentedMap(
+                        {
+                            "name": "<user defined config>",  # Placeholder for user-defined 
+                            # configuration name
+                            "lat": 47.5,  # Latitude for PV forecast @ Akkudoktor API
+                            "lon": 8.5,  # Longitude for PV forecast @ Akkudoktor API
+                            "azimuth": 90.0,  # Azimuth for PV forecast @ Akkudoktor API
+                            "tilt": 30.0,  # Tilt for PV forecast @ Akkudoktor API
+                            "power": 4600,  # Power for PV forecast @ Akkudoktor API
+                            "powerInverter": 5000,  # Power Inverter for PV forecast @ Akkudoktor API
+                            "inverterEfficiency": 0.9,  # Inverter Efficiency for
+                            # PV forecast @ Akkudoktor API
+                            "horizont": "10,20,10,15",  # Horizont to calculate shading
+                        }
+                    )
+                ],
                 "refresh_time": 3,  # Default refresh time in minutes
                 "time_zone": "Europe/Berlin",  # Add default time zone
                 "eos_connect_web_port": 8081,  # Default port for EOS connect server
@@ -170,36 +171,34 @@ class ConfigManager:
             "max_soc_percentage", before="URL for battery soc"
         )
         # pv forecast configuration
-        config["pv_forecast"].yaml_set_comment_before_after_key(
-            "default", before="Default PV forecast configuration"
+        config.yaml_set_comment_before_after_key(
+            "pv_forecast", before="List of PV forecast configurations. Add multiple entries as needed."
         )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
+        for index, pv_config in enumerate(config["pv_forecast"]):
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
             "lat", before="Latitude for PV forecast @ Akkudoktor API"
-        )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
+            )
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
             "lon", before="Longitude for PV forecast @ Akkudoktor API"
-        )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
+            )
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
             "azimuth", before="Azimuth for PV forecast @ Akkudoktor API"
-        )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
+            )
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
             "tilt", before="Tilt for PV forecast @ Akkudoktor API"
-        )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
+            )
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
             "power", before="Power for PV forecast @ Akkudoktor API"
-        )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
+            )
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
             "powerInverter", before="Power Inverter for PV forecast @ Akkudoktor API"
-        )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
-            "inverterEfficiency",
-            before="Inverter Efficiency for PV forecast @ Akkudoktor API",
-        )
-        config["pv_forecast"]["default"].yaml_set_comment_before_after_key(
-            "horizont",
-            before="horizont to calculate shading up to 360 values to describe shading" +
-                    "sitiation for your pv.",
-        )
+            )
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
+            "inverterEfficiency", before="Inverter Efficiency for PV forecast @ Akkudoktor API"
+            )
+            config["pv_forecast"][index].yaml_set_comment_before_after_key(
+            "horizont", before="Horizont to calculate shading up to 360 values to describe shading situation for your PV."
+            )
         # refresh time configuration
         config.yaml_set_comment_before_after_key(
             "refresh_time", before="Default refresh time in minutes"

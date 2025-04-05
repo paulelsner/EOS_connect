@@ -385,47 +385,46 @@ def get_prices_from_tibber(tgt_duration, start_time=None):
     return extended_prices
 
 
-def create_forecast_request(pv_config_name):
+def create_forecast_request(pv_config_entry):
     """
     Creates a forecast request URL for the EOS server.
     """
     horizont_string = ""
-    if config_manager.config["pv_forecast"][pv_config_name]["horizont"] != "":
+    if pv_config_entry["horizont"] != "":
         horizont_string = "&horizont=" + str(
-            config_manager.config["pv_forecast"][pv_config_name]["horizont"]
+            pv_config_entry["horizont"]
         )
     return (
         EOS_API_GET_PV_FORECAST
         + "?lat="
-        + str(config_manager.config["pv_forecast"][pv_config_name]["lat"])
+        + str(pv_config_entry["lat"])
         + "&lon="
-        + str(config_manager.config["pv_forecast"][pv_config_name]["lon"])
+        + str(pv_config_entry["lon"])
         + "&azimuth="
-        + str(config_manager.config["pv_forecast"][pv_config_name]["azimuth"])
+        + str(pv_config_entry["azimuth"])
         + "&tilt="
-        + str(config_manager.config["pv_forecast"][pv_config_name]["tilt"])
+        + str(pv_config_entry["tilt"])
         + "&power="
-        + str(config_manager.config["pv_forecast"][pv_config_name]["power"])
+        + str(pv_config_entry["power"])
         + "&powerInverter="
-        + str(config_manager.config["pv_forecast"][pv_config_name]["powerInverter"])
+        + str(pv_config_entry["powerInverter"])
         + "&inverterEfficiency="
         + str(
-            config_manager.config["pv_forecast"][pv_config_name]["inverterEfficiency"]
+            pv_config_entry["inverterEfficiency"]
         )
         + horizont_string
     )
 
 
-def get_pv_forecast(tgt_value="power", pv_config_name="default", tgt_duration=24):
+def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
     """
     Fetches the PV forecast data from the EOS API and processes it to extract
     power and temperature values for the specified duration starting from the current hour.
     """
-    if pv_config_name not in config_manager.config["pv_forecast"]:
-        # take the first entry if the config name is not found
-        pv_config_name = list(config_manager.config["pv_forecast"].keys())[0]
-
-    forecast_request_payload = create_forecast_request(pv_config_name)
+    if pv_config_entry is None:
+        logger.error("[FORECAST] No PV config entry provided.")
+        return []
+    forecast_request_payload = create_forecast_request(pv_config_entry)
     # print(forecast_request_payload)
     try:
         response = requests.get(forecast_request_payload, timeout=10)
@@ -454,7 +453,7 @@ def get_pv_forecast(tgt_value="power", pv_config_name="default", tgt_duration=24
             if current_time <= entry_time < end_time:
                 forecast_values.append(forecast.get(tgt_value, 0))
     request_type = "PV forecast"
-    pv_config_name = "for " + pv_config_name
+    pv_config_name = "for " + pv_config_entry["name"]
     if tgt_value == "temperature":
         request_type = "Temperature forecast"
         pv_config_name = ""
@@ -489,7 +488,7 @@ def get_summerized_pv_forecast(tgt_duration=24):
     """
     forecast_values = []
     for config_entry in config_manager.config["pv_forecast"]:
-        # logger.debug("[FORECAST] fetching forecast for %s", config_entry)
+        logger.debug("[FORECAST] fetching forecast for %s", config_entry['name'])
         forecast = get_pv_forecast("power", config_entry, tgt_duration)
         # print("values for " + config_entry+ " -> ")
         # print(forecast)
@@ -726,7 +725,9 @@ def create_optimize_request(api_version="new"):
             "eauto": get_eauto_data(api_version),
             "dishwasher": get_dishwasher_data(),
             "temperature_forecast": get_pv_forecast(
-                tgt_value="temperature", tgt_duration=EOS_TGT_DURATION
+                tgt_value="temperature",
+                pv_config_entry=config_manager.config["pv_forecast"][0],
+                tgt_duration=EOS_TGT_DURATION
             ),
             "start_solution": None,
         }
@@ -738,7 +739,9 @@ def create_optimize_request(api_version="new"):
             "eauto": get_eauto_data(),
             "dishwasher": get_dishwasher_data(),
             "temperature_forecast": get_pv_forecast(
-                tgt_value="temperature", tgt_duration=EOS_TGT_DURATION
+                tgt_value="temperature",
+                pv_config_entry=config_manager.config["pv_forecast"][0],
+                tgt_duration=EOS_TGT_DURATION
             ),
             "start_solution": None,
         }
@@ -828,6 +831,8 @@ if __name__ == "__main__":
     # json_optimize_input = create_optimize_request()
     # optimized_response = eos_set_optimize_request(json_optimize_input)
     # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
+
+    # get_summerized_pv_forecast(24)
 
     # sys.exit()
 

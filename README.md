@@ -12,6 +12,7 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
   - [Installation and Running](#installation-and-running)
   - [Running the Application](#running-the-application)
     - [Using Docker](#using-docker)
+    - [Using in Home Assistant with an Add On](#using-in-home-assistant-with-an-add-on)
     - [Local](#local)
       - [Installation](#installation)
       - [Running Locally](#running-locally)
@@ -90,6 +91,10 @@ Pull existing latest snapshot and run the application in the background using Do
 [![image tags](https://ghcr-badge.egpl.dev/ohand/eos_connect/tags?color=%2344cc11&ignore=latest&n=3&label=latest+image+tags&trim=)](https://github.com/ohAnd/EOS_connect/pkgs/container/eos_connect)
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ohand/eos_connect/docker-image.yml)
+
+### Using in Home Assistant with an Add On
+
+see https://github.com/ohAnd/ha_addons
 
 ### Local
 

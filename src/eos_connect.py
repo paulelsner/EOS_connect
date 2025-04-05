@@ -770,11 +770,20 @@ def get_optimize_request():
     """
     Returns the content of the 'optimize_request.json' file as a JSON response.
     """
-    with open(
-        base_path + "/json/optimize_request.json", "r", encoding="utf-8"
-    ) as json_file:
-        return json_file.read()
-
+    try:
+        with open(
+            base_path + "/json/optimize_request.json", "r", encoding="utf-8"
+        ) as json_file:
+            return json_file.read()
+    except FileNotFoundError as e:
+        logger.error("[Main] File not found error while reading optimize_request.json: %s", e)
+        return json.dumps({"error": "optimize_request.json file not found"})
+    except json.JSONDecodeError as e:
+        logger.error("[Main] JSON decode error while reading optimize_request.json: %s", e)
+        return json.dumps({"error": "Invalid JSON format in optimize_request.json"})
+    except OSError as e:
+        logger.error("[Main] OS error while reading optimize_request.json: %s", e)
+        return json.dumps({"error": str(e)})
 
 @app.route("/json/optimize_response.json", methods=["GET"])
 def get_optimize_response():

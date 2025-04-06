@@ -816,35 +816,49 @@ def change_control_state():
     """
     Adjusts the control state of the inverter based on the current overall state.
 
-    This function checks the current overall state of the inverter and logs the
-    corresponding action. The possible states and their actions are:
-    - MODE_CHARGE_FROM_GRID (state 0): Logs that the inverter is set to charge 
-      from the grid with the specified AC charge demand.
-    - MODE_AVOID_DISCHARGE (state 1): Logs that the inverter is set to avoid discharge.
-    - MODE_DISCHARGE_ALLOWED (state 2): Logs that the inverter is set to allow discharge.
-    - Uninitialized state (state < 0): Logs a warning indicating that the inverter 
+    This function checks the current overall state of the inverter and performs
+    the corresponding action. The possible states and their actions are:
+    - MODE_CHARGE_FROM_GRID (state 0): Sets the inverter to charge from the grid
+      with the specified AC charge demand.
+    - MODE_AVOID_DISCHARGE (state 1): Sets the inverter to avoid discharge.
+    - MODE_DISCHARGE_ALLOWED (state 2): Sets the inverter to allow discharge.
+    - Uninitialized state (state < 0): Logs a warning indicating that the inverter
       mode is not initialized yet.
 
     Returns:
-        bool: Always returns True.
+        bool: True if the state was changed recently and an action was performed,
+              False otherwise.
     """
-    # getting the current state of the inverter
-    # MODE_CHARGE_FROM_GRID
-    if base_control.get_current_overall_state() == 0:
-        inverter_interface.set_mode_force_charge(base_control.get_current_ac_charge_demand())
-        logger.info("[Main] Inverter mode set to charge from grid with %s W",
-                    base_control.get_current_ac_charge_demand())
-    # MODE_AVOID_DISCHARGE
-    elif base_control.get_current_overall_state() == 1:
-        inverter_interface.set_mode_avoid_discharge()
-        logger.info("[Main] Inverter mode set to avoid discharge")
-    # MODE_DISCHARGE_ALLOWED
-    elif base_control.get_current_overall_state() == 2:
-        inverter_interface.set_mode_allow_discharge()
-        logger.info("[Main] Inverter mode set to allow discharge")
-    elif base_control.get_current_overall_state() < 0:
-        logger.warning("[Main] Inverter mode not initialized yet")
-    return True
+    # Check if the overall state of the inverter was changed recently
+    if base_control.was_overall_state_changed_recently(180):
+        logger.debug("[Main] Overall state changed recently")
+        # MODE_CHARGE_FROM_GRID
+        if base_control.get_current_overall_state() == 0:
+            inverter_interface.set_mode_force_charge(base_control.get_current_ac_charge_demand())
+            logger.info("[Main] Inverter mode set to charge from grid with %s W",
+                        base_control.get_current_ac_charge_demand())
+        # MODE_AVOID_DISCHARGE
+        elif base_control.get_current_overall_state() == 1:
+            inverter_interface.set_mode_avoid_discharge()
+            logger.info("[Main] Inverter mode set to avoid discharge")
+        # MODE_DISCHARGE_ALLOWED
+        elif base_control.get_current_overall_state() == 2:
+            inverter_interface.set_mode_allow_discharge()
+            logger.info("[Main] Inverter mode set to allow discharge")
+        elif base_control.get_current_overall_state() < 0:
+            logger.warning("[Main] Inverter mode not initialized yet")
+        return True
+    else:
+        # Log the current state if no recent changes were made
+        state_mapping = {
+            0: "charge from grid",
+            1: "avoid discharge",
+            2: "allow discharge"
+        }
+        current_state = base_control.get_current_overall_state()
+        logger.info("[Main] Overall state not changed recently - remaining in current state: %s",
+                    state_mapping.get(current_state, "unknown state"))
+        return False
 
 # web server
 app = Flask(__name__)

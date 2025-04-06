@@ -67,7 +67,7 @@ class BatteryInterface:
         Returns:
             int: The SOC value as a percentage (0-100). Defaults to 5% in case of an error.
         """
-        logger.info("[BATTERY-IF] getting SOC from openhab ...")
+        logger.debug("[BATTERY-IF] getting SOC from openhab ...")
         openhab_url = self.url + "/rest/items/" + self.soc_sensor
         soc = 5  # Default SOC value in case of error
         try:
@@ -107,7 +107,7 @@ class BatteryInterface:
             requests.exceptions.Timeout: If the request to the Home Assistant API times out.
             requests.exceptions.RequestException: If there is an error during the request.
         """
-        logger.info("[BATTERY-IF] getting SOC from homeassistant ...")
+        logger.debug("[BATTERY-IF] getting SOC from homeassistant ...")
         homeassistant_url = f"{self.url}/api/states/{self.soc_sensor}"
         # Headers for the API request
         headers = {

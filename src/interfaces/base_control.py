@@ -2,6 +2,7 @@
 ...
 """
 import logging
+from time import time
 
 logger = logging.getLogger("__main__")
 logger.info("[BASE_CTRL] loading module ")
@@ -12,15 +13,30 @@ MODE_DISCHARGE_ALLOWED = 2
 
 class BaseControl:
     """
-...
+        BaseControl is a class that manages the state and demands of a control system.
+        It keeps track of the current AC and DC charge demands, discharge allowed status,
+        and the overall state of the system. The overall state can be one of three modes:
+        MODE_CHARGE_FROM_GRID, MODE_AVOID_DISCHARGE, or MODE_DISCHARGE_ALLOWED.
     """
 
-    def __init__(self,config):
+    def __init__(self, config):
         self.current_ac_charge_demand = 0
         self.current_dc_charge_demand = 0
         self.current_discharge_allowed = 1
         self.current_overall_state = MODE_DISCHARGE_ALLOWED
         self.config = config
+        self._state_change_timestamps = []
+
+    def was_overall_state_changed_recently(self, time_window_seconds):
+        """
+        Checks if the overall state was changed within the last `time_window_seconds`.
+        """
+        current_time = time()
+        # Remove timestamps older than the time window
+        self._state_change_timestamps = [
+            ts for ts in self._state_change_timestamps if current_time - ts <= time_window_seconds
+        ]
+        return len(self._state_change_timestamps) > 0
 
     def get_current_ac_charge_demand(self):
         """
@@ -72,14 +88,21 @@ class BaseControl:
 
     def set_current_overall_state(self):
         """
-        Sets the current overall state.
+        Sets the current overall state and logs the timestamp if it changes.
         """
         if self.current_ac_charge_demand > 0:
             value = MODE_CHARGE_FROM_GRID
-        # elif self.current_dc_charge_demand > 0:
         elif self.current_discharge_allowed > 0:
             value = MODE_DISCHARGE_ALLOWED
         else:
             value = MODE_AVOID_DISCHARGE
-        logger.debug("[BASE_CTRL] set current overall state to %s", value)
+
+        if value != self.current_overall_state:
+            self._state_change_timestamps.append(time())
+            # Limit the size of the state change timestamps to avoid memory overrun
+            max_timestamps = 1000  # Adjust this value as needed
+            if len(self._state_change_timestamps) > max_timestamps:
+                self._state_change_timestamps.pop(0)
+            logger.debug("[BASE_CTRL] overall state changed to %s", value)
+
         self.current_overall_state = value

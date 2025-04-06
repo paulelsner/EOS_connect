@@ -21,6 +21,7 @@ from interfaces.base_control import BaseControl
 from interfaces.load_interface import LoadInterface
 from interfaces.battery_interface import BatteryInterface
 from interfaces.inverter_fronius import FroniusWR
+from interfaces.evcc_interface import EvccInterface
 
 EOS_TGT_DURATION = 48
 EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
@@ -51,13 +52,14 @@ streamhandler.setFormatter(formatter)
 logger.addHandler(streamhandler)
 logger.setLevel(LOGLEVEL)
 logger.info("[Main] Starting eos_connect")
-
+###################################################################################################
 base_path = os.path.dirname(os.path.abspath(__file__))
 # get param to set a specific path
 if len(sys.argv) > 1:
     current_dir = sys.argv[1]
 else:
     current_dir = base_path
+###################################################################################################
 config_manager = ConfigManager(current_dir)
 time_zone = pytz.timezone(config_manager.config["time_zone"])
 
@@ -79,15 +81,41 @@ EOS_SERVER_PORT = config_manager.config["eos"]["port"]
 # initialize base control
 base_control = BaseControl(config_manager.config)
 # initialize the inverter interface
-inverter_config = {
-    "address": config_manager.config["inverter"]["address"],
-    "max_grid_charge_rate": config_manager.config["inverter"]["max_grid_charge_rate"],
-    "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
-    "user": config_manager.config["inverter"]["user"],
-    "password": config_manager.config["inverter"]["password"],
-}
+inverter_interface = None
+if config_manager.config["inverter"]["type"] == "fronius_gen24":
+    inverter_config = {
+        "address": config_manager.config["inverter"]["address"],
+        "max_grid_charge_rate": config_manager.config["inverter"]["max_grid_charge_rate"],
+        "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
+        "user": config_manager.config["inverter"]["user"],
+        "password": config_manager.config["inverter"]["password"],
+    }
+    inverter_interface = FroniusWR(inverter_config)
+else:
+    logger.info("[Inverter] Inverter type %s - no external connection." + 
+                " Changing to show only mode.", config_manager.config["inverter"]["type"])
 
-inverter_interface = FroniusWR(inverter_config)
+# initialize the evcc interface
+def charging_state_callback(new_state):
+    """
+    Callback function that gets triggered when the charging state changes.
+    """
+    logger.info("[MAIN] EVCC Event - Charging state changed to: %s",
+                 new_state)
+    change_control_state()
+    return None
+
+evcc_interface = EvccInterface(
+    url=config_manager.config["evcc"]["url"],
+    update_interval=10,
+    on_charging_state_change=charging_state_callback
+)
+
+# time.sleep(120)
+
+# evcc_interface.shutdown()
+
+# sys.exit(0)
 
 # intialize the load interface
 load_interface = LoadInterface(
@@ -129,6 +157,8 @@ EOS_API_OPTIMIZE = f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/optimize"
 EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
 AKKUDOKTOR_API_PRICES = "https://api.akkudoktor.net/prices"
 TIBBER_API = "https://api.tibber.com/v1-beta/gql"
+
+
 
 
 # EOS basic API helper
@@ -829,21 +859,32 @@ def change_control_state():
         bool: True if the state was changed recently and an action was performed,
               False otherwise.
     """
+    inverter_en = False
+    if config_manager.config["inverter"]["type"] == "fronius_gen24":
+        inverter_en = True
+
+    # getting the current charging state from evcc
+    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
+
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
         logger.debug("[Main] Overall state changed recently")
         # MODE_CHARGE_FROM_GRID
         if base_control.get_current_overall_state() == 0:
-            inverter_interface.set_mode_force_charge(base_control.get_current_ac_charge_demand())
+            if inverter_en:
+                inverter_interface.set_mode_force_charge(
+                    base_control.get_current_ac_charge_demand())
             logger.info("[Main] Inverter mode set to charge from grid with %s W",
                         base_control.get_current_ac_charge_demand())
         # MODE_AVOID_DISCHARGE
         elif base_control.get_current_overall_state() == 1:
-            inverter_interface.set_mode_avoid_discharge()
+            if inverter_en:
+                inverter_interface.set_mode_avoid_discharge()
             logger.info("[Main] Inverter mode set to avoid discharge")
         # MODE_DISCHARGE_ALLOWED
         elif base_control.get_current_overall_state() == 2:
-            inverter_interface.set_mode_allow_discharge()
+            if inverter_en:
+                inverter_interface.set_mode_allow_discharge()
             logger.info("[Main] Inverter mode set to allow discharge")
         elif base_control.get_current_overall_state() < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
@@ -1053,7 +1094,12 @@ if __name__ == "__main__":
         logger.info("[Main] Shutting down server")
         http_server.stop()
         # restore the old config
-        inverter_interface.shutdown()
+        if (
+            config_manager.config["inverter"]["type"] == "fronius_gen24"
+            and inverter_interface is not None
+        ):
+            inverter_interface.shutdown()
+        evcc_interface.shutdown()
         optimization_thread.join(timeout=10)
         if optimization_thread.is_alive():
             logger.warning(

@@ -85,11 +85,14 @@ Feel free to add more PV forecast entries under the pv_forecast section by provi
 
 - **inverter.type**: default: fronius_gen24 - currently not used
 - **inverter.address**: address of the inverter - e.g. 192.168.1.12
-- **inverter.user**: username in local portal e.g. customer
+- **inverter.user**: username in local portal e.g. customer (inverter local webpage login data - be aware: website Customer vs. customer in this level)
 - **inverter.password**: password for local portal
 - **inverter.max_grid_charge_rate**: e.g. 5000 in Watts
 - **inverter.max_pv_charge_rate**: e.g. 5000 in Watts
 - **inverter.max_bat_discharge_rate**: e.g. 5000 in Watts
+
+### EVCC Configuration Settings
+- **evcc.url**: url to EVCC instance e.g. htpp://192.168.0.1:7070
 
 ### Other Configuration Settings
 
@@ -111,13 +114,13 @@ If the configuration file does not exist, the application will create one with d
 ```yaml
 load:
   source: default  # Data source for load power - openhab, homeassistant, default (static data)
-  url: http://<ip>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
+  url: http://<ip-address>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
   load_sensor: sensor.load_power # item / entity name for load power data (openhab item/ homeassitant sensor)
   car_charge_load_sensor: sensor.car_charge_load_sensor # item / entity for wallbox power data
   access_token: 123456abcd # access token for homeassistant (optional)
 
 eos:
-  server: 192.168.1.94  # EOS server address
+  server: <ip-address>  # EOS server address
   port: 8503  # port for EOS server
   timeout: 180 # timeout for EOS optimize request in seconds
 
@@ -127,7 +130,7 @@ price:
 
 battery:
   source: default  # Data source for battery SOC - openhab, homeassistant, default (static data)
-  url: http://<ip>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
+  url: http://<ip-address>:8080  # URL for openhab (e.g. ip:8080) or homeassistant (e.g. ip:8123)
   load.load_sensor: sensor.battery_soc
   load.access_token: 123456abcd # access token for homeassistant (optional)
   capacity_wh: 11059  # Battery capacity in Wh
@@ -158,13 +161,16 @@ pv_forecast:
     horizont: ""  # Horizont to calculate shading up to 360 values to describe shading situation for your PV
 
 inverter:
-  type: fronius_gen24
-  address: 192.168.1.12
-  user: customer
-  password: abc123
-  max_grid_charge_rate: 5000
-  max_pv_charge_rate: 5000
-  max_bat_discharge_rate: 5000
+  type: fronius_gen24 # default or fronius_gen24 - default disables the controlling
+  address: <ip-address> # address of the inverter - e.g. 192.168.1.12
+  user: customer # username in local portal e.g. customer
+  password: abc123 # password for local portal
+  max_grid_charge_rate: 5000 # in Watts
+  max_pv_charge_rate: 5000 # in Watts
+  max_bat_discharge_rate: 5000 # in Watts
+
+evcc:
+  url: http://<ip>:7070 # URL to your evcc installation
 
 refresh_time: 3  # Default refresh time in minutes
 time_zone: Europe/Berlin  # Default time zone

@@ -103,6 +103,12 @@ class ConfigManager:
                         "max_bat_discharge_rate": 5000
                     }
                 ),
+                "evcc": CommentedMap(
+                    {
+                        "url": "http://<ip>:7070",  # URL for EVCC server
+                    }
+                ),
+
                 "refresh_time": 3,  # Default refresh time in minutes
                 "time_zone": "Europe/Berlin",  # Add default time zone
                 "eos_connect_web_port": 8081,  # Default port for EOS connect server
@@ -236,6 +242,13 @@ class ConfigManager:
         )
         config["inverter"].yaml_set_comment_before_after_key(
             "max_bat_discharge_rate", before="Max battery discharge rate in W"
+        )
+        # evcc configuration
+        config.yaml_set_comment_before_after_key(
+            "evcc", before="EVCC configuration"
+        )
+        config["evcc"].yaml_set_comment_before_after_key(
+            "url", before="URL for EVCC server"
         )
         # refresh time configuration
         config.yaml_set_comment_before_after_key(

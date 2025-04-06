@@ -21,8 +21,10 @@ class BaseControl:
 
     def __init__(self, config):
         self.current_ac_charge_demand = 0
+        self.last_ac_charge_demand = 0
         self.current_dc_charge_demand = 0
         self.current_discharge_allowed = 1
+        self.current_evcc_charging_state = False
         self.current_overall_state = MODE_DISCHARGE_ALLOWED
         self.config = config
         self._state_change_timestamps = []
@@ -86,6 +88,14 @@ class BaseControl:
         # logger.debug("[BASE_CTRL] set current discharge demand to %s", value)
         self.set_current_overall_state()
 
+    def set_current_evcc_charging_state(self, value):
+        """
+        Sets the current EVCC charging state.
+        """
+        self.current_evcc_charging_state = value
+        # logger.debug("[BASE_CTRL] set current EVCC charging state to %s", value)
+        self.set_current_overall_state()
+
     def set_current_overall_state(self):
         """
         Sets the current overall state and logs the timestamp if it changes.
@@ -96,13 +106,27 @@ class BaseControl:
             value = MODE_DISCHARGE_ALLOWED
         else:
             value = MODE_AVOID_DISCHARGE
+        # check if the grid charge demand has changed
+        grid_charge_value_changed = self.current_ac_charge_demand != self.last_ac_charge_demand
 
-        if value != self.current_overall_state:
+        # override overall state if EVCC charging state is active and discharge is allowed
+        if value == MODE_DISCHARGE_ALLOWED and self.current_evcc_charging_state:
+            value = MODE_AVOID_DISCHARGE
+            logger.info("[BASE_CTRL] EVCC charging state is active,"+
+                        " setting overall state to MODE_AVOID_DISCHARGE")
+
+        if value != self.current_overall_state or grid_charge_value_changed:
             self._state_change_timestamps.append(time())
             # Limit the size of the state change timestamps to avoid memory overrun
             max_timestamps = 1000  # Adjust this value as needed
             if len(self._state_change_timestamps) > max_timestamps:
                 self._state_change_timestamps.pop(0)
-            logger.debug("[BASE_CTRL] overall state changed to %s", value)
+            if grid_charge_value_changed:
+                logger.info("[BASE_CTRL] AC charge demand changed to %s",
+                            self.current_ac_charge_demand)
+            else:
+                logger.debug("[BASE_CTRL] overall state changed to %s", value)
+        # store the last AC charge demand for comparison
+        self.last_ac_charge_demand = self.current_ac_charge_demand
 
         self.current_overall_state = value

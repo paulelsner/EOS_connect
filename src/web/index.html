@@ -183,22 +183,10 @@
                     <span class="header_notification" id="timestamp_battery">--.--.--</span>
                 </div>
                 <div class="content">
-                    <div id="control_ac_charge">AC Charge: 0</div>
-                    <div id="control_dc_charge">DC Charge: 0</div>
-                    <div id="control_discharge_allowed">Discharge Allowed: 0</div>
-                </div>
-            </div>
-            <div class="top-box">
-                <div class="header"><i class="fa-solid fa-battery-full"></i></i> Last Charge</div>
-                <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
                         <tr>
-                            <th style="text-align: left;"></th>
-                            <th style="text-align: center;"></th>
-                        </tr>
-                        <tr>
-                            <td>Time</td>
-                            <td colspan="2" style="text-align: right;" id="last_charge_time">... last charge time</td>
+                            <th style="text-align: left;">Overall State</th>
+                            <th style="text-align: right;" id="control_overall"></th>
                         </tr>
                         <tr>
                             <td colspan="3">
@@ -206,12 +194,40 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Avg Price</td>
-                            <td colspan="2" style="text-align: right;" id="last_charge_avg_price">... kWh</td>
+                            <td>AC Charge</td>
+                            <td colspan="2" style="text-align: right;" id="control_ac_charge">--</td>
                         </tr>
                         <tr>
-                            <td>Energy Amount</td>
-                            <td colspan="2" style="text-align: right;" id="last_charge_amount">... kWh</td>
+                            <td>DC Charge</td>
+                            <td colspan="2" style="text-align: right;" id="control_dc_charge">--</td>
+                        </tr>
+                        <tr>
+                            <td>Discharge Allowed</td>
+                            <td colspan="2" style="text-align: right;" id="control_discharge_allowed">--</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="top-box">
+                <div class="header"><i class="fa-solid fa-battery-full"></i></i> Battery State</div>
+                <div class="content">
+                    <table style="width: 100%; text-align: left;padding-top: 10px;">
+                        <tr>
+                            <th style="text-align: left;">SOC</th>
+                            <th style="text-align: right;" id="battery_soc">-- %</th>
+                        </tr>
+                        <tr>
+                            <td colspan="3">
+                                <hr>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>...</td>
+                            <td colspan="2" style="text-align: right;" id="last_charge_avg_price">--</td>
+                        </tr>
+                        <tr>
+                            <td>...</td>
+                            <td colspan="2" style="text-align: right;" id="last_charge_amount">--</td>
                         </tr>
                     </table>
                 </div>
@@ -221,12 +237,8 @@
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
                         <tr>
-                            <th style="text-align: left;"></th>
-                            <th style="text-align: center;"></th>
-                        </tr>
-                        <tr>
-                            <td>Planned Time</td>
-                            <td colspan="2" style="text-align: right;" id="next_charge_time">... next charge time</td>
+                            <th style="text-align: left;">Planned Time</th>
+                            <th style="text-align: right;" id="next_charge_time">... next charge time</th>
                         </tr>
                         <tr>
                             <td colspan="3">
@@ -238,8 +250,12 @@
                             <td colspan="2" style="text-align: right;" id="next_charge_avg_price">... kWh</td>
                         </tr>
                         <tr>
-                            <td>Needed Energy Next Day</td>
+                            <td>Needed Energy</td>
                             <td colspan="2" style="text-align: right;" id="next_charge_amount">... kWh</td>
+                        </tr>
+                        <tr>
+                            <td>Charging Price</td>
+                            <td colspan="2" style="text-align: right;" id="next_charge_sum_price">... €</td>
                         </tr>
                     </table>
                 </div>
@@ -257,7 +273,7 @@
                             <td>current</td>
                             <td style="text-align: left;"></td>
                             <td style="text-align: center;">Price</td>
-                            <td style="text-align: right;" id="current_price">0.30 €</td>
+                            <td style="text-align: right;" id="current_price">-.-- €</td>
                         </tr>
                         <tr>
                             <td colspan="4">
@@ -266,27 +282,21 @@
                         </tr>
                         <tr>
                             <td>Grid</td>
-                            <td class="valueChange" style="text-align: right;" id="current_grid_power">500 W</td>
+                            <td class="valueChange" style="text-align: right;" id="current_grid_power">--- W</td>
                             <td style="text-align: center;">Price</td>
-                            <td class="valueChange" style="text-align: right;" id="current_grid_price">0.30 €</td>
+                            <td class="valueChange" style="text-align: right;" id="current_grid_price">-.-- €</td>
                         </tr>
                         <tr>
                             <td>Inverter</td>
-                            <td class="valueChange" style="text-align: right;" id="current_inverter_power">500 W</td>
+                            <td class="valueChange" style="text-align: right;" id="current_inverter_power">--- W</td>
                             <td style="text-align: center;">Price</td>
                             <td class="valueChange" style="text-align: right;" id="current_inverter_price"></td>
                         </tr>
                         <tr>
-                            <td>PV Garden</td>
-                            <td class="valueChange" style="text-align: right;" id="current_pv_garden_power">500 W</td>
-                            <td style="text-align: center;">Price</td>
-                            <td class="valueChange" style="text-align: right;" id="current_pv_garden_price"></td>
-                        </tr>
-                        <tr>
                             <td>Load</td>
-                            <td class="valueChange" style="text-align: right;" id="current_load_power">500 W</td>
+                            <td class="valueChange" style="text-align: right;" id="current_load_power">--- W</td>
                             <td style="text-align: center;">Price</td>
-                            <td class="valueChange" style="text-align: right;" id="current_load_price">0.30 €</td>
+                            <td class="valueChange" style="text-align: right;" id="current_load_price">-.-- €</td>
                         </tr>
                     </table>
                 </div>
@@ -339,28 +349,6 @@
     </div>
     <script>
         let max_charge_power_w = 0;
-
-        async function fetchCurrentGridPower() {
-            const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Grid_Power');
-            let data = await response.json();
-            data = data.state.split(' ')[0];
-            data = parseFloat(data).toFixed(0);
-            return data;
-        }
-        async function fetchCurrentInverterPower() {
-            const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Inverter_Power');
-            let data = await response.json();
-            data = data.state.split(' ')[0];
-            data = parseFloat(data).toFixed(0);
-            return data;
-        }
-        async function fetchCurrentSolarPower() {
-            const response = await fetch('http://192.168.1.30:8080/rest/items/inverterGrid_P');
-            let data = await response.json();
-            data = data.state.split(' ')[0];
-            data = parseFloat(data).toFixed(0);
-            return data;
-        }
         async function fetchCurrentLoadPower() {
             const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Load_Power');
             let data = await response.json();
@@ -369,54 +357,8 @@
             return data;
         }
 
-        function lastCharge(data) {
-            // *************** last charge ****************
-            // timestamp last charge
-            const lastChargeEntry = data["energyBatteryChargeDischargeJSON"].chargeHours.length - 1;
-            const lastChargeEntryEnd = data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry].length - 1;
-
-            // 2025-01-19T17:00+01:00[Europe/Berlin] => to timestamp
-            var lastChargeTimeStart = new Date(data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry][0].hour.replace('[Europe/Berlin]', ''));
-            var lastChargeTimeEnd = new Date(data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry][lastChargeEntryEnd].hour.replace('[Europe/Berlin]', ''));
-            lastChargeTimeEnd.setHours(lastChargeTimeEnd.getHours() + 1);
-
-            document.getElementById('last_charge_time').innerHTML = "" + lastChargeTimeStart.toLocaleString() + " - " + lastChargeTimeEnd.toLocaleString();
-            document.getElementById('last_charge_amount').innerText = (data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry].reduce((sum, hourData) => sum + (hourData.energy * -1), 0)).toFixed(3) + " kWh";
-
-            const chargeDuration = (lastChargeTimeEnd - lastChargeTimeStart) / (1000 * 60 * 60);
-            lastChargeAvgPrice = data["energyBatteryChargeDischargeJSON"].chargeHours[lastChargeEntry].reduce((sum, hourData) => sum + (hourData.price), 0) / chargeDuration;
-            document.getElementById('last_charge_avg_price').innerText = lastChargeAvgPrice.toFixed(4) + " €/kWh";
-        }
-
-        async function displayCurrentValues(data) {
-            // *************** display current values ****************
-            let currentGridPower = parseFloat(await fetchCurrentGridPower());
-            let currentInverterPower = parseFloat(await fetchCurrentInverterPower());
-            let currentSolarPower = parseFloat(await fetchCurrentSolarPower());
-            //let currentLoadPower = await fetchCurrentLoadPower();            
-            let currentLoadPower = currentGridPower + currentInverterPower + currentSolarPower
-
-            const currentPriceCent = parseFloat(data["energyPricesJSON"].priceToday[new Date().getHours()]) * 100;
-            const currentGridPriceCent = currentGridPower / currentLoadPower * currentPriceCent;
-            const lastChargeAvgPriceCent = lastChargeAvgPrice * 100;
-            const priceBatteryDischargeCent = currentInverterPower / currentLoadPower * lastChargeAvgPriceCent;
-            let resultingPriceCent = currentGridPriceCent + priceBatteryDischargeCent;
-
-            document.getElementById('current_grid_power').innerText = currentGridPower + " W";
-            document.getElementById('current_inverter_power').innerText = currentInverterPower + " W";
-            document.getElementById('current_pv_garden_power').innerText = currentSolarPower + " W";
-            document.getElementById('current_load_power').innerText = currentLoadPower + " W";
-
-            document.getElementById('current_price').innerText = currentPriceCent.toFixed(1) + " ct";
-            document.getElementById('current_grid_price').innerText = currentGridPriceCent.toFixed(1) + " ct";
-            document.getElementById('current_inverter_price').innerText = priceBatteryDischargeCent.toFixed(1) + " ct";
-            document.getElementById('current_pv_garden_price').innerText = "0.0 ct";
-            document.getElementById('current_load_price').innerText = resultingPriceCent.toFixed(1) + " ct";
-        }
-
         let chartInstance = null;
-        let batteryChartInstance = null;
-
+        
         function isMobile() {
             return window.innerWidth <= 768;
         }
@@ -725,7 +667,7 @@
             if (!data_response || !data_response["result"] || !data_response["result"]["Last_Wh_pro_Stunde"] || data_response["result"]["Last_Wh_pro_Stunde"].length === 0) {
                 return;
             }
-            if (chartInstance){ // && batteryChartInstance) {
+            if (chartInstance){
                 updateChart(data_request,data_response);
             } else {
                 createChart(data_request,data_response);
@@ -745,15 +687,60 @@
             //document.getElementById('timestamp_history').innerText = data["energyHistoricConsumptionJSON"].timestamp;
             //document.getElementById('timestamp_battery').innerHTML = data["energyBatteryChargeDischargeJSON"].timestamp;
             
-            //lastCharge(data);
             showBatteryCharge(data_request,data_response);
             //await displayCurrentValues(data);
 
             const data_controls = await fetch_EOS_Connect_Data("current_controls.json");
-            document.getElementById('control_ac_charge').innerText = "AC Charge: " + data_controls["current_ac_charge_demand"].toFixed(0) + " Wh";
-            document.getElementById('control_dc_charge').innerText = "DC Charge: " + data_controls["current_dc_charge_demand"].toFixed(0) + " Wh";
-            document.getElementById('control_discharge_allowed').innerText = "Discharge Allowed: " + (data_controls["current_discharge_allowed"] === 1 ? "Yes" : "No");
+            document.getElementById('control_ac_charge').innerText = data_controls["current_states"]["current_ac_charge_demand"].toFixed(0) + " Wh";
+            document.getElementById('control_dc_charge').innerText = data_controls["current_states"]["current_dc_charge_demand"].toFixed(0) + " Wh";
+            document.getElementById('control_discharge_allowed').innerText = (data_controls["current_states"]["current_discharge_allowed"] === true ? "Yes" : "No");
+            document.getElementById('control_overall').innerText = data_controls["current_states"]["inverter_mode"];
 
+            document.getElementById('battery_soc').innerText = data_controls["battery_soc"] + " %";
+            
+            
+            var currentHour = new Date().getHours();
+            var next_charge_time = data_response["ac_charge"].slice(currentHour).findIndex((value) => value > 0);
+            if (next_charge_time !== -1) {
+                next_charge_time += currentHour;
+                var next_charge_time_hour = next_charge_time % 24;
+                document.getElementById('next_charge_time').innerText = next_charge_time_hour + ":00";
+            } else {
+                document.getElementById('next_charge_time').innerText = "--:--";
+            }
+            // get the average price for the next charging
+            let next_charge_avg_price = (data_response["result"]["Electricity_price"][next_charge_time - currentHour] * 100000);
+            if (next_charge_time !== -1) {
+                document.getElementById('next_charge_avg_price').innerText = (next_charge_avg_price).toFixed(1) + " ct/kWh";
+            } else {
+                document.getElementById('next_charge_avg_price').innerText = "-- ct/kWh";
+            }
+            
+            var next_charge_amount = 0;
+            var foundFirst = false;
+            data_response["ac_charge"].slice(currentHour).forEach((value) => {
+                if (value > 0) {
+                    if (!foundFirst) {
+                        foundFirst = true;
+                    }
+                    next_charge_amount += value * max_charge_power_w;
+                } else if (foundFirst) {
+                    return; // Stop adding once a 0 is encountered after the first finding
+                }
+            });
+            if (next_charge_amount === 0) {
+                document.getElementById('next_charge_amount').innerText = "-.- kWh";
+            } else {
+                document.getElementById('next_charge_amount').innerText = (next_charge_amount / 1000).toFixed(2) + " kWh";
+            }
+            // next_charge_sum_price
+            var next_charge_sum_price = (next_charge_amount * next_charge_avg_price) / 1000;
+
+            if (next_charge_sum_price === 0) {
+                document.getElementById('next_charge_sum_price').innerText = "-.- €";
+            } else {
+                document.getElementById('next_charge_sum_price').innerText = (next_charge_sum_price / 100).toFixed(2) + " €";
+            }
         }
 
         init();

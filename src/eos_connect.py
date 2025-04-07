@@ -681,19 +681,19 @@ def change_control_state():
                     base_control.get_current_ac_charge_demand()
                 )
             logger.info(
-                "[Main] Inverter mode set to charge from grid with %s W",
+                "[Main] Inverter mode set to charge from grid with %s W (_____|||||_____)",
                 base_control.get_current_ac_charge_demand(),
             )
         # MODE_AVOID_DISCHARGE
         elif base_control.get_current_overall_state() == 1:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
-            logger.info("[Main] Inverter mode set to avoid discharge")
+            logger.info("[Main] Inverter mode set to AVOID discharge (_____-----_____)")
         # MODE_DISCHARGE_ALLOWED
         elif base_control.get_current_overall_state() == 2:
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
-            logger.info("[Main] Inverter mode set to allow discharge")
+            logger.info("[Main] Inverter mode set to ALLOW discharge (_____+++++_____)")
         elif base_control.get_current_overall_state() < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
@@ -705,7 +705,8 @@ def change_control_state():
     }
     current_state = base_control.get_current_overall_state()
     logger.info(
-        "[Main] Overall state not changed recently - remaining in current state: %s",
+        "[Main] Overall state not changed recently"+
+        " - remaining in current state: %s  (_____OOOOO_____)",
         state_mapping.get(current_state, "unknown state"),
     )
     return False
@@ -785,9 +786,14 @@ def serve_current_demands():
     current_dc_charge_demand = base_control.get_current_dc_charge_demand()
     current_discharge_allowed = base_control.get_current_discharge_allowed()
     response_data = {
-        "current_ac_charge_demand": current_ac_charge_demand,
-        "current_dc_charge_demand": current_dc_charge_demand,
-        "current_discharge_allowed": current_discharge_allowed,
+        "current_states": {
+            "current_ac_charge_demand": current_ac_charge_demand,
+            "current_dc_charge_demand": current_dc_charge_demand,
+            "current_discharge_allowed": current_discharge_allowed,
+            "inverter_mode": base_control.get_current_overall_state(False),
+            "evcc_charging_state": base_control.get_current_evcc_charging_state(),
+        },
+        "battery_soc": base_control.get_current_battery_soc(),
         "timestamp": datetime.now(time_zone).isoformat(),
     }
     return Response(json.dumps(response_data), content_type="application/json")

@@ -73,17 +73,27 @@ class BaseControl:
         """
         return self.current_discharge_allowed
 
-    def get_current_overall_state(self):
+    def get_current_overall_state(self, number=True):
         """
         Returns the current overall state.
         """
-        return self.current_overall_state
+        if number:
+            return self.current_overall_state
+        else:
+            # Return the string representation of the state
+            return state_mapping.get(self.current_overall_state, "unknown state")
 
     def get_current_battery_soc(self):
         """
         Returns the current battery state of charge (SOC).
         """
         return self.current_battery_soc
+
+    def get_current_evcc_charging_state(self):
+        """
+        Returns the current EVCC charging state.
+        """
+        return self.current_evcc_charging_state
 
     def set_current_ac_charge_demand(self, value_relative):
         """

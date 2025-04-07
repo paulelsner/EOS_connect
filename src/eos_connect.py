@@ -12,8 +12,6 @@ from threading import Thread
 import sched
 import pytz
 import requests
-import pandas as pd
-import numpy as np
 from flask import Flask, Response, render_template_string
 from gevent.pywsgi import WSGIServer
 from config import ConfigManager
@@ -22,9 +20,10 @@ from interfaces.load_interface import LoadInterface
 from interfaces.battery_interface import BatteryInterface
 from interfaces.inverter_fronius import FroniusWR
 from interfaces.evcc_interface import EvccInterface
+from interfaces.eos_interface import EosInterface
 
 EOS_TGT_DURATION = 48
-EOS_START_TIME = None  # None = midnight before EOS_TGT_DURATION hours
+
 
 ###################################################################################################
 # Custom formatter to use the configured timezone
@@ -32,6 +31,7 @@ class TimezoneFormatter(logging.Formatter):
     """
     A custom logging formatter that formats log timestamps according to a specified timezone.
     """
+
     def __init__(self, fmt=None, datefmt=None, tz=None):
         super().__init__(fmt, datefmt)
         self.tz = tz
@@ -40,8 +40,10 @@ class TimezoneFormatter(logging.Formatter):
         # Convert the record's timestamp to the configured timezone
         record_time = datetime.fromtimestamp(record.created, self.tz)
         return record_time.strftime(datefmt or self.default_time_format)
+
+
 ###################################################################################################
-LOGLEVEL = logging.DEBUG # start before reading the config file
+LOGLEVEL = logging.DEBUG  # start before reading the config file
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter(
     "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"
@@ -72,43 +74,50 @@ streamhandler.setFormatter(formatter)
 logger.info(
     "[Main] set user defined time zone to %s and loglevel to %s",
     config_manager.config["time_zone"],
-    LOGLEVEL
+    LOGLEVEL,
 )
-
-EOS_SERVER = config_manager.config["eos"]["server"]
-EOS_SERVER_PORT = config_manager.config["eos"]["port"]
-
+# initialize eos interface
+eos_interface = EosInterface(
+    eos_server=config_manager.config["eos"]["server"],
+    eos_port=config_manager.config["eos"]["port"],
+    timezone=time_zone,
+)
 # initialize base control
-base_control = BaseControl(config_manager.config)
+base_control = BaseControl(config_manager.config, time_zone)
 # initialize the inverter interface
 inverter_interface = None
 if config_manager.config["inverter"]["type"] == "fronius_gen24":
     inverter_config = {
         "address": config_manager.config["inverter"]["address"],
-        "max_grid_charge_rate": config_manager.config["inverter"]["max_grid_charge_rate"],
+        "max_grid_charge_rate": config_manager.config["inverter"][
+            "max_grid_charge_rate"
+        ],
         "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
         "user": config_manager.config["inverter"]["user"],
         "password": config_manager.config["inverter"]["password"],
     }
     inverter_interface = FroniusWR(inverter_config)
 else:
-    logger.info("[Inverter] Inverter type %s - no external connection." + 
-                " Changing to show only mode.", config_manager.config["inverter"]["type"])
+    logger.info(
+        "[Inverter] Inverter type %s - no external connection."
+        + " Changing to show only mode.",
+        config_manager.config["inverter"]["type"],
+    )
 
-# initialize the evcc interface
+
+# callback function for evcc interface
 def charging_state_callback(new_state):
     """
     Callback function that gets triggered when the charging state changes.
     """
-    logger.info("[MAIN] EVCC Event - Charging state changed to: %s",
-                 new_state)
+    logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
     change_control_state()
-    return None
+
 
 evcc_interface = EvccInterface(
     url=config_manager.config["evcc"]["url"],
     update_interval=10,
-    on_charging_state_change=charging_state_callback
+    on_charging_state_change=charging_state_callback,
 )
 
 # time.sleep(120)
@@ -134,100 +143,9 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("access_token", ""),
 )
 
-# *** EOS API URLs ***
-
-EOS_API_PUT_CONFIG_VALUES = (
-    f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/v1/config/value"  # ?key=..&value=..
-)
-EOS_API_POST_UPDATE_CONFIG_FROM_CONFIG_FILE = {
-    f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/v1/config/update"
-}
-EOS_API_PUT_SAVE_CONFIG_TO_CONFIG_FILE = {
-    f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/v1/config/file"
-}
-EOS_API_GET_CONFIG_VALUES = {f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/v1/config"}
-EOS_API_PUT_LOAD_PROFILE = {
-    f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/v1/measurement/load-mr/value/by-name"
-}
-EOS_API_PUT_LOAD_SERIES = {
-    f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/v1/measurement/load-mr/series/by-name"  #
-}  # ?name=Household
-EOS_API_OPTIMIZE = f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/optimize"
-
 EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
 AKKUDOKTOR_API_PRICES = "https://api.akkudoktor.net/prices"
 TIBBER_API = "https://api.tibber.com/v1-beta/gql"
-
-
-
-
-# EOS basic API helper
-def set_config_value(key, value):
-    """
-    Set a configuration value on the EOS server.
-    """
-    if isinstance(value, list):
-        value = json.dumps(value)
-    params = {"key": key, "value": value}
-    response = requests.put(EOS_API_PUT_CONFIG_VALUES, params=params, timeout=10)
-    response.raise_for_status()
-    logger.info(
-        "[Main] Config value set successfully. Key: {key} \t\t => Value: {value}"
-    )
-
-
-def send_measurement_to_eos(dataframe):
-    """
-    Send the measurement data to the EOS server.
-    """
-    params = {
-        "data": dataframe.to_json(orient="index"),
-        "dtype": "float64",
-        "tz": "UTC",
-    }
-    response = requests.put(
-        EOS_API_PUT_LOAD_SERIES + "?name=Household", params=params, timeout=10
-    )
-    response.raise_for_status()
-    if response.status_code == 200:
-        logger.debug("[SEND_TO_EOS] Data sent to EOS server successfully.")
-    else:
-        logger.debug(
-            "[SEND_TO_EOS]"
-            "Failed to send data to EOS server. Status code: {response.status_code}"
-            ", Response: {response.text}"
-        )
-
-
-def eos_set_optimize_request(payload, timeout=180):
-    """
-    Send the optimize request to the EOS server.
-    """
-    headers = {"accept": "application/json", "Content-Type": "application/json"}
-    request_url = EOS_API_OPTIMIZE + "?start_hour=" + str(datetime.now(time_zone).hour)
-    logger.info(
-        "[OPTIMIZE] request optimization with: %s - and with timeout: %s", request_url, timeout)
-    try:
-        start_time = time.time()
-        response = requests.post(
-            request_url, headers=headers, json=payload, timeout=timeout
-        )
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        minutes, seconds = divmod(elapsed_time, 60)
-        logger.info(
-            "[OPTIMIZE] Optimize response retrieved successfully in %d min %.2f sec",
-            int(minutes),
-            seconds,
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.Timeout:
-        logger.error("[OPTIMIZE] Request timed out after %s seconds", timeout)
-        return {"error": "Request timed out"}
-    except requests.exceptions.RequestException as e:
-        logger.error("[OPTIMIZE] Request failed: %s", e)
-        return {"error": str(e)}
 
 
 # getting data
@@ -253,7 +171,6 @@ def get_prices(tgt_duration, start_time=None):
         return get_prices_from_akkudoktor(tgt_duration, start_time)
     logger.error("[PRICES] Price source currently not supported.")
     return []
-
 
 def get_prices_from_akkudoktor(tgt_duration, start_time=None):
     """
@@ -323,7 +240,6 @@ def get_prices_from_akkudoktor(tgt_duration, start_time=None):
         extended_prices.extend(prices[:remaining_hours])
     logger.info("[PRICES] Prices from AKKUDOKTOR fetched successfully.")
     return prices
-
 
 def get_prices_from_tibber(tgt_duration, start_time=None):
     """
@@ -429,16 +345,13 @@ def get_prices_from_tibber(tgt_duration, start_time=None):
     logger.info("[PRICES] Prices from TIBBER fetched successfully.")
     return extended_prices
 
-
 def create_forecast_request(pv_config_entry):
     """
     Creates a forecast request URL for the EOS server.
     """
     horizont_string = ""
     if pv_config_entry["horizont"] != "":
-        horizont_string = "&horizont=" + str(
-            pv_config_entry["horizont"]
-        )
+        horizont_string = "&horizont=" + str(pv_config_entry["horizont"])
     return (
         EOS_API_GET_PV_FORECAST
         + "?lat="
@@ -454,12 +367,9 @@ def create_forecast_request(pv_config_entry):
         + "&powerInverter="
         + str(pv_config_entry["powerInverter"])
         + "&inverterEfficiency="
-        + str(
-            pv_config_entry["inverterEfficiency"]
-        )
+        + str(pv_config_entry["inverterEfficiency"])
         + horizont_string
     )
-
 
 def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
     """
@@ -517,7 +427,9 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
             pv_config_name,
         )
     elif len(forecast_values) < tgt_duration:
-        forecast_values.extend([forecast_values[-1]] * (tgt_duration - len(forecast_values)))
+        forecast_values.extend(
+            [forecast_values[-1]] * (tgt_duration - len(forecast_values))
+        )
         logger.debug(
             "[FORECAST] Day of time change %s values extended to %s for %s",
             request_type,
@@ -526,14 +438,13 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
         )
     return forecast_values
 
-
 def get_summerized_pv_forecast(tgt_duration=24):
     """
     requesting pv forecast freach config entry and summarize the values
     """
     forecast_values = []
     for config_entry in config_manager.config["pv_forecast"]:
-        logger.debug("[FORECAST] fetching forecast for %s", config_entry['name'])
+        logger.debug("[FORECAST] fetching forecast for %s", config_entry["name"])
         forecast = get_pv_forecast("power", config_entry, tgt_duration)
         # print("values for " + config_entry+ " -> ")
         # print(forecast)
@@ -542,77 +453,6 @@ def get_summerized_pv_forecast(tgt_duration=24):
         else:
             forecast_values = [x + y for x, y in zip(forecast_values, forecast)]
     return forecast_values
-
-
-def eos_save_config_to_config_file():
-    """
-    Save the current configuration to the configuration file on the EOS server.
-    """
-    response = requests.put(EOS_API_PUT_SAVE_CONFIG_TO_CONFIG_FILE, timeout=10)
-    response.raise_for_status()
-    logger.debug("[EOS_CONFIG] Config saved to config file successfully.")
-
-
-def eos_update_config_from_config_file():
-    """
-    Update the current configuration from the configuration file on the EOS server.
-    """
-    try:
-        response = requests.post(
-            EOS_API_POST_UPDATE_CONFIG_FROM_CONFIG_FILE, timeout=10
-        )
-        response.raise_for_status()
-        logger.info("[EOS_CONFIG] Config updated from config file successfully.")
-    except requests.exceptions.Timeout:
-        logger.error(
-            "[EOS_CONFIG] Request timed out while updating config from config file."
-        )
-    except requests.exceptions.RequestException as e:
-        logger.error(
-            "[EOS_CONFIG] Request failed while updating config from config file: %s", e
-        )
-
-
-# function that creates a pandas dataframe with a DateTimeIndex with the given average profile
-def create_dataframe(profile):
-    """
-    Creates a pandas DataFrame with hourly energy values for a given profile.
-
-    Args:
-        profile (list of tuples): A list of tuples where each tuple contains:
-            - month (int): The month (1-12).
-            - weekday (int): The day of the week (0=Monday, 6=Sunday).
-            - hour (int): The hour of the day (0-23).
-            - energy (float): The energy value to set.
-
-    Returns:
-        pandas.DataFrame: A DataFrame with a DateTime index for the year 2025 and a 'Household'
-        column containing the energy values from the profile.
-    """
-
-    # create a list of all dates in the year
-    dates = pd.date_range(start="1/1/2025", end="31/12/2025", freq="H")
-    # create an empty dataframe with the dates as index
-    df = pd.DataFrame(index=dates)
-    # add a column 'Household' to the dataframe with NaN values
-    df["Household"] = np.nan
-    # iterate over the profile and set the energy values in the dataframe
-    for entry in profile:
-        month = entry[0]
-        weekday = entry[1]
-        hour = entry[2]
-        energy = entry[3]
-        # get the dates that match the month, weekday and hour
-        dates = df[
-            (df.index.month == month)
-            & (df.index.weekday == weekday)
-            & (df.index.hour == hour)
-        ].index
-        # set the energy value for the dates
-        for date in dates:
-            df.loc[date, "Household"] = energy
-    return df
-
 
 # summarize all date
 def create_optimize_request(api_version="new"):
@@ -687,10 +527,7 @@ def create_optimize_request(api_version="new"):
             ],
             "preis_euro_pro_wh_akku": 0,
             "gesamtlast": load_interface.get_load_profile(
-                EOS_TGT_DURATION,
-                datetime.now(time_zone).replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                ),
+                EOS_TGT_DURATION
             ),
         }
 
@@ -705,7 +542,7 @@ def create_optimize_request(api_version="new"):
                 "max_ladeleistung_w": config_manager.config["battery"][
                     "max_charge_power_w"
                 ],
-                "start_soc_prozent": battery_interface.battery_get_current_soc(),
+                "start_soc_prozent": battery_interface.battery_request_current_soc(),
                 "min_soc_prozent": config_manager.config["battery"][
                     "min_soc_percentage"
                 ],
@@ -724,7 +561,7 @@ def create_optimize_request(api_version="new"):
             "max_charge_power_w": config_manager.config["battery"][
                 "max_charge_power_w"
             ],
-            "initial_soc_percentage": battery_interface.battery_get_current_soc(),
+            "initial_soc_percentage": battery_interface.battery_request_current_soc(),
             "min_soc_percentage": config_manager.config["battery"][
                 "min_soc_percentage"
             ],
@@ -772,7 +609,7 @@ def create_optimize_request(api_version="new"):
             "temperature_forecast": get_pv_forecast(
                 tgt_value="temperature",
                 pv_config_entry=config_manager.config["pv_forecast"][0],
-                tgt_duration=EOS_TGT_DURATION
+                tgt_duration=EOS_TGT_DURATION,
             ),
             "start_solution": None,
         }
@@ -786,61 +623,29 @@ def create_optimize_request(api_version="new"):
             "temperature_forecast": get_pv_forecast(
                 tgt_value="temperature",
                 pv_config_entry=config_manager.config["pv_forecast"][0],
-                tgt_duration=EOS_TGT_DURATION
+                tgt_duration=EOS_TGT_DURATION,
             ),
             "start_solution": None,
         }
 
     return payload
 
-def getting_control_data_from_eos(optimized_response_in):
+
+def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_allowed):
     """
     Process the optimized response from EOS and update the load interface.
 
     Args:
-        optimized_response (dict): The optimized response from EOS containing control data.
+        ac_charge_demand_rel (float): The relative AC charge demand.
+        dc_charge_demand_rel (float): The relative DC charge demand.
+        discharge_allowed (bool): Whether discharge is allowed (True/False).
     """
-    current_hour = datetime.now(time_zone).hour
-    if "ac_charge" in optimized_response_in:
-        ac_charge_demand = optimized_response_in["ac_charge"]
-        # getting entry for current hour
-        ac_charge_demand = ac_charge_demand[current_hour]
-        ac_charge_demand = ac_charge_demand * config_manager.config["battery"]["max_charge_power_w"]
-        base_control.set_current_ac_charge_demand(ac_charge_demand)
-        logger.debug(
-            "[Main] AC charge demand for current hour %s:00 -> %s Wh -" +
-            " based on max charge power %s W",
-            current_hour,
-            ac_charge_demand,
-            config_manager.config["battery"]["max_charge_power_w"]
-        )
-    if "dc_charge" in optimized_response_in:
-        dc_charge_demand = optimized_response_in["dc_charge"]
-        # getting entry for current hour
-        dc_charge_demand = dc_charge_demand[current_hour]
-        dc_charge_demand = dc_charge_demand * config_manager.config["battery"]["max_charge_power_w"]
-        base_control.set_current_dc_charge_demand(dc_charge_demand)
-        logger.debug(
-            "[Main] DC charge demand for current hour %s:00 -> %s Wh -" +
-            " based on max charge power %s W",
-            current_hour,
-            dc_charge_demand,
-            config_manager.config["battery"]["max_charge_power_w"]
-        )
-    if "discharge_allowed" in optimized_response_in:
-        discharge_allowed = optimized_response_in["discharge_allowed"]
-        # getting entry for current hour
-        discharge_allowed = discharge_allowed[current_hour]
-        base_control.set_current_discharge_allowed(discharge_allowed)
-        logger.debug(
-            "[Main] Discharge allowed for current hour %s: %s",
-            current_hour,
-            discharge_allowed
-        )
-    # if "eauto_obj" in optimized_response_in:
-    #     eauto_obj = optimized_response_in["eauto_obj"]
-    else:
-        logger.error("[Main] No control data in optimized response")
+    base_control.set_current_ac_charge_demand(ac_charge_demand_rel)
+    base_control.set_current_dc_charge_demand(dc_charge_demand_rel)
+    base_control.set_current_discharge_allowed(bool(discharge_allowed))
+    # set the current battery state of charge
+    base_control.set_current_battery_soc(battery_interface.get_current_soc())
+
 
 def change_control_state():
     """
@@ -873,9 +678,12 @@ def change_control_state():
         if base_control.get_current_overall_state() == 0:
             if inverter_en:
                 inverter_interface.set_mode_force_charge(
-                    base_control.get_current_ac_charge_demand())
-            logger.info("[Main] Inverter mode set to charge from grid with %s W",
-                        base_control.get_current_ac_charge_demand())
+                    base_control.get_current_ac_charge_demand()
+                )
+            logger.info(
+                "[Main] Inverter mode set to charge from grid with %s W",
+                base_control.get_current_ac_charge_demand(),
+            )
         # MODE_AVOID_DISCHARGE
         elif base_control.get_current_overall_state() == 1:
             if inverter_en:
@@ -889,20 +697,22 @@ def change_control_state():
         elif base_control.get_current_overall_state() < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
-    else:
-        # Log the current state if no recent changes were made
-        state_mapping = {
-            0: "charge from grid",
-            1: "avoid discharge",
-            2: "allow discharge"
-        }
-        current_state = base_control.get_current_overall_state()
-        logger.info("[Main] Overall state not changed recently - remaining in current state: %s",
-                    state_mapping.get(current_state, "unknown state"))
-        return False
+    # Log the current state if no recent changes were made
+    state_mapping = {
+        0: "charge from grid",
+        1: "avoid discharge",
+        2: "allow discharge",
+    }
+    current_state = base_control.get_current_overall_state()
+    logger.info(
+        "[Main] Overall state not changed recently - remaining in current state: %s",
+        state_mapping.get(current_state, "unknown state"),
+    )
+    return False
 
 # web server
 app = Flask(__name__)
+
 
 @app.route("/", methods=["GET"])
 def main_page():
@@ -925,19 +735,21 @@ def get_optimize_request():
         with open(
             base_path + "/json/optimize_request.json", "r", encoding="utf-8"
         ) as json_file:
-            return Response(
-                json_file.read(),
-                content_type="application/json"
-            )
+            return Response(json_file.read(), content_type="application/json")
     except FileNotFoundError as e:
-        logger.error("[Main] File not found error while reading optimize_request.json: %s", e)
+        logger.error(
+            "[Main] File not found error while reading optimize_request.json: %s", e
+        )
         return json.dumps({"error": "optimize_request.json file not found"})
     except json.JSONDecodeError as e:
-        logger.error("[Main] JSON decode error while reading optimize_request.json: %s", e)
+        logger.error(
+            "[Main] JSON decode error while reading optimize_request.json: %s", e
+        )
         return json.dumps({"error": "Invalid JSON format in optimize_request.json"})
     except OSError as e:
         logger.error("[Main] OS error while reading optimize_request.json: %s", e)
         return json.dumps({"error": str(e)})
+
 
 @app.route("/json/optimize_response.json", methods=["GET"])
 def get_optimize_response():
@@ -961,10 +773,8 @@ def get_optimize_response():
             "washingstart": 0,
             "timestamp": datetime.now(time_zone).isoformat(),
         }
-        return Response(
-            json.dumps(default_response),
-            content_type="application/json"
-        )
+        return Response(json.dumps(default_response), content_type="application/json")
+
 
 @app.route("/json/current_controls.json", methods=["GET"])
 def serve_current_demands():
@@ -978,15 +788,12 @@ def serve_current_demands():
         "current_ac_charge_demand": current_ac_charge_demand,
         "current_dc_charge_demand": current_dc_charge_demand,
         "current_discharge_allowed": current_discharge_allowed,
-        "timestamp": datetime.now(time_zone).isoformat(),    
+        "timestamp": datetime.now(time_zone).isoformat(),
     }
-    return Response(
-        json.dumps(response_data),
-        content_type="application/json"
-    )
+    return Response(json.dumps(response_data), content_type="application/json")
+
 
 if __name__ == "__main__":
-
     # initial config
     # set_config_value("latitude", 48.812)
     # set_config_value("longitude", 8.907)
@@ -1048,7 +855,7 @@ if __name__ == "__main__":
             ) as file:
                 json.dump(json_optimize_input, file, indent=4)
 
-            optimized_response = eos_set_optimize_request(
+            optimized_response = eos_interface.eos_set_optimize_request(
                 json_optimize_input, config_manager.config["eos"]["timeout"]
             )
             optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
@@ -1058,8 +865,12 @@ if __name__ == "__main__":
             ) as file:
                 json.dump(optimized_response, file, indent=4)
             # +++++++++
-            getting_control_data_from_eos(optimized_response)
-            change_control_state()
+            ac_charge_demand, dc_charge_demand, discharge_allowed, error = (
+                eos_interface.examine_repsonse_to_control_data(optimized_response)
+            )
+            if error is not True:
+                setting_control_data(ac_charge_demand, dc_charge_demand, discharge_allowed)
+                change_control_state()
             # +++++++++
 
             loop_now = datetime.now(time_zone).astimezone()
@@ -1082,6 +893,7 @@ if __name__ == "__main__":
                 seconds,
             )
             scheduler.enter(sleeptime, 1, run_optimization_event, (sc,))
+
         scheduler.enter(0, 1, run_optimization_event, (scheduler,))
         scheduler.run()
 

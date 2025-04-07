@@ -11,8 +11,8 @@ Dependencies:
     - requests: For making HTTP requests to the SOC data sources.
 Usage:
     Create an instance of the `BatteryInterface` class by providing the source, URL,
-    sensor identifier, and access token (if required). Use the `battery_get_current_soc` method to
-    fetch the current SOC value.
+    sensor identifier, and access token (if required). Use the `battery_request_current_soc`
+    method to fetch the current SOC value.
 Example:
     ```python
     battery_interface = BatteryInterface(
@@ -20,7 +20,7 @@ Example:
         url="http://openhab-server",
         soc_sensor="BatterySOC",
         access_token=None
-    current_soc = battery_interface.battery_get_current_soc()
+    current_soc = battery_interface.battery_request_current_soc()
     print(f"Current SOC: {current_soc}%")
     ```
 """
@@ -45,7 +45,7 @@ class BatteryInterface:
             Fetches the SOC data from the OpenHAB server using its REST API.
         fetch_soc_data_from_homeassistant():
             Fetches the SOC data from the Home Assistant API.
-        battery_get_current_soc():
+        battery_request_current_soc():
             Fetches the current SOC of the battery based on the configured source.
     """
 
@@ -54,6 +54,7 @@ class BatteryInterface:
         self.url = url
         self.soc_sensor = soc_sensor
         self.access_token = access_token
+        self.current_soc = 0
 
     def fetch_soc_data_from_openhab(self):
         """
@@ -92,7 +93,6 @@ class BatteryInterface:
                 e,soc
             )
             return soc  # Default SOC value in case of request failure
-
 
     def fetch_soc_data_from_homeassistant(self):
         """
@@ -142,7 +142,7 @@ class BatteryInterface:
             )
             return soc  # Default SOC value in case of request failure
 
-    def battery_get_current_soc(self):
+    def battery_request_current_soc(self):
         """
         Fetch the current state of charge (SOC) of the battery from OpenHAB.
         """
@@ -151,10 +151,18 @@ class BatteryInterface:
             logger.debug("[BATTERY-IF] source set to default with start SOC = 5%")
             return 5
         if self.src == "openhab":
-            return self.fetch_soc_data_from_openhab()
+            self.current_soc = self.fetch_soc_data_from_openhab()
+            return self.current_soc
         if self.src == "homeassistant":
-            return self.fetch_soc_data_from_homeassistant()
+            self.current_soc = self.fetch_soc_data_from_homeassistant()
+            return self.current_soc
         logger.error(
             "[BATTERY-IF] source currently not supported. Using default start SOC = 5%."
         )
         return 5
+
+    def get_current_soc(self):
+        """
+        Returns the current state of charge (SOC) of the battery.
+        """
+        return self.current_soc

@@ -1,3 +1,21 @@
+'''
+This module provides the `EvccInterface` class, which serves as an interface to interact 
+with the Electric Vehicle Charging Controller (EVCC) API. The class enables periodic 
+fetching of the charging state and triggers a callback when the state changes.
+Classes:
+    EvccInterface: A class to interact with the EVCC API, manage charging state updates, 
+                   and handle state change callbacks.
+Dependencies:
+    - logging: For logging messages and errors.
+    - threading: For managing background threads.
+    - time: For implementing delays in the update loop.
+    - requests: For making HTTP requests to the EVCC API.
+Usage:
+    Create an instance of the `EvccInterface` class by providing the EVCC API URL, 
+    an optional update interval, and a callback function to handle charging state changes. 
+    The class will automatically start a background thread to periodically fetch the 
+    charging state from the API.
+'''
 import logging
 import threading
 import time
@@ -8,7 +26,27 @@ logger.info("[EVCC] loading module ")
 
 
 class EvccInterface:
-
+    '''
+        EvccInterface is a class that provides an interface to interact with the EVCC
+        (Electric Vehicle Charging Controller) API. 
+        It periodically fetches the charging state and triggers a callback when the state changes.
+        Attributes:
+            last_known_charging_state (bool): The last known charging state.
+            on_charging_state_change (callable): A callback function to be called when
+                                                 the charging state changes.
+            _update_thread (threading.Thread):   The background thread for updating
+                                                 the charging state.
+            _stop_event (threading.Event):       An event to signal the thread to stop.
+        Methods:
+            __init__(url, update_interval=15, on_charging_state_change=None):
+            get_charging_state():
+            start_update_service():
+            shutdown():
+            _update_charging_state_loop():
+            request_charging_state():
+                Fetches the EVCC state from the API and updates the charging state.
+            fetch_evcc_state_via_api():
+    '''
     def __init__(self, url, update_interval=15, on_charging_state_change=None):
         """
         Initializes the EVCC interface and starts the update service.
@@ -94,6 +132,18 @@ class EvccInterface:
         return charging_state
 
     def fetch_evcc_state_via_api(self):
+        """
+        Fetches the state of the EVCC (Electric Vehicle Charging Controller) via its API.
+
+        This method sends a GET request to the EVCC API endpoint to retrieve the current state.
+        If the request is successful, the response is parsed as JSON and returned.
+        In case of a timeout or other request-related errors, the method logs the error and
+        returns None.
+
+        Returns:
+            dict: The JSON response from the EVCC API containing the state information, 
+                  or None if the request fails or times out.
+        """
         evcc_url = self.url + "/api/state"
         # logger.debug("[EVCC] fetching evcc state with url: %s", evcc_url)
         try:

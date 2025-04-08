@@ -820,9 +820,9 @@ if __name__ == "__main__":
 
     # capa = inverter_interface.get_capacity()
     # logger.info("[Main] Inverter capacity: %s", capa)
-    # # inverter_interface.set_mode_avoid_discharge()
-    # # time.sleep(30)
-    # inverter_interface.shutdown()
+
+    # day_one_week_before = datetime.now(time_zone).replace(
+    #         hour=0, minute=0, second=0, microsecond=0) - timedelta(days=2)
 
     # sys.exit()
 

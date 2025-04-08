@@ -166,7 +166,9 @@
 <body>
     <div id="overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); color: white; display: flex; justify-content: center; align-items: center; z-index: 1000;">
         <div style="text-align: center;">
-            <p style="font-size: 1.5em; margin-bottom: 20px; text-align: center;">Waiting for first data...</p>
+            <p style="font-size: 2.5em; margin-bottom: 20px; text-align: center;">EOS connect</p>
+            <p id="waiting_text" style="font-size: 1.5em; margin-bottom: 20px; text-align: center;">Waiting for first data...</p>
+            <p id="waiting_error_text" style="font-size: 1.0em; font-weight: bold;  margin-bottom: 20px; text-align: center; color:rgb(241, 177, 0)">...</p>
             <div style="border: 4px solid white; border-top: 4px solid gray; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto 0;"></div>
         </div>
     </div>
@@ -665,6 +667,19 @@
             max_charge_power_w = data_request["pv_akku"] && data_request["pv_akku"].hasOwnProperty("max_ladeleistung_w") ? data_request["pv_akku"]["max_ladeleistung_w"] : data_request["pv_akku"] ? data_request["pv_akku"]["max_charge_power_w"] : 0;
             const data_response = await fetch_EOS_Connect_Data("optimize_response.json");
             if (!data_response || !data_response["result"] || !data_response["result"]["Last_Wh_pro_Stunde"] || data_response["result"]["Last_Wh_pro_Stunde"].length === 0) {
+                document.getElementById('overlay').style.display = 'flex';
+                if(data_response["error"]){
+                    if(data_response["error"] === "Request timed out"){
+                        document.getElementById('waiting_text').innerText = "No data available...";
+                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
+                    } else {
+                        document.getElementById('waiting_text').innerText = "No data available...";
+                        document.getElementById('waiting_error_text').innerText = "no further error information available";
+                    }
+                } else {
+                    document.getElementById('waiting_text').innerText = "Waiting for first data...";
+                    document.getElementById('waiting_error_text').innerText = "";
+                }
                 return;
             }
             if (chartInstance){

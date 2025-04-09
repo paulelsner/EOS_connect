@@ -551,6 +551,8 @@ def create_optimize_request(api_version="new"):
                 ],
             }
         return {
+            "device_id": "battery1",
+            "hours": None,
             "capacity_wh": config_manager.config["battery"]["capacity_wh"],
             "charging_efficiency": config_manager.config["battery"][
                 "charge_efficiency"
@@ -573,7 +575,10 @@ def create_optimize_request(api_version="new"):
     def get_wechselrichter_data(api_version="new"):
         if api_version != "new":
             return {"max_leistung_wh": 8500}
-        return {"max_power_wh": 8500}
+        return {
+            "device_id": "inverter1",
+            "max_power_wh": 8500,
+            "battery_id": "battery1",}
 
     def get_eauto_data(api_version="new"):
         if api_version != "new":
@@ -587,6 +592,7 @@ def create_optimize_request(api_version="new"):
                 "max_soc_prozent": 100,
             }
         return {
+            "device_id": "ev1",
             "capacity_wh": 27000,
             "charging_efficiency": 0.90,
             "discharging_efficiency": 0.95,
@@ -597,7 +603,10 @@ def create_optimize_request(api_version="new"):
         }
 
     def get_dishwasher_data():
-        return {"consumption_wh": 1, "duration_h": 1}
+        return {
+            "device_id": "dishwasher1",
+            "consumption_wh": 1,
+            "duration_h": 1}
 
     if api_version != "new":
         payload = {
@@ -818,12 +827,23 @@ if __name__ == "__main__":
     # # persist and update config
     # eos_save_config_to_config_file()
 
-    # capa = inverter_interface.get_capacity()
-    # logger.info("[Main] Inverter capacity: %s", capa)
+    # json_optimize_input = create_optimize_request()
 
-    # day_one_week_before = datetime.now(time_zone).replace(
-    #         hour=0, minute=0, second=0, microsecond=0) - timedelta(days=2)
+    # with open(
+    #     base_path + "/json/optimize_request.json", "w", encoding="utf-8"
+    # ) as file:
+    #     json.dump(json_optimize_input, file, indent=4)
 
+    # optimized_response = eos_interface.eos_set_optimize_request(
+    #     json_optimize_input, config_manager.config["eos"]["timeout"]
+    # )
+    # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
+
+    # with open(
+    #     base_path + "/json/optimize_response.json", "w", encoding="utf-8"
+    # ) as file:
+    #     json.dump(optimized_response, file, indent=4)
+        
     # sys.exit()
 
     http_server = WSGIServer(

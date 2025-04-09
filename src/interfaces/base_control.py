@@ -36,7 +36,8 @@ class BaseControl:
         self.current_dc_charge_demand = 0
         self.current_discharge_allowed = 1
         self.current_evcc_charging_state = False
-        self.current_overall_state = MODE_DISCHARGE_ALLOWED
+        # startup with None to force a writing to the inverter
+        self.current_overall_state = None
         self.current_battery_soc = 0
         self.time_zone = timezone
         self.config = config

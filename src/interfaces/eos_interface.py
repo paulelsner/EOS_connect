@@ -1,8 +1,8 @@
-'''
+"""
 This module provides an interface for interacting with an EOS server.
-The `EosInterface` class includes methods for setting configuration values, 
-sending measurement data, sending optimization requests, saving configurations 
-to a file, and updating configurations from a file. It uses HTTP requests to 
+The `EosInterface` class includes methods for setting configuration values,
+sending measurement data, sending optimization requests, saving configurations
+to a file, and updating configurations from a file. It uses HTTP requests to
 communicate with the EOS server.
 Classes:
     EosInterface: A class that provides methods to interact with the EOS server.
@@ -13,11 +13,12 @@ Dependencies:
     - datetime: For working with date and time.
     - requests: For making HTTP requests.
 Usage:
-    Create an instance of the `EosInterface` class by providing the EOS server 
-    address, port, and timezone. Use the provided methods to interact with the 
-    EOS server for various operations such as setting configuration values, 
+    Create an instance of the `EosInterface` class by providing the EOS server
+    address, port, and timezone. Use the provided methods to interact with the
+    EOS server for various operations such as setting configuration values,
     sending measurement data, and managing configurations.
-'''
+"""
+
 import logging
 import time
 import json
@@ -40,8 +41,9 @@ logger.info("[EOS] loading module ")
 #     f"http://{EOS_SERVER}:{EOS_SERVER_PORT}/v1/measurement/load-mr/value/by-name"
 # }
 
+
 class EosInterface:
-    '''
+    """
     EosInterface is a class that provides an interface for interacting with an EOS server.
     This class includes methods for setting configuration values, sending measurement data,
     sending optimization requests, saving configurations to a file, and updating configurations
@@ -59,13 +61,14 @@ class EosInterface:
             Send an optimization request to the EOS server.
         eos_save_config_to_config_file():
         eos_update_config_from_config_file():
-    '''
+    """
 
     def __init__(self, eos_server, eos_port, timezone):
         self.eos_server = eos_server
         self.eos_port = eos_port
         self.base_url = f"http://{eos_server}:{eos_port}"
         self.time_zone = timezone
+        self.last_start_solution = None
 
     # EOS basic API helper
     def set_config_value(self, key, value):
@@ -75,7 +78,9 @@ class EosInterface:
         if isinstance(value, list):
             value = json.dumps(value)
         params = {"key": key, "value": value}
-        response = requests.put(self.base_url + "/v1/config/value", params=params, timeout=10)
+        response = requests.put(
+            self.base_url + "/v1/config/value", params=params, timeout=10
+        )
         response.raise_for_status()
         logger.info(
             "[EOS] Config value set successfully. Key: {key} \t\t => Value: {value}"
@@ -91,9 +96,11 @@ class EosInterface:
             "tz": "UTC",
         }
         response = requests.put(
-            self.base_url+ "/v1/measurement/load-mr/series/by-name" + "?name=Household",
+            self.base_url
+            + "/v1/measurement/load-mr/series/by-name"
+            + "?name=Household",
             params=params,
-            timeout=10
+            timeout=10,
         )
         response.raise_for_status()
         if response.status_code == 200:
@@ -110,12 +117,17 @@ class EosInterface:
         Send the optimize request to the EOS server.
         """
         headers = {"accept": "application/json", "Content-Type": "application/json"}
-        request_url = (self.base_url + "/optimize" + "?start_hour=" +
-                        str(datetime.now(self.time_zone).hour))
+        request_url = (
+            self.base_url
+            + "/optimize"
+            + "?start_hour="
+            + str(datetime.now(self.time_zone).hour)
+        )
         logger.info(
-            "[EOS] OPTIMIZE request optimization with: %s - and with timeout: %s", 
+            "[EOS] OPTIMIZE request optimization with: %s - and with timeout: %s",
             request_url,
-            timeout)
+            timeout,
+        )
         try:
             start_time = time.time()
             response = requests.post(
@@ -140,23 +152,23 @@ class EosInterface:
 
     def examine_repsonse_to_control_data(self, optimized_response_in):
         """
-        Examines the optimized response data for control parameters such as AC charge demand, 
+        Examines the optimized response data for control parameters such as AC charge demand,
         DC charge demand, and discharge allowance for the current hour.
         Args:
-            optimized_response_in (dict): A dictionary containing control data with keys 
-                                          "ac_charge", "dc_charge", and "discharge_allowed". 
-                                          Each key maps to a list or dictionary where the 
+            optimized_response_in (dict): A dictionary containing control data with keys
+                                          "ac_charge", "dc_charge", and "discharge_allowed".
+                                          Each key maps to a list or dictionary where the
                                           current hour's data can be accessed.
         Returns:
             tuple: A tuple containing:
-                - ac_charge_demand_relative (float or None): The AC charge demand percentage 
+                - ac_charge_demand_relative (float or None): The AC charge demand percentage
                   for the current hour, or None if not present.
-                - dc_charge_demand_relative (float or None): The DC charge demand percentage 
+                - dc_charge_demand_relative (float or None): The DC charge demand percentage
                   for the current hour, or None if not present.
-                - discharge_allowed (bool or None): Whether discharge is allowed for the 
+                - discharge_allowed (bool or None): Whether discharge is allowed for the
                   current hour, or None if not present.
         Logs:
-            - Debug logs for AC charge demand, DC charge demand, and discharge allowance 
+            - Debug logs for AC charge demand, DC charge demand, and discharge allowance
               values for the current hour if they are present in the input.
             - An error log if no control data is found in the optimized response.
         """
@@ -174,7 +186,7 @@ class EosInterface:
             logger.debug(
                 "[EOS] RESPONSE AC charge demand for current hour %s:00 -> %s %%",
                 current_hour,
-                ac_charge_demand_relative
+                ac_charge_demand_relative,
             )
         if "dc_charge" in optimized_response_in:
             dc_charge_demand_relative = optimized_response_in["dc_charge"]
@@ -183,7 +195,7 @@ class EosInterface:
             logger.debug(
                 "[EOS] RESPONSE DC charge demand for current hour %s:00 -> %s %%",
                 current_hour,
-                dc_charge_demand_relative
+                dc_charge_demand_relative,
             )
         if "discharge_allowed" in optimized_response_in:
             discharge_allowed = optimized_response_in["discharge_allowed"]
@@ -192,10 +204,21 @@ class EosInterface:
             logger.debug(
                 "[EOS] RESPONSE Discharge allowed for current hour %s:00 %s",
                 current_hour,
-                discharge_allowed
+                discharge_allowed,
             )
         # if "eauto_obj" in optimized_response_in:
         #     eauto_obj = optimized_response_in["eauto_obj"]
+
+        if (
+            "start_solution" in optimized_response_in
+            and len(optimized_response_in["start_solution"]) > 1
+        ):
+            self.set_last_start_solution(optimized_response_in["start_solution"])
+            logger.debug(
+                "[EOS] RESPONSE Start solution for current hour %s:00 %s",
+                current_hour,
+                self.get_last_start_solution(),
+            )
         else:
             logger.error("[EOS] RESPONSE No control data in optimized response")
             response_error = True
@@ -203,7 +226,7 @@ class EosInterface:
             ac_charge_demand_relative,
             dc_charge_demand_relative,
             discharge_allowed,
-            response_error
+            response_error,
         )
 
     def eos_save_config_to_config_file(self):
@@ -219,9 +242,7 @@ class EosInterface:
         Update the current configuration from the configuration file on the EOS server.
         """
         try:
-            response = requests.post(
-                self.base_url + "/v1/config/update", timeout=10
-            )
+            response = requests.post(self.base_url + "/v1/config/update", timeout=10)
             response.raise_for_status()
             logger.info("[EOS] CONFIG Config updated from config file successfully.")
         except requests.exceptions.Timeout:
@@ -230,8 +251,29 @@ class EosInterface:
             )
         except requests.exceptions.RequestException as e:
             logger.error(
-                "[EOS] CONFIG Request failed while updating config from config file: %s", e
+                "[EOS] CONFIG Request failed while updating config from config file: %s",
+                e,
             )
+
+    def set_last_start_solution(self, last_start_solution):
+        """
+        Set the last start solution for the EOS interface.
+
+        Args:
+            last_start_solution (str): The last start solution to set.
+        """
+        self.last_start_solution = last_start_solution
+
+    def get_last_start_solution(self):
+        '''
+        """
+        Get the last start solution for the EOS interface.
+
+        Returns:
+            str: The last start solution.
+        """
+        '''
+        return self.last_start_solution
 
     # function that creates a pandas dataframe with a DateTimeIndex with the given average profile
     def create_dataframe(self, profile):

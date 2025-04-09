@@ -183,7 +183,7 @@ class LoadInterface:
 
         while current_hour < end_time:
             next_hour = current_hour + timedelta(hours=1)
-            # logger.debug("[LOAD] Fetching data for %s to %s",current_hour, next_hour)
+            # logger.debug("[LOAD-IF] Fetching data for %s to %s",current_hour, next_hour)
 
             energy_data = self.fetch_energy_data_from_openhab(
                 self.url, current_hour, next_hour
@@ -227,7 +227,7 @@ class LoadInterface:
         Returns:
             list: A list of energy consumption values for the specified duration.
         """
-        logger.info("[LOAD] Creating load profile from Home Assistant ...")
+        logger.info("[LOAD-IF] Creating load profile from Home Assistant ...")
         current_time = datetime.now(self.time_zone).replace(
             minute=0, second=0, microsecond=0
         )
@@ -266,7 +266,7 @@ class LoadInterface:
 
         while current_hour < end_time:
             next_hour = current_hour + timedelta(hours=1)
-            # logger.debug("[LOAD] Fetching data for %s to %s", current_hour, next_hour)
+            # logger.debug("[LOAD-IF] Fetching data for %s to %s", current_hour, next_hour)
             energy_data = self.fetch_historical_energy_data_from_homeassistant(
                 self.load_sensor, current_hour, next_hour
             )
@@ -363,7 +363,7 @@ class LoadInterface:
         Returns:
             list: A list of energy consumption values for the specified day.
         """
-        logger.info(
+        logger.debug(
             "[LOAD-IF] Creating day load profile from %s to %s", start_time, end_time
         )
 
@@ -372,7 +372,7 @@ class LoadInterface:
 
         while current_hour < end_time:
             next_hour = current_hour + timedelta(hours=1)
-            # logger.debug("[LOAD] Fetching data for %s to %s", current_hour, next_hour)
+            # logger.debug("[LOAD-IF] Fetching data for %s to %s", current_hour, next_hour)
             energy_data = self.fetch_historical_energy_data_from_homeassistant(
                 self.load_sensor, current_hour, next_hour
             )
@@ -399,7 +399,8 @@ class LoadInterface:
             current_hour += timedelta(hours=1)
         if not load_profile:
             logger.error(
-                "[LOAD-IF] No load profile data available for the specified day."
+                "[LOAD-IF] No load profile data available for the specified day - % s to % s",
+                start_time, end_time
             )
         return load_profile
 
@@ -415,9 +416,6 @@ class LoadInterface:
         Returns:
             list: A list of 48 values representing the combined load profile for the specified days.
         """
-        logger.info(
-            "[LOAD] Creating load profile with WEEKDAYS from Home Assistant ..."
-        )
         day_one_week_before = datetime.now(self.time_zone).replace(
             hour=0, minute=0, second=0, microsecond=0
         ) - timedelta(days=7)
@@ -431,7 +429,7 @@ class LoadInterface:
         day_tomorrow_two_week_before = datetime.now(self.time_zone).replace(
             hour=0, minute=0, second=0, microsecond=0
         ) - timedelta(days=13)
-        logger.debug(
+        logger.info(
             "[LOAD-IF] creating load profile for weekdays %s (%s) and %s (%s)",
             day_one_week_before,
             day_one_week_before.strftime("%A"),
@@ -546,12 +544,12 @@ class LoadInterface:
             ]
             return default_profile[:tgt_duration]
         if self.src == "openhab":
-            # logger.info("[LOAD] Using load source openhab")
+            # logger.info("[LOAD-IF] Using load source openhab")
             return self.create_load_profile_openhab_from_last_days(
                 tgt_duration, start_time
             )
         if self.src == "homeassistant":
-            # logger.info("[LOAD] Using load source homeassistant")
+            # logger.info("[LOAD-IF] Using load source homeassistant")
             # return self.create_load_profile_homeassistant_from_last_days(tgt_duration, start_time)
             return self.create_load_profile_homeassistant_weekdays()
         logger.error(

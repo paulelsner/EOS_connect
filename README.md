@@ -1,16 +1,23 @@
 # EOS Connect
 
-EOS Connect is a tool designed to optimize energy usage by interacting with the EOS system. It fetches energy data, processes it, and displays the results dynamically on a webpage.
+EOS Connect is a tool designed to optimize energy usage by interacting with the [EOS (Energy Optimization System)](https://github.com/Akkudoktor-EOS/EOS). It fetches energy data, processes it, controls a FRONIUS inverter and connected battery and displays the results dynamically on a webpage.
 
 - [EOS Connect](#eos-connect)
   - [Features](#features)
   - [Current Status](#current-status)
+  - [How it Works](#how-it-works)
+    - [Base](#base)
+    - [Collecting Data](#collecting-data)
+      - [Home Assistant](#home-assistant)
+      - [OpenHAB](#openhab)
+      - [PV Forecast](#pv-forecast)
+      - [Energy Price Forecast](#energy-price-forecast)
   - [Webpage Example](#webpage-example)
   - [Configuration](#configuration)
   - [Useful Information](#useful-information)
     - [Getting historical values](#getting-historical-values)
       - [Homeassistant](#homeassistant)
-      - [Openhab](#openhab)
+      - [Openhab](#openhab-1)
   - [Usage](#usage)
   - [Project Structure](#project-structure)
   - [Requirements](#requirements)
@@ -36,7 +43,56 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
 * Controlling FRONIUS inverters and battery charging systems interactively.
 
 ## Current Status
+
 This project is in its early stages and is actively being developed and enhanced.
+
+---
+
+## How it Works
+
+### Base
+
+EOS Connect is a self-running system that periodically collects:
+- Local energy consumption data.
+- PV solar forecasts for the next 48 hours.
+- Upcoming energy prices.
+
+Using this data, a request is sent to EOS, which creates a model predicting the energy needs based on different energy sources and loads (grid, battery, PV).
+
+EOS Connect waits for the response from EOS (e.g., ~2 min 15 sec for a full 48-hour prediction on a Raspberry Pi 5). After receiving the response, it is analyzed to extract the necessary values.
+
+Finally, the system sets up the inverter based on the following states:
+- `MODE_CHARGE_FROM_GRID` with a specific target charging power (based on your configuration).
+- `MODE_AVOID_DISCHARGE`.
+- `MODE_DISCHARGE_ALLOWED` with a specific target maximum discharging power (based on your configuration).
+
+The system repeats this process periodically, e.g., every 3 minutes, as defined in the configuration.
+
+---
+
+### Collecting Data
+
+Data collection for load forecasting is based on your existing load data provided by an OpenHAB or Home Assistant instance (using the persistence of each system). EOS requires a load forecast for today and tomorrow.
+
+#### Home Assistant
+Load data is retrieved from:
+- Today one week ago, averaged with today two weeks ago.
+- Tomorrow one week ago, averaged with tomorrow two weeks ago.
+
+(See [Home Assistant](#home-assistant) for more details.)
+
+#### OpenHAB
+Load data is retrieved from the last two days:
+- From two days ago (00:00) to yesterday midnight.
+(hint: )
+
+#### PV Forecast
+PV forecasts are retrieved directly from the [AKKUDOKTOR API](https://api.akkudoktor.net/forecast).
+
+#### Energy Price Forecast
+Energy price forecasts are retrieved from the chosen source (TIBBER or AKKUDOKTOR API). **Note**: Prices for tomorrow are available earliest at 1 PM. Until then, today's prices are used to feed the model.
+
+---
 
 ## Webpage Example
 

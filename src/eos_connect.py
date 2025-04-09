@@ -625,9 +625,9 @@ def create_optimize_request(api_version="new"):
                 pv_config_entry=config_manager.config["pv_forecast"][0],
                 tgt_duration=EOS_TGT_DURATION,
             ),
-            "start_solution": None,
+            "start_solution": eos_interface.get_last_start_solution(),
         }
-
+    logger.debug("[Main] optimize request payload - startsolution: %s", payload["start_solution"])
     return payload
 
 

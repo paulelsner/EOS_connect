@@ -19,7 +19,6 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
       - [Homeassistant](#homeassistant)
       - [Openhab](#openhab-1)
   - [Usage](#usage)
-  - [Project Structure](#project-structure)
   - [Requirements](#requirements)
   - [Installation and Running](#installation-and-running)
   - [Running the Application](#running-the-application)
@@ -45,6 +44,13 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
 ## Current Status
 
 This project is in its early stages and is actively being developed and enhanced.
+
+2025-04-10
+
+- EOS made a breaking change - see here https://github.com/Akkudoktor-EOS/EOS/discussions/513
+- there were also changes in the API at '<your_ip>:8503' - unfortunately the API is not versioned (*ping* ;-) )
+- to fullfil both versions there is small hack to identify the connected EOS
+- finally the current version can run with both EOS versions
 
 ---
 
@@ -131,45 +137,25 @@ No specific info yet.
 
 ## Usage
 
-The application will start fetching energy data from OpenHAB or HomeAssistant and processing it according to the defined logic in `src/eos_connect.py`. You can access the web interface at `http://localhost:8081`. For local usage the port is configurable see [CONFIG_README](src/CONFIG_README.md). For docker usage change the mapped port in docker-compose.yml.
-
-## Project Structure
-
-```
-EOS_connect
-├── doc                             # aditional documentation stuff
-├── src
-│   ├── interfaces                  # needed interface modules for the different sources
-│   │  ├── load_interface.py        # handles getting load history from openhab and homeassistant
-│   │  ├── battery_interface.py     # handles getting soc data from openhab and homeassistant
-│   ├── json
-│   │  ├── optimize_request.json    # will be created/ rewritten with every new optimization request
-│   │  ├── optimize_response.json   # will be created/ rewritten after the feedback of EOS
-│   ├── web
-│   │  ├── index.html               # served webpage to dynamically showing the current state and response from EOS
-│   ├── eos_connect.py              # Main logic for fetching and processing energy data
-│   ├── config.py                   # config handling
-│   ├── config.yaml                 # config file - default will be created with first start
-│   ├── CONFIG_README.md            # config documentation
-├── Dockerfile                      # Docker configuration for the project
-├── docker-compose.yml              # Docker Compose configuration for multi-container setup
-├── requirements.txt                # Python dependencies for the project
-└── README.md                       # Project documentation
-```
+The application will start fetching energy data from OpenHAB or HomeAssistant and processing it. You can access the web interface at `http://localhost:8081`. For local usage the port is configurable see [CONFIG_README](src/CONFIG_README.md). For docker usage change the mapped port in docker-compose.yml.
 
 ## Requirements
 
 To run this project, you need to have the following installed:
 
 - Python 3.x
-- Docker
-- Docker Compose
+
 
 ## Installation and Running
 
 ## Running the Application
 
 ### Using Docker
+
+You need to have the following additionally installed:
+
+- Docker
+- Docker Compose
 
 Pull existing latest snapshot and run the application in the background using Docker Compose (`--pull always` ensures the latest image is pulled):
    ```
@@ -184,6 +170,10 @@ Pull existing latest snapshot and run the application in the background using Do
 ### Using in Home Assistant with an Add On
 
 see https://github.com/ohAnd/ha_addons
+
+or directly
+
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fohand%2Fha_addons)
 
 ### Local
 

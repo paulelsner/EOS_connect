@@ -172,6 +172,7 @@ def get_prices(tgt_duration, start_time=None):
     logger.error("[PRICES] Price source currently not supported.")
     return []
 
+
 def get_prices_from_akkudoktor(tgt_duration, start_time=None):
     """
     Fetches and processes electricity prices for today and tomorrow.
@@ -239,7 +240,8 @@ def get_prices_from_akkudoktor(tgt_duration, start_time=None):
         remaining_hours = tgt_duration - len(extended_prices)
         extended_prices.extend(prices[:remaining_hours])
     logger.info("[PRICES] Prices from AKKUDOKTOR fetched successfully.")
-    return prices
+    return extended_prices
+
 
 def get_prices_from_tibber(tgt_duration, start_time=None):
     """
@@ -345,6 +347,7 @@ def get_prices_from_tibber(tgt_duration, start_time=None):
     logger.info("[PRICES] Prices from TIBBER fetched successfully.")
     return extended_prices
 
+
 def create_forecast_request(pv_config_entry):
     """
     Creates a forecast request URL for the EOS server.
@@ -370,6 +373,7 @@ def create_forecast_request(pv_config_entry):
         + str(pv_config_entry["inverterEfficiency"])
         + horizont_string
     )
+
 
 def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
     """
@@ -438,7 +442,8 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
         )
     return forecast_values
 
-def get_summerized_pv_forecast(tgt_duration=24):
+
+def get_summarized_pv_forecast(tgt_duration=24):
     """
     requesting pv forecast freach config entry and summarize the values
     """
@@ -454,8 +459,9 @@ def get_summerized_pv_forecast(tgt_duration=24):
             forecast_values = [x + y for x, y in zip(forecast_values, forecast)]
     return forecast_values
 
+
 # summarize all date
-def create_optimize_request(api_version="new"):
+def create_optimize_request():
     """
     Creates an optimization request payload for energy management systems.
 
@@ -468,7 +474,7 @@ def create_optimize_request(api_version="new"):
 
     def get_ems_data():
         return {
-            "pv_prognose_wh": get_summerized_pv_forecast(EOS_TGT_DURATION),
+            "pv_prognose_wh": get_summarized_pv_forecast(EOS_TGT_DURATION),
             "strompreis_euro_pro_wh": get_prices(
                 EOS_TGT_DURATION,
                 datetime.now(time_zone).replace(
@@ -526,31 +532,11 @@ def create_optimize_request(api_version="new"):
                 0,
             ],
             "preis_euro_pro_wh_akku": 0,
-            "gesamtlast": load_interface.get_load_profile(
-                EOS_TGT_DURATION
-            ),
+            "gesamtlast": load_interface.get_load_profile(EOS_TGT_DURATION),
         }
 
-    def get_pv_akku_data(api_version="new"):
-        if api_version != "new":
-            return {
-                "kapazitaet_wh": config_manager.config["battery"]["capacity_wh"],
-                "lade_effizienz": config_manager.config["battery"]["charge_efficiency"],
-                "entlade_effizienz": config_manager.config["battery"][
-                    "discharge_efficiency"
-                ],
-                "max_ladeleistung_w": config_manager.config["battery"][
-                    "max_charge_power_w"
-                ],
-                "start_soc_prozent": battery_interface.battery_request_current_soc(),
-                "min_soc_prozent": config_manager.config["battery"][
-                    "min_soc_percentage"
-                ],
-                "max_soc_prozent": config_manager.config["battery"][
-                    "max_soc_percentage"
-                ],
-            }
-        return {
+    def get_pv_akku_data():
+        akku_object = {
             "capacity_wh": config_manager.config["battery"]["capacity_wh"],
             "charging_efficiency": config_manager.config["battery"][
                 "charge_efficiency"
@@ -569,65 +555,58 @@ def create_optimize_request(api_version="new"):
                 "max_soc_percentage"
             ],
         }
+        if eos_interface.get_eos_version() == ">=2025-04-09":
+            akku_object = {"device_id": "battery1", **akku_object}
+        return akku_object
 
-    def get_wechselrichter_data(api_version="new"):
-        if api_version != "new":
-            return {"max_leistung_wh": 8500}
-        return {"max_power_wh": 8500}
+    def get_wechselrichter_data():
+        wechselrichter_object = {
+            "max_power_wh": config_manager.config["inverter"]["max_pv_charge_rate"],
+        }
+        if eos_interface.get_eos_version() == ">=2025-04-09":
+            wechselrichter_object = {"device_id": "inverter1", **wechselrichter_object} # at top
+            wechselrichter_object["battery_id"] = "battery1" # at the bottom
+        return wechselrichter_object
 
-    def get_eauto_data(api_version="new"):
-        if api_version != "new":
-            return {
-                "kapazitaet_wh": 1,
-                "lade_effizienz": 0.90,
-                "entlade_effizienz": 0.95,
-                "max_ladeleistung_w": 1,
-                "start_soc_prozent": 50,
-                "min_soc_prozent": 5,
-                "max_soc_prozent": 100,
-            }
-        return {
+    def get_eauto_data():
+        eauto_object = {
             "capacity_wh": 27000,
             "charging_efficiency": 0.90,
             "discharging_efficiency": 0.95,
             "max_charge_power_w": 7360,
             "initial_soc_percentage": 50,
             "min_soc_percentage": 5,
-            "max_soc_percentage": 100,
+            "max_soc_percentage": 100
         }
+        if eos_interface.get_eos_version() == ">=2025-04-09":
+            eauto_object = {"device_id": "ev1", **eauto_object}
+        return eauto_object
 
     def get_dishwasher_data():
-        return {"consumption_wh": 1, "duration_h": 1}
+        dishwaser_object = {
+            "consumption_wh": 1,
+            "duration_h": 1
+        }
+        if eos_interface.get_eos_version() == ">=2025-04-09":
+            dishwaser_object = {"device_id": "dishwasher1", **dishwaser_object}
+        return dishwaser_object
 
-    if api_version != "new":
-        payload = {
-            "ems": get_ems_data(),
-            "pv_akku": get_pv_akku_data(api_version),
-            "inverter": get_wechselrichter_data(api_version),
-            "eauto": get_eauto_data(api_version),
-            "dishwasher": get_dishwasher_data(),
-            "temperature_forecast": get_pv_forecast(
-                tgt_value="temperature",
-                pv_config_entry=config_manager.config["pv_forecast"][0],
-                tgt_duration=EOS_TGT_DURATION,
-            ),
-            "start_solution": None,
-        }
-    else:
-        payload = {
-            "ems": get_ems_data(),
-            "pv_akku": get_pv_akku_data(),
-            "inverter": get_wechselrichter_data(),
-            "eauto": get_eauto_data(),
-            "dishwasher": get_dishwasher_data(),
-            "temperature_forecast": get_pv_forecast(
-                tgt_value="temperature",
-                pv_config_entry=config_manager.config["pv_forecast"][0],
-                tgt_duration=EOS_TGT_DURATION,
-            ),
-            "start_solution": eos_interface.get_last_start_solution(),
-        }
-    logger.debug("[Main] optimize request payload - startsolution: %s", payload["start_solution"])
+    payload = {
+        "ems": get_ems_data(),
+        "pv_akku": get_pv_akku_data(),
+        "inverter": get_wechselrichter_data(),
+        "eauto": get_eauto_data(),
+        "dishwasher": get_dishwasher_data(),
+        "temperature_forecast": get_pv_forecast(
+            tgt_value="temperature",
+            pv_config_entry=config_manager.config["pv_forecast"][0],
+            tgt_duration=EOS_TGT_DURATION,
+        ),
+        "start_solution": eos_interface.get_last_start_solution(),
+    }
+    logger.debug(
+        "[Main] optimize request payload - startsolution: %s", payload["start_solution"]
+    )
     return payload
 
 
@@ -705,11 +684,12 @@ def change_control_state():
     }
     current_state = base_control.get_current_overall_state()
     logger.info(
-        "[Main] Overall state not changed recently"+
-        " - remaining in current state: %s  (_____OOOOO_____)",
+        "[Main] Overall state not changed recently"
+        + " - remaining in current state: %s  (_____OOOOO_____)",
         state_mapping.get(current_state, "unknown state"),
     )
     return False
+
 
 # web server
 app = Flask(__name__)
@@ -818,11 +798,29 @@ if __name__ == "__main__":
     # # persist and update config
     # eos_save_config_to_config_file()
 
-    # capa = inverter_interface.get_capacity()
-    # logger.info("[Main] Inverter capacity: %s", capa)
+    # json_optimize_input = create_optimize_request()
 
-    # day_one_week_before = datetime.now(time_zone).replace(
-    #         hour=0, minute=0, second=0, microsecond=0) - timedelta(days=2)
+    # with open(
+    #     base_path + "/json/optimize_request.json", "w", encoding="utf-8"
+    # ) as file:
+    #     json.dump(json_optimize_input, file, indent=4)
+
+    # optimized_response = eos_interface.eos_set_optimize_request(
+    #     json_optimize_input, config_manager.config["eos"]["timeout"]
+    # )
+    # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
+
+    # with open(
+    #     base_path + "/json/optimize_response.json", "w", encoding="utf-8"
+    # ) as file:
+    #     json.dump(optimized_response, file, indent=4)
+
+    # evcc_interface.shutdown()
+    # if (
+    #     config_manager.config["inverter"]["type"] == "fronius_gen24"
+    #     and inverter_interface is not None
+    # ):
+    #     inverter_interface.shutdown()
 
     # sys.exit()
 
@@ -872,10 +870,12 @@ if __name__ == "__main__":
                 json.dump(optimized_response, file, indent=4)
             # +++++++++
             ac_charge_demand, dc_charge_demand, discharge_allowed, error = (
-                eos_interface.examine_repsonse_to_control_data(optimized_response)
+                eos_interface.examine_response_to_control_data(optimized_response)
             )
             if error is not True:
-                setting_control_data(ac_charge_demand, dc_charge_demand, discharge_allowed)
+                setting_control_data(
+                    ac_charge_demand, dc_charge_demand, discharge_allowed
+                )
                 change_control_state()
             # +++++++++
 

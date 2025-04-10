@@ -69,6 +69,8 @@ class EosInterface:
         self.base_url = f"http://{eos_server}:{eos_port}"
         self.time_zone = timezone
         self.last_start_solution = None
+        self.eos_version = None
+        self.eos_version = self.__retrieve_eos_version()
 
     # EOS basic API helper
     def set_config_value(self, key, value):
@@ -147,10 +149,10 @@ class EosInterface:
             logger.error("[EOS] OPTIMIZE Request timed out after %s seconds", timeout)
             return {"error": "Request timed out"}
         except requests.exceptions.RequestException as e:
-            logger.error("[EOS] OPTIMIZE Request failed: %s", e)
+            logger.error("[EOS] OPTIMIZE Request failed: %s - response: %s", e, response)
             return {"error": str(e)}
 
-    def examine_repsonse_to_control_data(self, optimized_response_in):
+    def examine_response_to_control_data(self, optimized_response_in):
         """
         Examines the optimized response data for control parameters such as AC charge demand,
         DC charge demand, and discharge allowance for the current hour.
@@ -314,3 +316,67 @@ class EosInterface:
             for date in dates:
                 df.loc[date, "Household"] = energy
         return df
+
+    # def __retrieve_eos_version(self):
+    #     """
+    #     Get the EOS api version from the server.
+
+    #     Returns:
+    #         str: The EOS version.
+    #     """
+    #     try:
+    #         response = requests.get(self.base_url + "/openapi.json", timeout=10)
+    #         response.raise_for_status()
+    #         eos_version = response.json().get("info").get("version")
+    #         logger.info("[EOS] EOS version: %s", eos_version)
+    #         return eos_version
+    #     except requests.exceptions.RequestException as e:
+    #         logger.error("[EOS] Failed to get EOS version: %s", e)
+    #         return None
+    #     except json.JSONDecodeError as e:
+    #         logger.error("[EOS] Failed to decode EOS version response: %s", e)
+    #         return None
+
+    def __retrieve_eos_version(self):
+        """
+        Get the EOS version from the server. Dirty hack to get something to distinguish between
+        different versions of the EOS server.
+
+        Returns:
+            str: The EOS version.
+        """
+        try:
+            response = requests.get(self.base_url + "/v1/health", timeout=10)
+            # response = requests.get(self.base_url + "/v1/config", timeout=10)
+            response.raise_for_status()
+            eos_version = response.json().get("status")
+            if eos_version == "alive":
+                eos_version = ">=2025-04-09"
+            logger.info("[EOS] Getting EOS version: %s", eos_version)
+            return eos_version
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                # if not found, assume version < 2025-04-09
+                eos_version = "<2025-04-09"
+                logger.info("[EOS] Getting EOS version: %s", eos_version)
+                return eos_version
+            else:
+                logger.error(
+                    "[EOS] HTTP error occurred while getting EOS version: %s", e
+                )
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error("[EOS] Failed to get EOS version: %s", e)
+            return None
+        except json.JSONDecodeError as e:
+            logger.error("[EOS] Failed to decode EOS version response: %s", e)
+            return None
+
+    def get_eos_version(self):
+        """
+        Get the EOS version from the server.
+
+        Returns:
+            str: The EOS version.
+        """
+        return self.eos_version

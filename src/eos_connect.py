@@ -240,7 +240,7 @@ def get_prices_from_akkudoktor(tgt_duration, start_time=None):
         remaining_hours = tgt_duration - len(extended_prices)
         extended_prices.extend(prices[:remaining_hours])
     logger.info("[PRICES] Prices from AKKUDOKTOR fetched successfully.")
-    return prices
+    return extended_prices
 
 
 def get_prices_from_tibber(tgt_duration, start_time=None):
@@ -443,7 +443,7 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
     return forecast_values
 
 
-def get_summerized_pv_forecast(tgt_duration=24):
+def get_summarized_pv_forecast(tgt_duration=24):
     """
     requesting pv forecast freach config entry and summarize the values
     """
@@ -474,7 +474,7 @@ def create_optimize_request():
 
     def get_ems_data():
         return {
-            "pv_prognose_wh": get_summerized_pv_forecast(EOS_TGT_DURATION),
+            "pv_prognose_wh": get_summarized_pv_forecast(EOS_TGT_DURATION),
             "strompreis_euro_pro_wh": get_prices(
                 EOS_TGT_DURATION,
                 datetime.now(time_zone).replace(
@@ -815,8 +815,6 @@ if __name__ == "__main__":
     # ) as file:
     #     json.dump(optimized_response, file, indent=4)
 
-    
-
     # evcc_interface.shutdown()
     # if (
     #     config_manager.config["inverter"]["type"] == "fronius_gen24"
@@ -872,7 +870,7 @@ if __name__ == "__main__":
                 json.dump(optimized_response, file, indent=4)
             # +++++++++
             ac_charge_demand, dc_charge_demand, discharge_allowed, error = (
-                eos_interface.examine_repsonse_to_control_data(optimized_response)
+                eos_interface.examine_response_to_control_data(optimized_response)
             )
             if error is not True:
                 setting_control_data(

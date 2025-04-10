@@ -152,7 +152,7 @@ class EosInterface:
             logger.error("[EOS] OPTIMIZE Request failed: %s - response: %s", e, response)
             return {"error": str(e)}
 
-    def examine_repsonse_to_control_data(self, optimized_response_in):
+    def examine_response_to_control_data(self, optimized_response_in):
         """
         Examines the optimized response data for control parameters such as AC charge demand,
         DC charge demand, and discharge allowance for the current hour.
@@ -339,7 +339,7 @@ class EosInterface:
 
     def __retrieve_eos_version(self):
         """
-        Get the EOS version from the server. Dirty hack to get something ti distinguish between
+        Get the EOS version from the server. Dirty hack to get something to distinguish between
         different versions of the EOS server.
 
         Returns:

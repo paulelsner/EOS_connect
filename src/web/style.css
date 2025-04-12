@@ -1,0 +1,151 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: rgb(54, 54, 54);
+    color: lightgray;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.top-boxes,
+.bottom-boxes {
+    display: flex;
+}
+
+.top-boxes {
+    height: 20%;
+}
+
+.top-box {
+    flex: 1;
+    margin: 10px;
+    padding: 10px;
+    background-color: rgb(78, 78, 78);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.93em;
+}
+
+.bottom-boxes {
+    height: 80%;
+}
+
+.left-box {
+    width: 75%;
+    margin: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    background-color: rgb(78, 78, 78);
+}
+
+.right-box {
+    width: 24%;
+    margin: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    background-color: rgb(78, 78, 78);
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    background-color: rgb(114, 114, 114);
+    ;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    border-radius: 10px;
+    position: relative;
+}
+
+.header_notification {
+    background-color: rgb(58, 58, 58);
+    color: white;
+    padding: 4px;
+    text-align: center;
+    border-radius: 5px;
+    font-size: 0.65em;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.content {
+    padding: 10px;
+    flex: 1;
+    overflow: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 0 5px 0 5px;
+    text-align: left;
+}
+th {
+    text-align:center;
+}
+
+/* Media Queries for Smartphones */
+@media (max-width: 768px) {
+    .top-boxes {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .top-box {
+        min-height: 150px;
+        font-size: 0.73em;
+    }
+
+    .bottom-boxes {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .left-box,
+    .right-box {
+        width: auto;
+        height: auto;
+    }
+}
+
+.table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-header, .table-body {
+    display: table-row-group;
+}
+
+.table-row {
+    display: table-row;
+}
+
+.table-cell {
+    display: table-cell;
+    padding: 1px 5px;
+    text-align: left;
+    margin: 2px;
+    border-radius: 20px;
+}
+
+.table-cell.rounded {
+    border-radius: 10px;
+    overflow: hidden;
+}

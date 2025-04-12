@@ -200,4 +200,4 @@ class BaseControl:
         Sets the current battery state of charge (SOC).
         """
         self.current_battery_soc = value
-        logger.debug("[BASE_CTRL] set current battery SOC to %s", value)
+        # logger.debug("[BASE_CTRL] set current battery SOC to %s", value)

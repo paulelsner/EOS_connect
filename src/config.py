@@ -59,6 +59,8 @@ class ConfigManager:
                     {
                         "source": "default",
                         "token": "tibberBearerToken",  # token for electricity price
+                        "feed_in_price": 0.0, # feed in price for the grid
+                        "negative_price_switch": False,  # switch for negative price
                     }
                 ),
                 "battery": CommentedMap(
@@ -154,6 +156,12 @@ class ConfigManager:
         )
         config["price"].yaml_set_comment_before_after_key(
             "token", before="Token for electricity price"
+        )
+        config["price"].yaml_set_comment_before_after_key(
+            "feed_in_price", before="feed in price for the grid"
+        )
+        config["price"].yaml_set_comment_before_after_key(
+            "negative_price_switch", before="switch for no payment if negative stock price"
         )
         # battery configuration
         config.yaml_set_comment_before_after_key("battery", before="battery configuration")

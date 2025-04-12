@@ -400,7 +400,8 @@ class LoadInterface:
         if not load_profile:
             logger.error(
                 "[LOAD-IF] No load profile data available for the specified day - % s to % s",
-                start_time, end_time
+                start_time,
+                end_time,
             )
         return load_profile
 
@@ -459,12 +460,15 @@ class LoadInterface:
         # combine to a list with 48 values
         load_profile = []
         for i, value in enumerate(load_profile_one_week_before):
-            if load_profile_two_week_before:
+            if load_profile_two_week_before and len(load_profile_two_week_before) >= 24:
                 load_profile.append((value + load_profile_two_week_before[i]) / 2)
             else:
                 load_profile.append(value)
         for i, value in enumerate(load_profile_tomorrow_one_week_before):
-            if load_profile_tomorrow_two_week_before:
+            if (
+                load_profile_tomorrow_two_week_before
+                and len(load_profile_tomorrow_two_week_before) >= 24
+            ):
                 load_profile.append(
                     (value + load_profile_tomorrow_two_week_before[i]) / 2
                 )

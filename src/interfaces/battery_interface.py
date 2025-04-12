@@ -25,6 +25,8 @@ Example:
     ```
 """
 import logging
+import threading
+import time
 import requests
 
 logger = logging.getLogger("__main__")
@@ -55,6 +57,10 @@ class BatteryInterface:
         self.soc_sensor = soc_sensor
         self.access_token = access_token
         self.current_soc = 0
+        self.update_interval = 30
+        self._update_thread = None
+        self._stop_event = threading.Event()
+        self.start_update_service()
 
     def fetch_soc_data_from_openhab(self):
         """
@@ -107,7 +113,7 @@ class BatteryInterface:
             requests.exceptions.Timeout: If the request to the Home Assistant API times out.
             requests.exceptions.RequestException: If there is an error during the request.
         """
-        logger.debug("[BATTERY-IF] getting SOC from homeassistant ...")
+        # logger.debug("[BATTERY-IF] getting SOC from homeassistant ...")
         homeassistant_url = f"{self.url}/api/states/{self.soc_sensor}"
         # Headers for the API request
         headers = {
@@ -122,8 +128,8 @@ class BatteryInterface:
             # print(f'Entity data: {entity_data}')
             soc = float(entity_data["state"])
             # print(f'State: {state}')
-            logger.info("[BATTERY-IF] successfully fetched SOC = %s %%", soc)
-            return round(soc)
+            logger.debug("[BATTERY-IF] successfully fetched SOC = %s %%", soc)
+            return round(soc,1)
         except requests.exceptions.Timeout:
             logger.error(
                 (
@@ -166,3 +172,43 @@ class BatteryInterface:
         Returns the current state of charge (SOC) of the battery.
         """
         return self.current_soc
+
+    def start_update_service(self):
+        """
+        Starts the background thread to periodically update the state.
+        """
+        if self._update_thread is None or not self._update_thread.is_alive():
+            self._stop_event.clear()
+            self._update_thread = threading.Thread(
+                target=self._update_state_loop, daemon=True
+            )
+            self._update_thread.start()
+            logger.info("[BATTERY-IF] Update service started.")
+
+    def shutdown(self):
+        """
+        Stops the background thread and shuts down the update service.
+        """
+        if self._update_thread and self._update_thread.is_alive():
+            self._stop_event.set()
+            self._update_thread.join()
+            logger.info("[BATTERY-IF] Update service stopped.")
+
+    def _update_state_loop(self):
+        """
+        The loop that runs in the background thread to update the state.
+        """
+        while not self._stop_event.is_set():
+            try:
+                self.battery_request_current_soc()
+            except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+                logger.error("[BATTERY-IF] Error while updating state: %s", e)
+                    # Break the sleep interval into smaller chunks to allow immediate shutdown
+            sleep_interval = self.update_interval
+            while sleep_interval > 0:
+                if self._stop_event.is_set():
+                    return  # Exit immediately if stop event is set
+                time.sleep(min(1, sleep_interval))  # Sleep in 1-second chunks
+                sleep_interval -= 1
+
+        self.start_update_service()

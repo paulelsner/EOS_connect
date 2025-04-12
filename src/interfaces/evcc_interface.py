@@ -101,7 +101,13 @@ class EvccInterface:
                 self.request_charging_state()
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 logger.error("[EVCC] Error while updating charging state: %s", e)
-            time.sleep(self.update_interval)
+                    # Break the sleep interval into smaller chunks to allow immediate shutdown
+            sleep_interval = self.update_interval
+            while sleep_interval > 0:
+                if self._stop_event.is_set():
+                    return  # Exit immediately if stop event is set
+                time.sleep(min(1, sleep_interval))  # Sleep in 1-second chunks
+                sleep_interval -= 1
 
         self.start_update_service()
 

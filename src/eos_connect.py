@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import time
 import logging
 import json
-from threading import Thread
+import threading
 import sched
 import pytz
 import requests
@@ -23,6 +23,9 @@ from interfaces.evcc_interface import EvccInterface
 from interfaces.eos_interface import EosInterface
 
 EOS_TGT_DURATION = 48
+EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
+AKKUDOKTOR_API_PRICES = "https://api.akkudoktor.net/prices"
+TIBBER_API = "https://api.tibber.com/v1-beta/gql"
 
 
 ###################################################################################################
@@ -40,112 +43,6 @@ class TimezoneFormatter(logging.Formatter):
         # Convert the record's timestamp to the configured timezone
         record_time = datetime.fromtimestamp(record.created, self.tz)
         return record_time.strftime(datefmt or self.default_time_format)
-
-
-###################################################################################################
-LOGLEVEL = logging.DEBUG  # start before reading the config file
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter(
-    "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"
-)
-streamhandler = logging.StreamHandler(sys.stdout)
-
-streamhandler.setFormatter(formatter)
-logger.addHandler(streamhandler)
-logger.setLevel(LOGLEVEL)
-logger.info("[Main] Starting eos_connect")
-###################################################################################################
-base_path = os.path.dirname(os.path.abspath(__file__))
-# get param to set a specific path
-if len(sys.argv) > 1:
-    current_dir = sys.argv[1]
-else:
-    current_dir = base_path
-###################################################################################################
-config_manager = ConfigManager(current_dir)
-time_zone = pytz.timezone(config_manager.config["time_zone"])
-
-LOGLEVEL = config_manager.config["log_level"].upper()
-logger.setLevel(LOGLEVEL)
-formatter = TimezoneFormatter(
-    "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S", tz=time_zone
-)
-streamhandler.setFormatter(formatter)
-logger.info(
-    "[Main] set user defined time zone to %s and loglevel to %s",
-    config_manager.config["time_zone"],
-    LOGLEVEL,
-)
-# initialize eos interface
-eos_interface = EosInterface(
-    eos_server=config_manager.config["eos"]["server"],
-    eos_port=config_manager.config["eos"]["port"],
-    timezone=time_zone,
-)
-# initialize base control
-base_control = BaseControl(config_manager.config, time_zone)
-# initialize the inverter interface
-inverter_interface = None
-if config_manager.config["inverter"]["type"] == "fronius_gen24":
-    inverter_config = {
-        "address": config_manager.config["inverter"]["address"],
-        "max_grid_charge_rate": config_manager.config["inverter"][
-            "max_grid_charge_rate"
-        ],
-        "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
-        "user": config_manager.config["inverter"]["user"],
-        "password": config_manager.config["inverter"]["password"],
-    }
-    inverter_interface = FroniusWR(inverter_config)
-else:
-    logger.info(
-        "[Inverter] Inverter type %s - no external connection."
-        + " Changing to show only mode.",
-        config_manager.config["inverter"]["type"],
-    )
-
-
-# callback function for evcc interface
-def charging_state_callback(new_state):
-    """
-    Callback function that gets triggered when the charging state changes.
-    """
-    logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
-    change_control_state()
-
-
-evcc_interface = EvccInterface(
-    url=config_manager.config["evcc"]["url"],
-    update_interval=10,
-    on_charging_state_change=charging_state_callback,
-)
-
-# time.sleep(120)
-
-# evcc_interface.shutdown()
-
-# sys.exit(0)
-
-# intialize the load interface
-load_interface = LoadInterface(
-    config_manager.config.get("load", {}).get("source", ""),
-    config_manager.config.get("load", {}).get("url", ""),
-    config_manager.config.get("load", {}).get("load_sensor", ""),
-    config_manager.config.get("load", {}).get("car_charge_load_sensor", ""),
-    config_manager.config.get("load", {}).get("access_token", ""),
-    time_zone,
-)
-
-battery_interface = BatteryInterface(
-    config_manager.config.get("battery", {}).get("source", ""),
-    config_manager.config.get("battery", {}).get("url", ""),
-    config_manager.config.get("battery", {}).get("soc_sensor", ""),
-    config_manager.config.get("battery", {}).get("access_token", ""),
-)
-
-EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
-AKKUDOKTOR_API_PRICES = "https://api.akkudoktor.net/prices"
-TIBBER_API = "https://api.tibber.com/v1-beta/gql"
 
 
 # getting data
@@ -547,7 +444,7 @@ def create_optimize_request():
             "max_charge_power_w": config_manager.config["battery"][
                 "max_charge_power_w"
             ],
-            "initial_soc_percentage": battery_interface.battery_request_current_soc(),
+            "initial_soc_percentage": round(battery_interface.battery_request_current_soc()),
             "min_soc_percentage": config_manager.config["battery"][
                 "min_soc_percentage"
             ],
@@ -564,8 +461,11 @@ def create_optimize_request():
             "max_power_wh": config_manager.config["inverter"]["max_pv_charge_rate"],
         }
         if eos_interface.get_eos_version() == ">=2025-04-09":
-            wechselrichter_object = {"device_id": "inverter1", **wechselrichter_object} # at top
-            wechselrichter_object["battery_id"] = "battery1" # at the bottom
+            wechselrichter_object = {
+                "device_id": "inverter1",
+                **wechselrichter_object,
+            }  # at top
+            wechselrichter_object["battery_id"] = "battery1"  # at the bottom
         return wechselrichter_object
 
     def get_eauto_data():
@@ -576,17 +476,14 @@ def create_optimize_request():
             "max_charge_power_w": 7360,
             "initial_soc_percentage": 50,
             "min_soc_percentage": 5,
-            "max_soc_percentage": 100
+            "max_soc_percentage": 100,
         }
         if eos_interface.get_eos_version() == ">=2025-04-09":
             eauto_object = {"device_id": "ev1", **eauto_object}
         return eauto_object
 
     def get_dishwasher_data():
-        dishwaser_object = {
-            "consumption_wh": 1,
-            "duration_h": 1
-        }
+        dishwaser_object = {"consumption_wh": 1, "duration_h": 1}
         if eos_interface.get_eos_version() == ">=2025-04-09":
             dishwaser_object = {"device_id": "dishwasher1", **dishwaser_object}
         return dishwaser_object
@@ -608,6 +505,237 @@ def create_optimize_request():
         "[Main] optimize request payload - startsolution: %s", payload["start_solution"]
     )
     return payload
+
+
+class OptimizationScheduler:
+    '''
+    A scheduler class that manages the periodic execution of an optimization process
+    in a background thread. The class is responsible for starting, stopping, and 
+    managing the lifecycle of the optimization service.
+    Attributes:
+        update_interval (int): The interval in seconds between optimization runs.
+        _update_thread (threading.Thread): The background thread running the optimization loop.
+        _stop_event (threading.Event): An event used to signal the thread to stop.
+    Methods:
+        start_update_service():
+        shutdown():
+        _update_state_loop():
+        run_optimization():
+    '''
+    def __init__(self, update_interval):
+        self.update_interval = update_interval
+        self._update_thread = None
+        self._stop_event = threading.Event()
+        self.start_update_service()
+
+    def start_update_service(self):
+        """
+        Starts the background thread to periodically update the state.
+        """
+        if self._update_thread is None or not self._update_thread.is_alive():
+            self._stop_event.clear()
+            self._update_thread = threading.Thread(
+                target=self._update_state_loop, daemon=True
+            )
+            self._update_thread.start()
+            logger.info("[BATTERY-IF] Update service started.")
+
+    def shutdown(self):
+        """
+        Stops the background thread and shuts down the update service.
+        """
+        if self._update_thread and self._update_thread.is_alive():
+            self._stop_event.set()
+            self._update_thread.join()
+            logger.info("[OPTIMIZATION] Update service stopped.")
+
+    def _update_state_loop(self):
+        """
+        The loop that runs in the background thread to update the state.
+        """
+        while not self._stop_event.is_set():
+            try:
+                self.run_optimization()
+            except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+                logger.error("[BATTERY-IF] Error while updating state: %s", e)
+                # Break the sleep interval into smaller chunks to allow immediate shutdown
+            sleep_interval = self.update_interval
+            while sleep_interval > 0:
+                if self._stop_event.is_set():
+                    return  # Exit immediately if stop event is set
+                time.sleep(min(1, sleep_interval))  # Sleep in 1-second chunks
+                sleep_interval -= 1
+
+        self.start_update_service()
+
+    def run_optimization(self):
+        """
+        Executes the optimization process by creating an optimization request, 
+        sending it to the EOS interface, processing the response, and scheduling 
+        the next optimization run.
+        The method performs the following steps:
+        1. Logs the start of a new optimization run.
+        2. Creates an optimization request in JSON format and saves it to a file.
+        3. Sends the optimization request to the EOS interface and retrieves the response.
+        4. Adds a timestamp to the response and saves it to a file.
+        5. Extracts control data from the response and, if no error is detected, 
+           applies the control settings and updates the control state.
+        6. Calculates the time for the next optimization run and logs the sleep duration.
+        Raises:
+            Any exceptions raised during file operations, JSON serialization, 
+            or EOS interface communication will propagate to the caller.
+        Notes:
+            - The method assumes the presence of global variables or objects such as 
+              `logger`, `base_path`, `eos_interface`, `config_manager`, and `time_zone`.
+            - The `config_manager.config` dictionary is expected to contain the 
+              necessary configuration values for "eos.timeout" and "refresh_time".
+        """
+        logger.info("[Main] start new run")
+        # create optimize request
+        json_optimize_input = create_optimize_request()
+
+        with open(
+            base_path + "/json/optimize_request.json", "w", encoding="utf-8"
+        ) as file:
+            json.dump(json_optimize_input, file, indent=4)
+
+        optimized_response = eos_interface.eos_set_optimize_request(
+            json_optimize_input, config_manager.config["eos"]["timeout"]
+        )
+        optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
+
+        with open(
+            base_path + "/json/optimize_response.json", "w", encoding="utf-8"
+        ) as file:
+            json.dump(optimized_response, file, indent=4)
+        # +++++++++
+        ac_charge_demand, dc_charge_demand, discharge_allowed, error = (
+            eos_interface.examine_response_to_control_data(optimized_response)
+        )
+        if error is not True:
+            setting_control_data(ac_charge_demand, dc_charge_demand, discharge_allowed)
+            change_control_state()
+        # +++++++++
+
+        loop_now = datetime.now(time_zone)
+        # Reset base to full minutes on the clock
+        next_eval = loop_now.replace(microsecond=0)
+        # Add the update interval to calculate the next evaluation time
+        next_eval += timedelta(seconds=self.update_interval)
+        sleeptime = (next_eval - loop_now).total_seconds()
+        minutes, seconds = divmod(sleeptime, 60)
+        logger.info(
+            "[Main] Next optimization at %s. Sleeping for %d min %.0f seconds\n",
+            next_eval.strftime("%H:%M:%S"),
+            minutes,
+            seconds,
+        )
+
+
+###################################################################################################
+LOGLEVEL = logging.DEBUG  # start before reading the config file
+logger = logging.getLogger(__name__)
+formatter = logging.Formatter(
+    "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"
+)
+streamhandler = logging.StreamHandler(sys.stdout)
+
+streamhandler.setFormatter(formatter)
+logger.addHandler(streamhandler)
+logger.setLevel(LOGLEVEL)
+logger.info("[Main] Starting eos_connect")
+###################################################################################################
+base_path = os.path.dirname(os.path.abspath(__file__))
+# get param to set a specific path
+if len(sys.argv) > 1:
+    current_dir = sys.argv[1]
+else:
+    current_dir = base_path
+###################################################################################################
+config_manager = ConfigManager(current_dir)
+time_zone = pytz.timezone(config_manager.config["time_zone"])
+
+LOGLEVEL = config_manager.config["log_level"].upper()
+logger.setLevel(LOGLEVEL)
+formatter = TimezoneFormatter(
+    "%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S", tz=time_zone
+)
+streamhandler.setFormatter(formatter)
+logger.info(
+    "[Main] set user defined time zone to %s and loglevel to %s",
+    config_manager.config["time_zone"],
+    LOGLEVEL,
+)
+# initialize eos interface
+eos_interface = EosInterface(
+    eos_server=config_manager.config["eos"]["server"],
+    eos_port=config_manager.config["eos"]["port"],
+    timezone=time_zone,
+)
+# initialize base control
+base_control = BaseControl(config_manager.config, time_zone)
+# initialize the inverter interface
+inverter_interface = None
+if config_manager.config["inverter"]["type"] == "fronius_gen24":
+    inverter_config = {
+        "address": config_manager.config["inverter"]["address"],
+        "max_grid_charge_rate": config_manager.config["inverter"][
+            "max_grid_charge_rate"
+        ],
+        "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
+        "user": config_manager.config["inverter"]["user"],
+        "password": config_manager.config["inverter"]["password"],
+    }
+    inverter_interface = FroniusWR(inverter_config)
+else:
+    logger.info(
+        "[Inverter] Inverter type %s - no external connection."
+        + " Changing to show only mode.",
+        config_manager.config["inverter"]["type"],
+    )
+
+optimization_scheduler = OptimizationScheduler(
+    config_manager.config["refresh_time"] * 60  # convert to seconds
+)
+
+
+# callback function for evcc interface
+def charging_state_callback(new_state):
+    """
+    Callback function that gets triggered when the charging state changes.
+    """
+    logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
+    change_control_state()
+
+
+evcc_interface = EvccInterface(
+    url=config_manager.config["evcc"]["url"],
+    update_interval=10,
+    on_charging_state_change=charging_state_callback,
+)
+
+# time.sleep(120)
+
+# evcc_interface.shutdown()
+
+# sys.exit(0)
+
+# intialize the load interface
+load_interface = LoadInterface(
+    config_manager.config.get("load", {}).get("source", ""),
+    config_manager.config.get("load", {}).get("url", ""),
+    config_manager.config.get("load", {}).get("load_sensor", ""),
+    config_manager.config.get("load", {}).get("car_charge_load_sensor", ""),
+    config_manager.config.get("load", {}).get("access_token", ""),
+    time_zone,
+)
+
+battery_interface = BatteryInterface(
+    config_manager.config.get("battery", {}).get("source", ""),
+    config_manager.config.get("battery", {}).get("url", ""),
+    config_manager.config.get("battery", {}).get("soc_sensor", ""),
+    config_manager.config.get("battery", {}).get("access_token", ""),
+)
 
 
 def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_allowed):
@@ -707,6 +835,18 @@ def main_page():
         return render_template_string(html_file.read())
 
 
+@app.route("/style.css", methods=["GET"])
+def style_css():
+    """
+    Serves the CSS file for styling the web application.
+
+    This function reads the content of the 'style.css' file located in the 'web' directory
+    and returns it as a response with the appropriate content type.
+    """
+    with open(base_path + "/web/style.css", "r", encoding="utf-8") as css_file:
+        return Response(css_file.read(), content_type="text/css")
+
+
 @app.route("/json/optimize_request.json", methods=["GET"])
 def get_optimize_request():
     """
@@ -765,15 +905,18 @@ def serve_current_demands():
     current_ac_charge_demand = base_control.get_current_ac_charge_demand()
     current_dc_charge_demand = base_control.get_current_dc_charge_demand()
     current_discharge_allowed = base_control.get_current_discharge_allowed()
+    current_inverter_mode = base_control.get_current_overall_state(False)
+    current_battery_soc = battery_interface.get_current_soc()
+    base_control.set_current_battery_soc(current_battery_soc)
     response_data = {
         "current_states": {
             "current_ac_charge_demand": current_ac_charge_demand,
             "current_dc_charge_demand": current_dc_charge_demand,
             "current_discharge_allowed": current_discharge_allowed,
-            "inverter_mode": base_control.get_current_overall_state(False),
+            "inverter_mode": current_inverter_mode,
             "evcc_charging_state": base_control.get_current_evcc_charging_state(),
         },
-        "battery_soc": base_control.get_current_battery_soc(),
+        "battery_soc": current_battery_soc,
         "timestamp": datetime.now(time_zone).isoformat(),
     }
     return Response(json.dumps(response_data), content_type="application/json")
@@ -815,7 +958,10 @@ if __name__ == "__main__":
     # ) as file:
     #     json.dump(optimized_response, file, indent=4)
 
+    # time.sleep(30)
+
     # evcc_interface.shutdown()
+    # battery_interface.shutdown()
     # if (
     #     config_manager.config["inverter"]["type"] == "fronius_gen24"
     #     and inverter_interface is not None
@@ -831,86 +977,14 @@ if __name__ == "__main__":
         error_log=logger,
     )
 
-    def run_optimization_loop():
-        """
-        Continuously runs the optimization loop until interrupted.
-        This function performs the following steps in an infinite loop:
-        1. Logs the start of a new run.
-        2. Creates an optimization request and saves it to a JSON file.
-        3. Sends the optimization request and receives the optimized response.
-        4. Adds a timestamp to the optimized response and saves it to a JSON file.
-        5. Calculates the time to the next evaluation based on a predefined interval.
-        6. Logs the next evaluation time and sleeps until that time.
-        The loop can be interrupted with a KeyboardInterrupt, which will log an exit message and
-        terminate the program.
-        Raises:
-            KeyboardInterrupt: If the loop is interrupted by the user.
-        """
-
-        scheduler = sched.scheduler(time.time, time.sleep)
-
-        def run_optimization_event(sc):
-            logger.info("[Main] start new run")
-            # create optimize request
-            json_optimize_input = create_optimize_request()
-
-            with open(
-                base_path + "/json/optimize_request.json", "w", encoding="utf-8"
-            ) as file:
-                json.dump(json_optimize_input, file, indent=4)
-
-            optimized_response = eos_interface.eos_set_optimize_request(
-                json_optimize_input, config_manager.config["eos"]["timeout"]
-            )
-            optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
-
-            with open(
-                base_path + "/json/optimize_response.json", "w", encoding="utf-8"
-            ) as file:
-                json.dump(optimized_response, file, indent=4)
-            # +++++++++
-            ac_charge_demand, dc_charge_demand, discharge_allowed, error = (
-                eos_interface.examine_response_to_control_data(optimized_response)
-            )
-            if error is not True:
-                setting_control_data(
-                    ac_charge_demand, dc_charge_demand, discharge_allowed
-                )
-                change_control_state()
-            # +++++++++
-
-            loop_now = datetime.now(time_zone).astimezone()
-            # reset base to full minutes on the clock
-            next_eval = loop_now - timedelta(
-                minutes=loop_now.minute % config_manager.config["refresh_time"],
-                seconds=loop_now.second,
-                microseconds=loop_now.microsecond,
-            )
-            # add time increments to trigger next evaluation
-            next_eval += timedelta(
-                minutes=config_manager.config["refresh_time"], seconds=0, microseconds=0
-            )
-            sleeptime = (next_eval - loop_now).total_seconds()
-            minutes, seconds = divmod(sleeptime, 60)
-            logger.info(
-                "[Main] Next optimization at %s. Sleeping for %d min %.0f seconds\n",
-                next_eval.astimezone(time_zone).strftime("%H:%M:%S"),
-                minutes,
-                seconds,
-            )
-            scheduler.enter(sleeptime, 1, run_optimization_event, (sc,))
-
-        scheduler.enter(0, 1, run_optimization_event, (scheduler,))
-        scheduler.run()
-
-    optimization_thread = Thread(target=run_optimization_loop)
-    optimization_thread.start()
-
     try:
         http_server.serve_forever()
     except KeyboardInterrupt:
-        logger.info("[Main] Shutting down server")
+        logger.info("[Main] Shutting down EOS connect")
+        optimization_scheduler.shutdown()
         http_server.stop()
+        logger.info("[Main] HTTP server stopped")
+
         # restore the old config
         if (
             config_manager.config["inverter"]["type"] == "fronius_gen24"
@@ -918,19 +992,8 @@ if __name__ == "__main__":
         ):
             inverter_interface.shutdown()
         evcc_interface.shutdown()
-        optimization_thread.join(timeout=10)
-        if optimization_thread.is_alive():
-            logger.warning(
-                "[Main] Optimization thread did not finish in time, terminating."
-            )
-            # Terminate the thread (not recommended, but shown here for completeness)
-            # Note: Python does not provide a direct way to kill a thread. This is a workaround.
-            import ctypes
-
-            if optimization_thread.ident is not None:
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    ctypes.c_long(optimization_thread.ident),
-                    ctypes.py_object(SystemExit),
-                )
+        battery_interface.shutdown()
         logger.info("[Main] Server stopped")
+    finally:
+        logger.info("[Main] Cleanup complete. Exiting.")
         sys.exit(0)

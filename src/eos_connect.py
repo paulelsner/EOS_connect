@@ -9,7 +9,6 @@ import time
 import logging
 import json
 import threading
-import sched
 import pytz
 import requests
 from flask import Flask, Response, render_template_string
@@ -137,6 +136,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("url", ""),
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
+    config_manager.config.get("battery", {}).get("max_charge_power_w", ""),
 )
 
 price_interface = PriceInterface(
@@ -145,7 +145,6 @@ price_interface = PriceInterface(
     config_manager.config["price"]["feed_in_price"],
     config_manager.config["price"]["negative_price_switch"],
 )
-
 
 def create_forecast_request(pv_config_entry):
     """
@@ -209,7 +208,11 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
         for forecast in forecast_entry:
             entry_time = datetime.fromisoformat(forecast["datetime"]).astimezone()
             if current_time <= entry_time < end_time:
-                forecast_values.append(forecast.get(tgt_value, 0))
+                value = forecast.get(tgt_value, 0)
+                # if power is negative, set it to 0 (fixing wrong values form api)
+                if tgt_value == "power" and value < 0:
+                    value = 0
+                forecast_values.append(value)
     request_type = "PV forecast"
     pv_config_name = "for " + pv_config_entry["name"]
     if tgt_value == "temperature":
@@ -538,13 +541,17 @@ def change_control_state():
         logger.debug("[Main] Overall state changed recently")
         # MODE_CHARGE_FROM_GRID
         if base_control.get_current_overall_state() == 0:
+            # get the current ac charge demand and set it to the inverter according
+            # to the max dynamic charge power of the battery based on SOC
+            tgt_charge_power = min(
+                base_control.get_current_ac_charge_demand(),
+                round(battery_interface.get_max_charge_power_dyn())
+            )
             if inverter_en:
-                inverter_interface.set_mode_force_charge(
-                    base_control.get_current_ac_charge_demand()
-                )
+                inverter_interface.set_mode_force_charge(tgt_charge_power)
             logger.info(
                 "[Main] Inverter mode set to charge from grid with %s W (_____|||||_____)",
-                base_control.get_current_ac_charge_demand(),
+                tgt_charge_power,
             )
         # MODE_AVOID_DISCHARGE
         elif base_control.get_current_overall_state() == 1:
@@ -672,58 +679,13 @@ def serve_current_demands():
             "evcc_charging_state": base_control.get_current_evcc_charging_state(),
         },
         "battery_soc": current_battery_soc,
+        "battery_max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
         "timestamp": datetime.now(time_zone).isoformat(),
     }
     return Response(json.dumps(response_data), content_type="application/json")
 
 
 if __name__ == "__main__":
-    # initial config
-    # set_config_value("latitude", 48.812)
-    # set_config_value("longitude", 8.907)
-
-    # set_config_value("measurement_load0_name", "Household")
-    # set_config_value("loadakkudoktor_year_energy", 4600)
-
-    # # set_config_value("pvforecast_provider", "PVForecastAkkudoktor")
-    # set_config_value("pvforecast_provider", "PVForecast")
-    # set_config_value("pvforecast0_surface_tilt", 31)
-    # set_config_value("pvforecast0_surface_azimuth", 13)
-    # set_config_value("pvforecast0_peakpower", 860.0)
-    # set_config_value("pvforecast0_inverter_paco", 800)
-    # # set_config_value("pvforecast0_userhorizon", [0,0])
-
-    # # persist and update config
-    # eos_save_config_to_config_file()
-
-    # json_optimize_input = create_optimize_request()
-
-    # with open(
-    #     base_path + "/json/optimize_request.json", "w", encoding="utf-8"
-    # ) as file:
-    #     json.dump(json_optimize_input, file, indent=4)
-
-    # optimized_response = eos_interface.eos_set_optimize_request(
-    #     json_optimize_input, config_manager.config["eos"]["timeout"]
-    # )
-    # optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
-
-    # with open(
-    #     base_path + "/json/optimize_response.json", "w", encoding="utf-8"
-    # ) as file:
-    #     json.dump(optimized_response, file, indent=4)
-
-    # time.sleep(30)
-
-    # evcc_interface.shutdown()
-    # battery_interface.shutdown()
-    # if (
-    #     config_manager.config["inverter"]["type"] == "fronius_gen24"
-    #     and inverter_interface is not None
-    # ):
-    #     inverter_interface.shutdown()
-
-    # sys.exit()
 
     http_server = WSGIServer(
         ("0.0.0.0", config_manager.config["eos_connect_web_port"]),

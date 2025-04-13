@@ -670,6 +670,9 @@ def serve_current_demands():
     current_inverter_mode = base_control.get_current_overall_state(False)
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
+    current_inverter_mode = base_control.get_current_overall_state(False)
+    current_battery_soc = battery_interface.get_current_soc()
+    base_control.set_current_battery_soc(current_battery_soc)
     response_data = {
         "current_states": {
             "current_ac_charge_demand": current_ac_charge_demand,

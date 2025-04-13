@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -537,6 +538,10 @@
                         document.getElementById('waiting_text').innerText = "No data available...";
                         document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
                     }
+                    else if(data_response["error"].includes("422 Client Error: Unprocessable Entity")){
+                        document.getElementById('waiting_text').innerText = "No data available...";
+                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
+                    }
                     else {
                         document.getElementById('waiting_text').innerText = "No data available...";
                         document.getElementById('waiting_error_text').innerText = "no further error information available";
@@ -568,6 +573,8 @@
             //document.getElementById('timestamp_battery').innerHTML = data["energyBatteryChargeDischargeJSON"].timestamp;
             
             showBatteryCharge(data_request,data_response);
+            
+            await showCurrentData();           
             
             await showCurrentData();           
             

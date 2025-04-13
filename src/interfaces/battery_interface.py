@@ -1,8 +1,19 @@
 """
-This module provides the `BatteryInterface` class, which serves as an interface for fetching 
+- BatteryInterface: A class to interact with SOC data sources, retrieve battery SOC, and calculate
+  dynamic maximum charge power based on SOC.
+- threading: For managing background update services.
+- time: For managing sleep intervals in the update loop.
+sensor identifier, access token (if required), and maximum fixed charge power. Use the
+`battery_request_current_soc` method to fetch the current SOC value or `get_max_charge_power_dyn`
+to calculate the dynamic maximum charge power.
+    access_token=None,
+    max_charge_power_w=3000
+max_charge_power = battery_interface.get_max_charge_power_dyn()
+print(f"Max Charge Power: {max_charge_power}W")
+This module provides the `BatteryInterface` class, which serves as an interface for fetching
 the State of Charge (SOC) data of a battery from various sources such as OpenHAB and Home Assistant.
-The `BatteryInterface` class allows users to configure the source of SOC data and retrieve the 
-current SOC value through its methods. It supports fetching SOC data from OpenHAB using its REST API 
+The `BatteryInterface` class allows users to configure the source of SOC data and retrieve the
+current SOC value through its methods. It supports fetching SOC data from OpenHAB using its REST API
 and from Home Assistant using its API with authentication.
 Classes:
     - BatteryInterface: A class to interact with SOC data sources and retrieve battery SOC.
@@ -24,6 +35,7 @@ Example:
     print(f"Current SOC: {current_soc}%")
     ```
 """
+
 import logging
 import threading
 import time
@@ -51,11 +63,12 @@ class BatteryInterface:
             Fetches the current SOC of the battery based on the configured source.
     """
 
-    def __init__(self, src, url, soc_sensor, access_token):
+    def __init__(self, src, url, soc_sensor, access_token, max_charge_power_w):
         self.src = src
         self.url = url
         self.soc_sensor = soc_sensor
         self.access_token = access_token
+        self.max_charge_power_fix = max_charge_power_w
         self.current_soc = 0
         self.update_interval = 30
         self._update_thread = None
@@ -87,7 +100,8 @@ class BatteryInterface:
         except requests.exceptions.Timeout:
             logger.error(
                 "[BATTERY-IF] OPENHAB - Request timed out while fetching battery SOC. "
-                "Using default SOC = %s%%.", soc
+                "Using default SOC = %s%%.",
+                soc,
             )
             return soc  # Default SOC value in case of timeout
         except requests.exceptions.RequestException as e:
@@ -96,7 +110,8 @@ class BatteryInterface:
                     "[BATTERY-IF] OPENHAB - Request failed while fetching battery SOC: %s. "
                     "Using default SOC = %s%%."
                 ),
-                e,soc
+                e,
+                soc,
             )
             return soc  # Default SOC value in case of request failure
 
@@ -129,12 +144,13 @@ class BatteryInterface:
             soc = float(entity_data["state"])
             # print(f'State: {state}')
             logger.debug("[BATTERY-IF] successfully fetched SOC = %s %%", soc)
-            return round(soc,1)
+            return round(soc, 1)
         except requests.exceptions.Timeout:
             logger.error(
                 (
                     "[BATTERY-IF] HOMEASSISTANT - Request timed out while fetching battery SOC. "
-                    "Using default SOC = %s%%.", soc
+                    "Using default SOC = %s%%.",
+                    soc,
                 )
             )
             return soc  # Default SOC value in case of timeout
@@ -144,7 +160,8 @@ class BatteryInterface:
                     "[BATTERY-IF] HOMEASSISTANT - Request failed while fetching battery SOC: %s. "
                     "Using default SOC = %s %%."
                 ),
-                e,soc
+                e,
+                soc,
             )
             return soc  # Default SOC value in case of request failure
 
@@ -172,6 +189,32 @@ class BatteryInterface:
         Returns the current state of charge (SOC) of the battery.
         """
         return self.current_soc
+
+    def get_max_charge_power_dyn(self, soc=None):
+        """
+        Calculates the maximum charge power of the battery depending on the SOC.
+
+        - If SOC < 60%, the fixed maximum charge power is used.
+        - If SOC >= 60% and < 95%, the maximum charge power decreases linearly.
+        - If SOC >= 95%, the maximum charge power is fixed at 500W.
+
+        Args:
+            soc (float, optional): The state of charge to use for calculation. 
+                       If None, the current SOC is used.
+
+        Returns:
+            float: The dynamically calculated maximum charge power in watts.
+        """
+        if soc is None:
+            soc = self.current_soc
+
+        if soc < 70:
+            return self.max_charge_power_fix
+        elif soc >= 70 and soc < 95:
+            return max(500, self.max_charge_power_fix * ((95 - soc) / 35))
+            # return max(500, self.max_charge_power_fix * (1 - (soc / 100)**2))
+        else:  # SOC >= 95
+            return 500
 
     def start_update_service(self):
         """
@@ -203,7 +246,7 @@ class BatteryInterface:
                 self.battery_request_current_soc()
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 logger.error("[BATTERY-IF] Error while updating state: %s", e)
-                    # Break the sleep interval into smaller chunks to allow immediate shutdown
+                # Break the sleep interval into smaller chunks to allow immediate shutdown
             sleep_interval = self.update_interval
             while sleep_interval > 0:
                 if self._stop_event.is_set():

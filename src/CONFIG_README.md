@@ -23,6 +23,8 @@ A default config file will be created with the first start, if there is no confi
 
 - **price.source**: Data source for electricity price. Possible values: `tibber`, `akkudoktor`.
 - **price.token**: Token for electricity price.
+- **price.feed_in_price**: Feed-in price for the grid.
+- **price.negative_price_switch**: Switch for handling negative electricity prices (e.g., no payment if negative stock price).
 
 ### Battery Configuration
 - **battery.source**: Data source for battery SOC. Possible values: openhab, homeassistant, default (static data).

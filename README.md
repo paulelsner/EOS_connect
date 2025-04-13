@@ -40,6 +40,7 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
 * Manages configurations via a user-friendly config.yaml file.
 * Displays results dynamically on a webpage.
 * Controlling FRONIUS inverters and battery charging systems interactively.
+* Battery charging is dynamicaly limited depending on the SOC (charging curve)
 
 ## Current Status
 

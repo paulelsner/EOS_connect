@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -72,8 +73,8 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>...</td>
-                            <td colspan="2" style="text-align: right;" id="last_charge_avg_price">--</td>
+                            <td>Dynamic Max Charge Power</td>
+                            <td colspan="2" style="text-align: right;" id="current_max_charge_dyn">--</td>
                         </tr>
                         <tr>
                             <td>...</td>
@@ -111,7 +112,7 @@
                 </div>
             </div>
             <div class="top-box">
-                <div class="header"><i class="fa-solid fa-plug-circle-bolt"></i> Current Power</div>
+                <div class="header"><i class="fa-solid fa-car-battery"></i> eCar Charging</div>
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
                         <tr>
@@ -120,10 +121,10 @@
                             <th style="text-align: center;"></th>
                         </tr>
                         <tr>
-                            <td>current</td>
+                            <td>Current SOC</td>
                             <td style="text-align: left;"></td>
-                            <td style="text-align: center;">Price</td>
-                            <td style="text-align: right;" id="current_price">-.-- €</td>
+                            <td style="text-align: center;"></td>
+                            <td style="text-align: right;" id="ecar_soc">--.- %</td>
                         </tr>
                         <tr>
                             <td colspan="4">
@@ -131,22 +132,22 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Grid</td>
-                            <td class="valueChange" style="text-align: right;" id="current_grid_power">--- W</td>
-                            <td style="text-align: center;">Price</td>
+                            <td>Planned Start</td>
+                            <td class="valueChange" style="text-align: right;" id="current_inverter_power">--:--</td>
+                            <td style="text-align: left;">Planned End</td>
+                            <td class="valueChange" style="text-align: right;" id="current_inverter_price">--:--</td>
+                        </tr>
+                        <tr>
+                            <td>Needed Amount</td>
+                            <td class="valueChange" style="text-align: right;" id="current_grid_power">--- kWh</td>
+                            <td style="text-align: left;">Price</td>
                             <td class="valueChange" style="text-align: right;" id="current_grid_price">-.-- €</td>
                         </tr>
                         <tr>
-                            <td>Inverter</td>
-                            <td class="valueChange" style="text-align: right;" id="current_inverter_power">--- W</td>
-                            <td style="text-align: center;">Price</td>
-                            <td class="valueChange" style="text-align: right;" id="current_inverter_price"></td>
-                        </tr>
-                        <tr>
-                            <td>Load</td>
-                            <td class="valueChange" style="text-align: right;" id="current_load_power">--- W</td>
-                            <td style="text-align: center;">Price</td>
-                            <td class="valueChange" style="text-align: right;" id="current_load_price">-.-- €</td>
+                            <td> </td>
+                            <td class="valueChange" style="text-align: right;" id="current_load_power"> </td>
+                            <td style="text-align: left;"> </td>
+                            <td class="valueChange" style="text-align: right;" id="current_load_price"> </td>
                         </tr>
                     </table>
                 </div>
@@ -438,6 +439,7 @@
             document.getElementById('control_overall').innerText = data_controls["current_states"]["inverter_mode"];
 
             document.getElementById('battery_soc').innerText = data_controls["battery_soc"] + " %";
+            document.getElementById('current_max_charge_dyn').innerText = data_controls["battery_max_charge_power_dyn"].toFixed(0) + " W";
         }
 
         function showBatteryCharge(data_request, data_response) {
@@ -536,6 +538,10 @@
                         document.getElementById('waiting_text').innerText = "No data available...";
                         document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
                     }
+                    else if(data_response["error"].includes("422 Client Error: Unprocessable Entity")){
+                        document.getElementById('waiting_text').innerText = "No data available...";
+                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
+                    }
                     else {
                         document.getElementById('waiting_text').innerText = "No data available...";
                         document.getElementById('waiting_error_text').innerText = "no further error information available";
@@ -567,6 +573,8 @@
             //document.getElementById('timestamp_battery').innerHTML = data["energyBatteryChargeDischargeJSON"].timestamp;
             
             showBatteryCharge(data_request,data_response);
+            
+            await showCurrentData();           
             
             await showCurrentData();           
             

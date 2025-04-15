@@ -391,7 +391,7 @@ class OptimizationScheduler:
             "response": json.dumps(
                 {
                     "state": "initializing",
-                    "message": "waiting for finishing of first optimization run",
+                    "message": "waiting for finishing first optimization run",
                 },
                 indent=4,
             ),
@@ -519,6 +519,7 @@ class OptimizationScheduler:
             json_optimize_input, config_manager.config["eos"]["timeout"]
         )
 
+        json_optimize_input["timestamp"] = datetime.now(time_zone).isoformat()
         self.last_request_response["request"] = json.dumps(
             json_optimize_input, indent=4
         )
@@ -548,7 +549,7 @@ class OptimizationScheduler:
         next_eval += timedelta(seconds=self.update_interval)
         sleeptime = (next_eval - loop_now).total_seconds()
         minutes, seconds = divmod(sleeptime, 60)
-        self.__set_state_next_run(next_eval.strftime("%H:%M:%S"))
+        self.__set_state_next_run(next_eval.astimezone(time_zone).isoformat())
         logger.info(
             "[Main] Next optimization at %s. Sleeping for %d min %.0f seconds\n",
             next_eval.strftime("%H:%M:%S"),
@@ -739,7 +740,7 @@ def get_controls():
         "timestamp": datetime.now(time_zone).isoformat(),
         "state": optimization_scheduler.get_current_state(),
     }
-    return Response(json.dumps(response_data), content_type="application/json")
+    return Response(json.dumps(response_data, indent=4), content_type="application/json")
 
 
 if __name__ == "__main__":

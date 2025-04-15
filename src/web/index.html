@@ -156,9 +156,8 @@
         <div class="bottom-boxes">
             <div class="left-box">
                 <div class="header"><i class="fa-solid fa-chart-column"></i> Energy Consumption
-                    <span class="header_notification" id="timestamp_today">01.01.2025 00:00:00</span>
-                    <span class="header_notification" id="timestamp_history" style="display: none;">01.01.2025
-                        00:00:00</span>
+                    <span class="header_notification" id="timestamp_next_run" style="left: 10px;right: unset;">00:00:00</span>
+                    <span class="header_notification" id="timestamp_last_run">00:00:00</span>
                 </div>
                 <div class="content">
                     <canvas id="energyChart"></canvas>
@@ -200,14 +199,6 @@
     </div>
     <script>
         let max_charge_power_w = 0;
-        async function fetchCurrentLoadPower() {
-            const response = await fetch('http://192.168.1.30:8080/rest/items/Fronius_Load_Power');
-            let data = await response.json();
-            data = data.state.split(' ')[0];
-            data = parseFloat(data).toFixed(0) * -1;
-            return data;
-        }
-
         let chartInstance = null;
         
         function isMobile() {
@@ -431,7 +422,7 @@
         }
 
         async function showCurrentData() {
-            console.log("------- showCurrentControls -------");
+            //console.log("------- showCurrentControls -------");
             const data_controls = await fetch_EOS_Connect_Data("current_controls.json");
             document.getElementById('control_ac_charge').innerText = data_controls["current_states"]["current_ac_charge_demand"].toFixed(0) + " Wh";
             document.getElementById('control_dc_charge').innerText = data_controls["current_states"]["current_dc_charge_demand"].toFixed(0) + " Wh";
@@ -440,10 +431,33 @@
 
             document.getElementById('battery_soc').innerText = data_controls["battery_soc"] + " %";
             document.getElementById('current_max_charge_dyn').innerText = data_controls["battery_max_charge_power_dyn"].toFixed(0) + " W";
+
+            // last result received
+            const timestamp_last_run = new Date(data_controls.state.last_response_timestamp);
+            const timestamp_next_run = new Date(data_controls.state.next_run);
+            const timestamp_last_run_formatted = timestamp_last_run.toLocaleString('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('timestamp_last_run').innerText = timestamp_last_run_formatted;
+            document.getElementById('timestamp_last_run').title = "last run";
+            let time_to_next_run = Math.floor((timestamp_next_run - new Date()) / 1000);
+            let minutes = Math.floor(Math.abs(time_to_next_run) / 60); // Correct calculation for minutes
+            let seconds = Math.abs(time_to_next_run % 60);
+            if(time_to_next_run < 0) {
+                document.getElementById('timestamp_next_run').style.color = "lightgreen";
+                // add alt text to the time field
+                document.getElementById('timestamp_next_run').title = "current optimization running for " + minutes.toString().padStart(2, '0') + " min and " + seconds.toString().padStart(2, '0') + " sec";
+            } else {
+                document.getElementById('timestamp_next_run').style.color = "orange";
+                document.getElementById('timestamp_next_run').title = "next optimization run in " + minutes.toString().padStart(2, '0') + " min and " + seconds.toString().padStart(2, '0') + " sec";
+            }            
+            document.getElementById('timestamp_next_run').innerText = minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0') + " min";
         }
 
         function showBatteryCharge(data_request, data_response) {
-            console.log("------- showBatteryCharge -------");
+            //console.log("------- showBatteryCharge -------");
             var discharge_allowed = data_response["discharge_allowed"];
             var ac_charge = data_response["ac_charge"];
             ac_charge = ac_charge.map((value, index) => value * max_charge_power_w);
@@ -563,20 +577,6 @@
                 createChart(data_request,data_response);
                 document.getElementById('overlay').style.display = 'none';
             }
-            // timestamps for chart - 2025-02-21T08:04:00.939977
-            const timestamp = new Date(data_response.timestamp);
-            const formattedTimestamp = timestamp.toLocaleString('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-            document.getElementById('timestamp_today').innerText = formattedTimestamp;
-            //document.getElementById('timestamp_history').innerText = data["energyHistoricConsumptionJSON"].timestamp;
-            //document.getElementById('timestamp_battery').innerHTML = data["energyBatteryChargeDischargeJSON"].timestamp;
-            
             showBatteryCharge(data_request,data_response);
             
             await showCurrentData();           

@@ -147,7 +147,7 @@ class EosInterface:
             return response.json()
         except requests.exceptions.Timeout:
             logger.error("[EOS] OPTIMIZE Request timed out after %s seconds", timeout)
-            return {"error": "Request timed out"}
+            return {"error": "Request timed out - trying again with next run"}
         except requests.exceptions.RequestException as e:
             logger.error("[EOS] OPTIMIZE Request failed: %s - response: %s", e, response)
             return {"error": str(e)}

@@ -111,6 +111,8 @@ def charging_state_callback(new_state):
     """
     Callback function that gets triggered when the charging state changes.
     """
+    # update the base control with the new charging state
+    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
     logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
     change_control_state()
 
@@ -145,6 +147,7 @@ price_interface = PriceInterface(
     config_manager.config["price"]["feed_in_price"],
     config_manager.config["price"]["negative_price_switch"],
 )
+
 
 def create_forecast_request(pv_config_entry):
     """
@@ -510,6 +513,8 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
     base_control.set_current_discharge_allowed(bool(discharge_allowed))
     # set the current battery state of charge
     base_control.set_current_battery_soc(battery_interface.get_current_soc())
+    # getting the current charging state from evcc
+    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
 
 
 def change_control_state():
@@ -533,9 +538,6 @@ def change_control_state():
     if config_manager.config["inverter"]["type"] == "fronius_gen24":
         inverter_en = True
 
-    # getting the current charging state from evcc
-    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
-
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
         logger.debug("[Main] Overall state changed recently")
@@ -545,38 +547,56 @@ def change_control_state():
             # to the max dynamic charge power of the battery based on SOC
             tgt_charge_power = min(
                 base_control.get_current_ac_charge_demand(),
-                round(battery_interface.get_max_charge_power_dyn())
+                round(battery_interface.get_max_charge_power_dyn()),
             )
             if inverter_en:
                 inverter_interface.set_mode_force_charge(tgt_charge_power)
             logger.info(
-                "[Main] Inverter mode set to charge from grid with %s W (_____|||||_____)",
+                "[Main] Inverter mode set to %s with %s W (_____|||||_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
                 tgt_charge_power,
             )
         # MODE_AVOID_DISCHARGE
         elif base_control.get_current_overall_state() == 1:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
-            logger.info("[Main] Inverter mode set to AVOID discharge (_____-----_____)")
+            logger.info(
+                "[Main] Inverter mode set to %s (_____-----_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
+            )
         # MODE_DISCHARGE_ALLOWED
         elif base_control.get_current_overall_state() == 2:
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
-            logger.info("[Main] Inverter mode set to ALLOW discharge (_____+++++_____)")
+            logger.info(
+                "[Main] Inverter mode set to %s (_____+++++_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
+            )
+        # MODE_AVOID_DISCHARGE_EVCC
+        elif base_control.get_current_overall_state() == 3:
+            if inverter_en:
+                inverter_interface.set_mode_avoid_discharge()
+            logger.info(
+                "[Main] Inverter mode set to %s (_____-+-+-_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
+            )
         elif base_control.get_current_overall_state() < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
     # Log the current state if no recent changes were made
-    state_mapping = {
-        0: "charge from grid",
-        1: "avoid discharge",
-        2: "allow discharge",
-    }
     current_state = base_control.get_current_overall_state()
     logger.info(
         "[Main] Overall state not changed recently"
         + " - remaining in current state: %s  (_____OOOOO_____)",
-        state_mapping.get(current_state, "unknown state"),
+        base_control.get_state_mapping().get(current_state, "unknown state"),
     )
     return False
 
@@ -660,19 +680,17 @@ def get_optimize_response():
 
 
 @app.route("/json/current_controls.json", methods=["GET"])
-def serve_current_demands():
+def get_controls():
     """
     Returns the current demands for AC and DC charging as a JSON response.
     """
     current_ac_charge_demand = base_control.get_current_ac_charge_demand()
     current_dc_charge_demand = base_control.get_current_dc_charge_demand()
     current_discharge_allowed = base_control.get_current_discharge_allowed()
-    current_inverter_mode = base_control.get_current_overall_state(False)
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
     current_inverter_mode = base_control.get_current_overall_state(False)
-    current_battery_soc = battery_interface.get_current_soc()
-    base_control.set_current_battery_soc(current_battery_soc)
+
     response_data = {
         "current_states": {
             "current_ac_charge_demand": current_ac_charge_demand,
@@ -689,7 +707,6 @@ def serve_current_demands():
 
 
 if __name__ == "__main__":
-
     http_server = WSGIServer(
         ("0.0.0.0", config_manager.config["eos_connect_web_port"]),
         app,

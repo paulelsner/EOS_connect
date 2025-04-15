@@ -14,13 +14,14 @@ logger.info("[BASE_CTRL] loading module ")
 MODE_CHARGE_FROM_GRID = 0
 MODE_AVOID_DISCHARGE = 1
 MODE_DISCHARGE_ALLOWED = 2
+MODE_AVOID_DISCHARGE_EVCC = 3
 
 state_mapping = {
     0: "MODE_CHARGE_FROM_GRID",
     1: "MODE_AVOID_DISCHARGE",
     2: "MODE_DISCHARGE_ALLOWED",
+    3: "MODE_AVOID_DISCHARGE_EVCC",
 }
-
 
 class BaseControl:
     """
@@ -42,6 +43,12 @@ class BaseControl:
         self.time_zone = timezone
         self.config = config
         self._state_change_timestamps = []
+
+    def get_state_mapping(self):
+        """
+        Returns the state mapping dictionary.
+        """
+        return state_mapping
 
     def was_overall_state_changed_recently(self, time_window_seconds):
         """
@@ -168,7 +175,7 @@ class BaseControl:
 
         # override overall state if EVCC charging state is active and discharge is allowed
         if new_state == MODE_DISCHARGE_ALLOWED and self.current_evcc_charging_state:
-            new_state = MODE_AVOID_DISCHARGE
+            new_state = MODE_AVOID_DISCHARGE_EVCC
             logger.info(
                 "[BASE_CTRL] EVCC charging state is active,"
                 + " setting overall state to MODE_AVOID_DISCHARGE"

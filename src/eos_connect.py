@@ -111,6 +111,8 @@ def charging_state_callback(new_state):
     """
     Callback function that gets triggered when the charging state changes.
     """
+    # update the base control with the new charging state
+    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
     logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
     change_control_state()
 
@@ -145,6 +147,7 @@ price_interface = PriceInterface(
     config_manager.config["price"]["feed_in_price"],
     config_manager.config["price"]["negative_price_switch"],
 )
+
 
 def create_forecast_request(pv_config_entry):
     """
@@ -378,9 +381,62 @@ class OptimizationScheduler:
 
     def __init__(self, update_interval):
         self.update_interval = update_interval
+        self.last_request_response = {
+            "request": json.dumps(
+                {
+                    "state": "waiting for first optimization run",
+                },
+                indent=4,
+            ),
+            "response": json.dumps(
+                {
+                    "state": "initializing",
+                    "message": "waiting for finishing first optimization run",
+                },
+                indent=4,
+            ),
+        }
+        self.current_state = {
+            "request_state": None,
+            "last_request_timestamp": None,
+            "last_response_timestamp": None,
+            "next_run": None,
+        }
         self._update_thread = None
         self._stop_event = threading.Event()
         self.start_update_service()
+
+    def get_last_request_response(self):
+        """
+        Returns the last request response.
+        """
+        return self.last_request_response
+
+    def get_current_state(self):
+        """
+        Returns the current state of the optimization scheduler.
+        """
+        return self.current_state
+
+    def __set_state_request(self):
+        """
+        Sets the current state of the optimization scheduler.
+        """
+        self.current_state["request_state"] = "request send"
+        self.current_state["last_request_timestamp"] = datetime.now(time_zone).isoformat()
+
+    def __set_state_response(self):
+        """
+        Sets the current state of the optimization scheduler.
+        """
+        self.current_state["request_state"] = "response received"
+        self.current_state["last_response_timestamp"] = datetime.now(time_zone).isoformat()
+
+    def __set_state_next_run(self, next_run_time):
+        """
+        Sets the current state of the optimization scheduler.
+        """
+        self.current_state["next_run"] = next_run_time
 
     def start_update_service(self):
         """
@@ -452,6 +508,7 @@ class OptimizationScheduler:
         )
         # create optimize request
         json_optimize_input = create_optimize_request()
+        self.__set_state_request()
 
         with open(
             base_path + "/json/optimize_request.json", "w", encoding="utf-8"
@@ -461,7 +518,16 @@ class OptimizationScheduler:
         optimized_response = eos_interface.eos_set_optimize_request(
             json_optimize_input, config_manager.config["eos"]["timeout"]
         )
+
+        json_optimize_input["timestamp"] = datetime.now(time_zone).isoformat()
+        self.last_request_response["request"] = json.dumps(
+            json_optimize_input, indent=4
+        )
         optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
+        self.last_request_response["response"] = json.dumps(
+            optimized_response, indent=4
+        )
+        self.__set_state_response()
 
         with open(
             base_path + "/json/optimize_response.json", "w", encoding="utf-8"
@@ -483,6 +549,7 @@ class OptimizationScheduler:
         next_eval += timedelta(seconds=self.update_interval)
         sleeptime = (next_eval - loop_now).total_seconds()
         minutes, seconds = divmod(sleeptime, 60)
+        self.__set_state_next_run(next_eval.astimezone(time_zone).isoformat())
         logger.info(
             "[Main] Next optimization at %s. Sleeping for %d min %.0f seconds\n",
             next_eval.strftime("%H:%M:%S"),
@@ -510,6 +577,8 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
     base_control.set_current_discharge_allowed(bool(discharge_allowed))
     # set the current battery state of charge
     base_control.set_current_battery_soc(battery_interface.get_current_soc())
+    # getting the current charging state from evcc
+    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
 
 
 def change_control_state():
@@ -533,9 +602,6 @@ def change_control_state():
     if config_manager.config["inverter"]["type"] == "fronius_gen24":
         inverter_en = True
 
-    # getting the current charging state from evcc
-    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
-
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
         logger.debug("[Main] Overall state changed recently")
@@ -545,38 +611,56 @@ def change_control_state():
             # to the max dynamic charge power of the battery based on SOC
             tgt_charge_power = min(
                 base_control.get_current_ac_charge_demand(),
-                round(battery_interface.get_max_charge_power_dyn())
+                round(battery_interface.get_max_charge_power_dyn()),
             )
             if inverter_en:
                 inverter_interface.set_mode_force_charge(tgt_charge_power)
             logger.info(
-                "[Main] Inverter mode set to charge from grid with %s W (_____|||||_____)",
+                "[Main] Inverter mode set to %s with %s W (_____|||||_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
                 tgt_charge_power,
             )
         # MODE_AVOID_DISCHARGE
         elif base_control.get_current_overall_state() == 1:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
-            logger.info("[Main] Inverter mode set to AVOID discharge (_____-----_____)")
+            logger.info(
+                "[Main] Inverter mode set to %s (_____-----_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
+            )
         # MODE_DISCHARGE_ALLOWED
         elif base_control.get_current_overall_state() == 2:
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
-            logger.info("[Main] Inverter mode set to ALLOW discharge (_____+++++_____)")
+            logger.info(
+                "[Main] Inverter mode set to %s (_____+++++_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
+            )
+        # MODE_AVOID_DISCHARGE_EVCC
+        elif base_control.get_current_overall_state() == 3:
+            if inverter_en:
+                inverter_interface.set_mode_avoid_discharge()
+            logger.info(
+                "[Main] Inverter mode set to %s (_____-+-+-_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
+            )
         elif base_control.get_current_overall_state() < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
     # Log the current state if no recent changes were made
-    state_mapping = {
-        0: "charge from grid",
-        1: "avoid discharge",
-        2: "allow discharge",
-    }
     current_state = base_control.get_current_overall_state()
     logger.info(
         "[Main] Overall state not changed recently"
         + " - remaining in current state: %s  (_____OOOOO_____)",
-        state_mapping.get(current_state, "unknown state"),
+        base_control.get_state_mapping().get(current_state, "unknown state"),
     )
     return False
 
@@ -612,67 +696,37 @@ def style_css():
 @app.route("/json/optimize_request.json", methods=["GET"])
 def get_optimize_request():
     """
-    Returns the content of the 'optimize_request.json' file as a JSON response.
+    Retrieves the last optimization request and returns it as a JSON response.
     """
-    try:
-        with open(
-            base_path + "/json/optimize_request.json", "r", encoding="utf-8"
-        ) as json_file:
-            return Response(json_file.read(), content_type="application/json")
-    except FileNotFoundError as e:
-        logger.error(
-            "[Main] File not found error while reading optimize_request.json: %s", e
-        )
-        return json.dumps({"error": "optimize_request.json file not found"})
-    except json.JSONDecodeError as e:
-        logger.error(
-            "[Main] JSON decode error while reading optimize_request.json: %s", e
-        )
-        return json.dumps({"error": "Invalid JSON format in optimize_request.json"})
-    except OSError as e:
-        logger.error("[Main] OS error while reading optimize_request.json: %s", e)
-        return json.dumps({"error": str(e)})
+    return Response(
+        optimization_scheduler.get_last_request_response()["request"],
+        content_type="application/json",
+    )
 
 
 @app.route("/json/optimize_response.json", methods=["GET"])
 def get_optimize_response():
     """
-    Returns the content of the 'optimize_response.json' file as a JSON response.
+    Retrieves the last optimization response and returns it as a JSON response.
     """
-    try:
-        with open(
-            base_path + "/json/optimize_response.json", "r", encoding="utf-8"
-        ) as json_file:
-            return json_file.read()
-    except FileNotFoundError:
-        default_response = {
-            "ac_charge": [],
-            "dc_charge": [],
-            "discharge_allowed": [],
-            "eautocharge_hours_float": None,
-            "result": {},
-            "eauto_obj": {},
-            "start_solution": [],
-            "washingstart": 0,
-            "timestamp": datetime.now(time_zone).isoformat(),
-        }
-        return Response(json.dumps(default_response), content_type="application/json")
+    return Response(
+        optimization_scheduler.get_last_request_response()["response"],
+        content_type="application/json",
+    )
 
 
 @app.route("/json/current_controls.json", methods=["GET"])
-def serve_current_demands():
+def get_controls():
     """
     Returns the current demands for AC and DC charging as a JSON response.
     """
     current_ac_charge_demand = base_control.get_current_ac_charge_demand()
     current_dc_charge_demand = base_control.get_current_dc_charge_demand()
     current_discharge_allowed = base_control.get_current_discharge_allowed()
-    current_inverter_mode = base_control.get_current_overall_state(False)
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
     current_inverter_mode = base_control.get_current_overall_state(False)
-    current_battery_soc = battery_interface.get_current_soc()
-    base_control.set_current_battery_soc(current_battery_soc)
+
     response_data = {
         "current_states": {
             "current_ac_charge_demand": current_ac_charge_demand,
@@ -684,12 +738,12 @@ def serve_current_demands():
         "battery_soc": current_battery_soc,
         "battery_max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
         "timestamp": datetime.now(time_zone).isoformat(),
+        "state": optimization_scheduler.get_current_state(),
     }
-    return Response(json.dumps(response_data), content_type="application/json")
+    return Response(json.dumps(response_data, indent=4), content_type="application/json")
 
 
 if __name__ == "__main__":
-
     http_server = WSGIServer(
         ("0.0.0.0", config_manager.config["eos_connect_web_port"]),
         app,

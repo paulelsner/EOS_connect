@@ -23,8 +23,8 @@ A default config file will be created with the first start, if there is no confi
 
 - **price.source**: Data source for electricity price. Possible values: `tibber`, `akkudoktor`.
 - **price.token**: Token for electricity price.
-- **price.feed_in_price**: Feed-in price for the grid.
-- **price.negative_price_switch**: Switch for handling negative electricity prices (e.g., no payment if negative stock price).
+- **price.feed_in_price**: Feed-in price for the grid in €/kWh
+- **price.negative_price_switch**: Switch for handling negative electricity prices (e.g., no payment if negative stock price). select "True" for limit the feed-in price to 0 if there is a negative stock price in this hour or "False" to ignore this specific handling and use only the feed-in price as constant
 
 ### Battery Configuration
 - **battery.source**: Data source for battery SOC. Possible values: openhab, homeassistant, default (static data).
@@ -71,6 +71,8 @@ pv_forecast:
 ```
 
 Each PV forecast entry can have the following parameters:
+
+*hint: check also for details https://api.akkudoktor.net/#/pv%20generation%20calculation/getForecast*
 
 - **lat**: Latitude for PV forecast @ Akkudoktor API.
 - **lon**: Longitude for PV forecast @ Akkudoktor API.
@@ -129,6 +131,8 @@ eos:
 price:
   source: tibber  # Data source for electricity price
   token: tibberBearerToken  # Token for electricity price
+  feed_in_price: 0 # Feed-in price for the grid in €/kWh
+  negative_price_switch: False # Switch for handling negative electricity prices - True / False
 
 battery:
   source: default  # Data source for battery SOC - openhab, homeassistant, default (static data)

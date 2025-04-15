@@ -31,7 +31,7 @@
         <div class="top-boxes">
             <div class="top-box">
                 <div class="header"><i class="fa-solid fa-battery-full"></i> Current Controls
-                    <span class="header_notification" id="timestamp_battery">--.--.--</span>
+                    <!-- <span class="header_notification" id="timestamp_battery">--.--.--</span> -->
                 </div>
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
@@ -112,7 +112,10 @@
                 </div>
             </div>
             <div class="top-box">
-                <div class="header"><i class="fa-solid fa-car-battery"></i> eCar Charging</div>
+                <div class="header"><i class="fa-solid fa-car-battery"></i> eCar Charging
+                    <span class="header_notification" id="evcc_mode" style="left: 10px;right: unset;">...</span>
+                    <span class="header_notification" id="evcc_state">...</span>
+                </div>
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
                         <tr>
@@ -429,8 +432,8 @@
             document.getElementById('control_discharge_allowed').innerText = (data_controls["current_states"]["current_discharge_allowed"] === true ? "Yes" : "No");
             document.getElementById('control_overall').innerText = data_controls["current_states"]["inverter_mode"];
 
-            document.getElementById('battery_soc').innerText = data_controls["battery_soc"] + " %";
-            document.getElementById('current_max_charge_dyn').innerText = data_controls["battery_max_charge_power_dyn"].toFixed(0) + " W";
+            document.getElementById('battery_soc').innerText = data_controls["battery"]["soc"] + " %";
+            document.getElementById('current_max_charge_dyn').innerText = data_controls["battery"]["max_charge_power_dyn"].toFixed(0) + " W";
 
             // last result received
             const timestamp_last_run = new Date(data_controls.state.last_response_timestamp);
@@ -454,6 +457,31 @@
                 document.getElementById('timestamp_next_run').title = "next optimization run in " + minutes.toString().padStart(2, '0') + " min and " + seconds.toString().padStart(2, '0') + " sec";
             }            
             document.getElementById('timestamp_next_run').innerText = minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0') + " min";
+
+            // ecar_soc
+            let evcc_mode = data_controls["evcc"]["charging_mode"];
+            if(evcc_mode === "off") {
+                document.getElementById('evcc_mode').innerText = "Off";
+            } else if(evcc_mode === "pv") {
+                document.getElementById('evcc_mode').innerText = "PV"; 
+            } else if(evcc_mode === "minpv") {
+                document.getElementById('evcc_mode').innerText = "Min+PV";
+            } else if(evcc_mode === "now") {
+                document.getElementById('evcc_mode').innerText = "Fast charge";
+            } else {
+                document.getElementById('evcc_mode').innerText = "N/A";
+            }
+
+
+            let evcc_state = data_controls["evcc"]["charging_state"];
+            if(evcc_state) {
+                document.getElementById('evcc_state').innerText = "charging";
+                document.getElementById('evcc_state').style.color = "red";
+            } else {
+                document.getElementById('evcc_state').innerText = "not charging";
+                document.getElementById('evcc_state').style.color = "white";
+            }
+            
         }
 
         function showBatteryCharge(data_request, data_response) {

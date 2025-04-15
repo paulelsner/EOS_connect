@@ -113,6 +113,8 @@ def charging_state_callback(new_state):
     """
     # update the base control with the new charging state
     base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
+    base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
+    
     logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
     change_control_state()
 
@@ -579,6 +581,7 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
     base_control.set_current_battery_soc(battery_interface.get_current_soc())
     # getting the current charging state from evcc
     base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
+    base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
 
 
 def change_control_state():
@@ -642,10 +645,19 @@ def change_control_state():
                     base_control.get_current_overall_state(), "unknown state"
                 ),
             )
-        # MODE_AVOID_DISCHARGE_EVCC
+        # MODE_AVOID_DISCHARGE_EVCC_FAST
         elif base_control.get_current_overall_state() == 3:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
+            logger.info(
+                "[Main] Inverter mode set to %s (_____-+-+-_____)",
+                base_control.get_state_mapping().get(
+                    base_control.get_current_overall_state(), "unknown state"
+                ),
+            )
+        elif base_control.get_current_overall_state() == 4:
+            if inverter_en:
+                inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-+-+-_____)",
                 base_control.get_state_mapping().get(
@@ -733,12 +745,17 @@ def get_controls():
             "current_dc_charge_demand": current_dc_charge_demand,
             "current_discharge_allowed": current_discharge_allowed,
             "inverter_mode": current_inverter_mode,
-            "evcc_charging_state": base_control.get_current_evcc_charging_state(),
         },
-        "battery_soc": current_battery_soc,
-        "battery_max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
-        "timestamp": datetime.now(time_zone).isoformat(),
+        "evcc": {
+            "charging_state": base_control.get_current_evcc_charging_state(),
+            "charging_mode": base_control.get_current_evcc_charging_mode(),
+        },
+        "battery": {
+            "soc": current_battery_soc,
+            "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),    
+        },
         "state": optimization_scheduler.get_current_state(),
+        "timestamp": datetime.now(time_zone).isoformat(),
     }
     return Response(json.dumps(response_data, indent=4), content_type="application/json")
 

@@ -381,9 +381,62 @@ class OptimizationScheduler:
 
     def __init__(self, update_interval):
         self.update_interval = update_interval
+        self.last_request_response = {
+            "request": json.dumps(
+                {
+                    "state": "waiting for first optimization run",
+                },
+                indent=4,
+            ),
+            "response": json.dumps(
+                {
+                    "state": "initializing",
+                    "message": "waiting for finishing of first optimization run",
+                },
+                indent=4,
+            ),
+        }
+        self.current_state = {
+            "request_state": None,
+            "last_request_timestamp": None,
+            "last_response_timestamp": None,
+            "next_run": None,
+        }
         self._update_thread = None
         self._stop_event = threading.Event()
         self.start_update_service()
+
+    def get_last_request_response(self):
+        """
+        Returns the last request response.
+        """
+        return self.last_request_response
+
+    def get_current_state(self):
+        """
+        Returns the current state of the optimization scheduler.
+        """
+        return self.current_state
+
+    def __set_state_request(self):
+        """
+        Sets the current state of the optimization scheduler.
+        """
+        self.current_state["request_state"] = "request send"
+        self.current_state["last_request_timestamp"] = datetime.now(time_zone).isoformat()
+
+    def __set_state_response(self):
+        """
+        Sets the current state of the optimization scheduler.
+        """
+        self.current_state["request_state"] = "response received"
+        self.current_state["last_response_timestamp"] = datetime.now(time_zone).isoformat()
+
+    def __set_state_next_run(self, next_run_time):
+        """
+        Sets the current state of the optimization scheduler.
+        """
+        self.current_state["next_run"] = next_run_time
 
     def start_update_service(self):
         """
@@ -455,6 +508,7 @@ class OptimizationScheduler:
         )
         # create optimize request
         json_optimize_input = create_optimize_request()
+        self.__set_state_request()
 
         with open(
             base_path + "/json/optimize_request.json", "w", encoding="utf-8"
@@ -464,7 +518,15 @@ class OptimizationScheduler:
         optimized_response = eos_interface.eos_set_optimize_request(
             json_optimize_input, config_manager.config["eos"]["timeout"]
         )
+
+        self.last_request_response["request"] = json.dumps(
+            json_optimize_input, indent=4
+        )
         optimized_response["timestamp"] = datetime.now(time_zone).isoformat()
+        self.last_request_response["response"] = json.dumps(
+            optimized_response, indent=4
+        )
+        self.__set_state_response()
 
         with open(
             base_path + "/json/optimize_response.json", "w", encoding="utf-8"
@@ -486,6 +548,7 @@ class OptimizationScheduler:
         next_eval += timedelta(seconds=self.update_interval)
         sleeptime = (next_eval - loop_now).total_seconds()
         minutes, seconds = divmod(sleeptime, 60)
+        self.__set_state_next_run(next_eval.strftime("%H:%M:%S"))
         logger.info(
             "[Main] Next optimization at %s. Sleeping for %d min %.0f seconds\n",
             next_eval.strftime("%H:%M:%S"),
@@ -632,51 +695,23 @@ def style_css():
 @app.route("/json/optimize_request.json", methods=["GET"])
 def get_optimize_request():
     """
-    Returns the content of the 'optimize_request.json' file as a JSON response.
+    Retrieves the last optimization request and returns it as a JSON response.
     """
-    try:
-        with open(
-            base_path + "/json/optimize_request.json", "r", encoding="utf-8"
-        ) as json_file:
-            return Response(json_file.read(), content_type="application/json")
-    except FileNotFoundError as e:
-        logger.error(
-            "[Main] File not found error while reading optimize_request.json: %s", e
-        )
-        return json.dumps({"error": "optimize_request.json file not found"})
-    except json.JSONDecodeError as e:
-        logger.error(
-            "[Main] JSON decode error while reading optimize_request.json: %s", e
-        )
-        return json.dumps({"error": "Invalid JSON format in optimize_request.json"})
-    except OSError as e:
-        logger.error("[Main] OS error while reading optimize_request.json: %s", e)
-        return json.dumps({"error": str(e)})
+    return Response(
+        optimization_scheduler.get_last_request_response()["request"],
+        content_type="application/json",
+    )
 
 
 @app.route("/json/optimize_response.json", methods=["GET"])
 def get_optimize_response():
     """
-    Returns the content of the 'optimize_response.json' file as a JSON response.
+    Retrieves the last optimization response and returns it as a JSON response.
     """
-    try:
-        with open(
-            base_path + "/json/optimize_response.json", "r", encoding="utf-8"
-        ) as json_file:
-            return json_file.read()
-    except FileNotFoundError:
-        default_response = {
-            "ac_charge": [],
-            "dc_charge": [],
-            "discharge_allowed": [],
-            "eautocharge_hours_float": None,
-            "result": {},
-            "eauto_obj": {},
-            "start_solution": [],
-            "washingstart": 0,
-            "timestamp": datetime.now(time_zone).isoformat(),
-        }
-        return Response(json.dumps(default_response), content_type="application/json")
+    return Response(
+        optimization_scheduler.get_last_request_response()["response"],
+        content_type="application/json",
+    )
 
 
 @app.route("/json/current_controls.json", methods=["GET"])
@@ -702,6 +737,7 @@ def get_controls():
         "battery_soc": current_battery_soc,
         "battery_max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
         "timestamp": datetime.now(time_zone).isoformat(),
+        "state": optimization_scheduler.get_current_state(),
     }
     return Response(json.dumps(response_data), content_type="application/json")
 

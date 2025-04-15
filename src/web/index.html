@@ -546,7 +546,11 @@
                         document.getElementById('waiting_text').innerText = "No data available...";
                         document.getElementById('waiting_error_text').innerText = "no further error information available";
                     }
-                } else {
+                } else if(data_response["state"]) {
+                    document.getElementById('waiting_text').innerText = data_response["state"];
+                    document.getElementById('waiting_error_text').innerText = data_response["message"];
+                }
+                    else {
                     document.getElementById('waiting_text').innerText = "Waiting for first data...";
                     document.getElementById('waiting_error_text').innerText = "";
                 }
@@ -554,6 +558,7 @@
             }
             if (chartInstance){
                 updateChart(data_request,data_response);
+                document.getElementById('overlay').style.display = 'none';
             } else {
                 createChart(data_request,data_response);
                 document.getElementById('overlay').style.display = 'none';
@@ -575,9 +580,6 @@
             showBatteryCharge(data_request,data_response);
             
             await showCurrentData();           
-            
-            await showCurrentData();           
-            
             
             var currentHour = new Date().getHours();
             var next_charge_time = data_response["ac_charge"].slice(currentHour).findIndex((value) => value > 0);

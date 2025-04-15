@@ -72,6 +72,8 @@ pv_forecast:
 
 Each PV forecast entry can have the following parameters:
 
+*hint: check also for details https://api.akkudoktor.net/#/pv%20generation%20calculation/getForecast*
+
 - **lat**: Latitude for PV forecast @ Akkudoktor API.
 - **lon**: Longitude for PV forecast @ Akkudoktor API.
 - **azimuth**: Azimuth for PV forecast @ Akkudoktor API.

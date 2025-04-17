@@ -87,7 +87,7 @@ Feel free to add more PV forecast entries under the pv_forecast section by provi
 
 ### Inverter Configuration Settings
 
-- **inverter.type**: default: fronius_gen24 - currently not used
+- **inverter.type**: fronius_gen24 or default
 - **inverter.address**: address of the inverter - e.g. 192.168.1.12
 - **inverter.user**: username in local portal e.g. customer (inverter local webpage login data - be aware: website Customer vs. customer in this level)
 - **inverter.password**: password for local portal

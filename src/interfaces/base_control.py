@@ -14,14 +14,17 @@ logger.info("[BASE_CTRL] loading module ")
 MODE_CHARGE_FROM_GRID = 0
 MODE_AVOID_DISCHARGE = 1
 MODE_DISCHARGE_ALLOWED = 2
-MODE_AVOID_DISCHARGE_EVCC = 3
+MODE_AVOID_DISCHARGE_EVCC_FAST = 3
+MODE_DISCHARGE_ALLOWED_EVCC_PV = 4
 
 state_mapping = {
     0: "MODE_CHARGE_FROM_GRID",
     1: "MODE_AVOID_DISCHARGE",
     2: "MODE_DISCHARGE_ALLOWED",
-    3: "MODE_AVOID_DISCHARGE_EVCC",
+    3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
+    4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
 }
+
 
 class BaseControl:
     """
@@ -37,6 +40,7 @@ class BaseControl:
         self.current_dc_charge_demand = 0
         self.current_discharge_allowed = 1
         self.current_evcc_charging_state = False
+        self.current_evcc_charging_mode = False
         # startup with None to force a writing to the inverter
         self.current_overall_state = None
         self.current_battery_soc = 0
@@ -91,6 +95,12 @@ class BaseControl:
             # Return the string representation of the state
             return state_mapping.get(self.current_overall_state, "unknown state")
 
+    def get_current_overall_state_number(self):
+        """
+        Returns the current overall state as a number.
+        """
+        return self.current_overall_state
+
     def get_current_battery_soc(self):
         """
         Returns the current battery state of charge (SOC).
@@ -102,6 +112,12 @@ class BaseControl:
         Returns the current EVCC charging state.
         """
         return self.current_evcc_charging_state
+
+    def get_current_evcc_charging_mode(self):
+        """
+        Returns the current EVCC charging mode.
+        """
+        return self.current_evcc_charging_mode
 
     def set_current_ac_charge_demand(self, value_relative):
         """
@@ -158,6 +174,14 @@ class BaseControl:
         # logger.debug("[BASE_CTRL] set current EVCC charging state to %s", value)
         self.set_current_overall_state()
 
+    def set_current_evcc_charging_mode(self, value):
+        """
+        Sets the current EVCC charging mode.
+        """
+        self.current_evcc_charging_mode = value
+        # logger.debug("[BASE_CTRL] set current EVCC charging mode to %s", value)
+        self.set_current_overall_state()
+
     def set_current_overall_state(self):
         """
         Sets the current overall state and logs the timestamp if it changes.
@@ -173,9 +197,13 @@ class BaseControl:
             self.current_ac_charge_demand != self.last_ac_charge_demand
         )
 
-        # override overall state if EVCC charging state is active and discharge is allowed
-        if new_state == MODE_DISCHARGE_ALLOWED and self.current_evcc_charging_state:
-            new_state = MODE_AVOID_DISCHARGE_EVCC
+        # override overall state if EVCC charging state is active and in mode fast charge and discharge is allowed
+        if (
+            new_state == MODE_DISCHARGE_ALLOWED
+            and self.current_evcc_charging_state
+            and self.current_evcc_charging_mode == "now"
+        ):
+            new_state = MODE_AVOID_DISCHARGE_EVCC_FAST
             logger.info(
                 "[BASE_CTRL] EVCC charging state is active,"
                 + " setting overall state to MODE_AVOID_DISCHARGE"

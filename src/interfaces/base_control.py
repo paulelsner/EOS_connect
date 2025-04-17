@@ -95,6 +95,12 @@ class BaseControl:
             # Return the string representation of the state
             return state_mapping.get(self.current_overall_state, "unknown state")
 
+    def get_current_overall_state_number(self):
+        """
+        Returns the current overall state as a number.
+        """
+        return self.current_overall_state
+
     def get_current_battery_soc(self):
         """
         Returns the current battery state of charge (SOC).

@@ -738,6 +738,7 @@ def get_controls():
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
     current_inverter_mode = base_control.get_current_overall_state(False)
+    current_inverter_mode_num = base_control.get_current_overall_state()
 
     response_data = {
         "current_states": {
@@ -745,6 +746,7 @@ def get_controls():
             "current_dc_charge_demand": current_dc_charge_demand,
             "current_discharge_allowed": current_discharge_allowed,
             "inverter_mode": current_inverter_mode,
+            "inverter_mode_num": current_inverter_mode_num,
         },
         "evcc": {
             "charging_state": base_control.get_current_evcc_charging_state(),

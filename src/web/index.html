@@ -21,6 +21,14 @@
             <p id="waiting_error_text" style="font-size: 1.0em; font-weight: bold;  margin-bottom: 20px; text-align: center; color:rgb(241, 177, 0)">...</p>
             <div style="border: 4px solid white; border-top: 4px solid gray; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto 0;"></div>
         </div>
+        <div id="version_overlay" style="position: absolute; bottom: 10px; right: 10px; width: 100%; text-align: right; font-size: x-small;">EOS connect: v00.00.00</div>
+    </div>
+    <div id="overlay_menu" style="position: fixed; top: 20%; left: 20%; width: 60%; height: 60%; background-color: rgba(0, 0, 0, 0.9); color: white; display: none; justify-content: center; align-items: center; z-index: 1100; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);">
+        <div style="text-align: center; padding: 20px;">
+            <p style="font-size: 2em; margin-bottom: 20px;" id="overlay_menu_head">Menu Overlay</p>
+            <p style="font-size: 1.2em; margin-bottom: 20px;" id="overlay_menu_content">This is a centered overlay menu.</p>
+            <button onclick="document.getElementById('overlay_menu').style.display='none'" style="padding: 10px 20px; font-size: 1em; background-color: #444; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+        </div>
     </div>
     <style>
         @keyframes spin {
@@ -32,7 +40,8 @@
         <div class="top-boxes">
             <div class="top-box">
                 <div class="header"><i class="fa-solid fa-battery-full"></i> Current Controls
-                    <!-- <span class="header_notification" id="timestamp_battery">--.--.--</span> -->
+                    <span class="header_notification" id="current_header_left" style="left: 10px;right: unset;">...</span>
+                    <span class="header_notification" id="current_header_right">...</span>
                 </div>
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
@@ -240,6 +249,17 @@
         window.addEventListener('resize', updateLegendVisibility);
         updateLegendVisibility();
 
+        function overlayMenu(header, content) {
+            const overlay = document.getElementById('overlay_menu');
+            if (overlay.style.display === 'none') {
+                overlay.style.display = 'flex';
+                document.getElementById('overlay_menu_head').innerHTML = header;
+                document.getElementById('overlay_menu_content').innerHTML = content;
+            } else {
+                overlay.style.display = 'none';
+            }
+        }
+
         async function fetch_EOS_Connect_Data(filename) {
             const response = await fetch('json/' + filename + '?nocache=' + new Date().getTime());
             const data = await response.json();
@@ -358,6 +378,44 @@
                 document.getElementById('evcc_state').style.color = "white";
             }
             
+            document.getElementById('version_overlay').innerText = "EOS connect: " + data_controls["eos_connect_version"];
+            
+            document.getElementById('current_header_left').innerHTML = '<i class="fa-solid fa-circle-info"></i>'; // + " " + data_controls["eos_connect_version"];
+            document.getElementById('current_header_left').title = "EOS connect version: " + data_controls["eos_connect_version"];
+            document.getElementById('current_header_left').addEventListener('click', function () {
+                overlayMenu("EOS connect version", data_controls["eos_connect_version"]);
+            });
+
+            // dependent on inverter mode show the icon
+            //0: "MODE_CHARGE_FROM_GRID",
+            //1: "MODE_AVOID_DISCHARGE",
+            //2: "MODE_DISCHARGE_ALLOWED",
+            //3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
+            //4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
+            
+            const iconElement = document.getElementById('current_header_right');
+            iconElement.innerHTML = ""; // Clear previous content
+            
+            if (inverter_mode_num === 4) {
+                iconElement.innerHTML = '<i class="fa-solid fa-charging-station"></i>';
+                iconElement.style.color = "lightgreen";
+                iconElement.title = "Discharge allowed during e-car charging in pv mode";                    
+            } else if (inverter_mode_num === 3) {
+                iconElement.innerHTML = '<i class="fa-solid fa-charging-station"></i>';
+                iconElement.title = "Avoid discharge due to e-car fast charge";
+            } else if (inverter_mode_num === 2) {
+                iconElement.innerHTML = "<i class='fa-solid fa-battery-half'></i>";
+                iconElement.style.color = "lightgreen";
+                iconElement.title = "Discharge allowed";                    
+            } else if (inverter_mode_num === 1) {
+                iconElement.innerHTML = "<i class='fa-solid fa-lock'></i>";
+                iconElement.style.color = "lightgray";                           
+                iconElement.title = "Avoid discharge";
+            } else { // if 0
+                iconElement.innerHTML = "<i class='fa-solid fa-plug-circle-bolt'></i> ";
+                iconElement.style.backgroundColor = "darkred";                
+                iconElement.title = "Charge from grid";
+            }
         }
 
         function showSchedule(data_request, data_response) {
@@ -516,6 +574,7 @@
                 createChart(data_request,data_response);
                 document.getElementById('overlay').style.display = 'none';
             }
+            
             showSchedule(data_request,data_response);
             
             await showCurrentData();           

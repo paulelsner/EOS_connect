@@ -13,6 +13,7 @@ import pytz
 import requests
 from flask import Flask, Response, render_template_string
 from gevent.pywsgi import WSGIServer
+from version import __version__
 from config import ConfigManager
 from interfaces.base_control import BaseControl
 from interfaces.load_interface import LoadInterface
@@ -54,7 +55,7 @@ streamhandler = logging.StreamHandler(sys.stdout)
 streamhandler.setFormatter(formatter)
 logger.addHandler(streamhandler)
 logger.setLevel(LOGLEVEL)
-logger.info("[Main] Starting eos_connect")
+logger.info("[Main] Starting eos_connect - version: %s", __version__)
 ###################################################################################################
 base_path = os.path.dirname(os.path.abspath(__file__))
 # get param to set a specific path
@@ -757,6 +758,7 @@ def get_controls():
             "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),    
         },
         "state": optimization_scheduler.get_current_state(),
+        "eos_connect_version": __version__,
         "timestamp": datetime.now(time_zone).isoformat(),
     }
     return Response(json.dumps(response_data, indent=4), content_type="application/json")

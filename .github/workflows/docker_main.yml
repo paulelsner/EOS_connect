@@ -1,12 +1,12 @@
 name: Main - build image and push
-# This workflow builds and pushes a Docker image to GitHub Container Registry
-# and optionally to Docker Hub.
-# It runs nightly at 2 AM UTC and can also be triggered manually.
-# The image is tagged with "nightly" and the repository owner is converted to lowercase.
+# This workflow builds and pushes a Docker image to GitHub Container Registry.
+# It is triggered on push and pull_request events for the "main" branch, as well as manually via workflow_dispatch.
+# The image is tagged with a snapshot version and optionally with "latest".
+# The repository owner is converted to lowercase for consistent tagging.
 # The workflow uses the GITHUB_TOKEN secret for authentication with GitHub Container Registry.
 # Uncomment the Docker Hub section if you want to push to Docker Hub as well.
 # The Docker Hub credentials should be stored in the repository secrets as DOCKER_USERNAME and DOCKER_PASSWORD.
-# The workflow is triggered on a schedule and can also be run manually.
+# The workflow also includes a cleanup job to remove old Docker images from the registry.
 
 on:
   push:
@@ -25,8 +25,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Pull latest changes
+        run: git pull origin develop --rebase
+
       - name: Set version string
         run: echo "VERSION=${{ env.VERSION_PREFIX }}${{ github.run_number }}" >> $GITHUB_ENV
+
+      - name: Write version to file
+        run: echo "__version__ = '${{ env.VERSION }}'" > src/version.py
+
+      - name: Commit version file and push changes
+        if: github.event_name == 'push'
+        uses: devops-infra/action-commit-push@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_prefix: "[AUTO] "
+          commit_message: "Update version to ${{ env.VERSION }}"
 
       - name: Convert repository owner to lowercase
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
@@ -34,7 +48,19 @@ jobs:
       - name: Build image
         run: docker build -t ghcr.io/${{ env.owner }}/eos_connect:snapshot .
 
+      # Only upload the image artifact for pull_request events
+      - name: Upload Docker image as artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eos_connect_image-${{ env.VERSION }}
+          path: eos_connect_${{ env.VERSION }}.tar.gz
+
       # Only run tagging and pushing tasks for "push" events
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Tag image with snapshot version
         if: github.event_name == 'push'
         run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:${{ env.VERSION }}
@@ -42,10 +68,6 @@ jobs:
       - name: Tag image with latest
         if: github.event_name == 'push'
         run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:latest
-
-      - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Push Docker image to GitHub Container Registry
         if: github.event_name == 'push'
@@ -63,23 +85,12 @@ jobs:
     needs: publish_image
     runs-on: ubuntu-latest
     steps:
-      - name: Delete old develop versions
+      - name: Cleanup old Docker images
         env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION_PREFIX: ${{ env.VERSION_PREFIX }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Fetch all versions of the container
-          versions=$(curl -s -H "Authorization: Bearer $GHCR_TOKEN" \
-            https://ghcr.io/v2/${{ github.repository_owner }}/eos_connect/tags/list | jq -r ".tags[] | select(startswith(\"$VERSION_PREFIX\"))" | sort -r)
-
-          # Keep the latest 3 versions
-          keep=$(echo "$versions" | head -n 3)
-
-          # Delete older versions
-          for version in $(echo "$versions" | tail -n +4); do
-            echo "Deleting version: $version"
-            digest=$(curl -s -H "Authorization: Bearer $GHCR_TOKEN" \
-              https://ghcr.io/v2/${{ github.repository_owner }}/eos_connect/manifests/$version | jq -r '.config.digest')
-            curl -X DELETE -H "Authorization: Bearer $GHCR_TOKEN" \
-              https://ghcr.io/v2/${{ github.repository_owner }}/eos_connect/manifests/$digest
+          echo "Cleaning up old Docker images..."
+          ghcr_images=$(gh api -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | startswith("${{ env.VERSION_PREFIX }}")) | .id' | tail -n +4)
+          for image_id in $ghcr_images; do
+            gh api -X DELETE -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions/$image_id
           done

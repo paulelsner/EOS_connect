@@ -34,14 +34,13 @@ jobs:
       - name: Write version to file
         run: echo "__version__ = '${{ env.VERSION }}'" > src/version.py
 
-      - name: amend version file to last commit and push changes
+      - name: Commit version file and push changes
         if: github.event_name == 'push'
         uses: devops-infra/action-commit-push@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          commit_prefix: "[AUTO]"
-          amend: true
-          force: true
+          commit_prefix: "[AUTO] "
+          commit_message: "Update version to ${{ env.VERSION }}"
 
       - name: Convert repository owner to lowercase
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV

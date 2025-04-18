@@ -76,9 +76,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Cleanup old Docker images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Cleaning up old Docker images..."
-          ghcr_images=$(gh api -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | startswith("${{ env.VERSION_PREFIX }}")) | .id' | tail -n +4)
+          ghcr_images=$(gh api -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | startswith("${{ env.VERSION_PREFIX }}")) | .id' | tail -n +4)
           for image_id in $ghcr_images; do
-            gh api -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" /user/packages/container/eos_connect/versions/$image_id
+            gh api -X DELETE -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions/$image_id
           done

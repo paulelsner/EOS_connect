@@ -38,6 +38,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_prefix: "[AUTO]"
           amend: true
+          force: true
 
       - name: Convert repository owner to lowercase
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV

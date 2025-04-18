@@ -1,4 +1,4 @@
-name: Develop - build image and push
+name: Main - build image and push
 # This workflow builds and pushes a Docker image to GitHub Container Registry
 # and optionally to Docker Hub.
 # It runs nightly at 2 AM UTC and can also be triggered manually.
@@ -10,13 +10,13 @@ name: Develop - build image and push
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "develop" ]
+    branches: [ "main" ]
   workflow_dispatch: # allows manual triggering of the workflow
 
 env:
-  VERSION_PREFIX: develop-v0.0.
+  VERSION_PREFIX: snapshot-v0.0.
 
 jobs:
   publish_image:
@@ -32,36 +32,38 @@ jobs:
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Build image
-        run: docker build -t ghcr.io/${{ env.owner }}/eos_connect:develop .
-
-      # Only upload the image artifact for pull_request events
-      - name: Upload Docker image as artifact
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v3
-        with:
-          name: eos_connect_develop_image-${{ env.VERSION }}
-          path: eos_connect_${{ env.VERSION }}.tar.gz
+        run: docker build -t ghcr.io/${{ env.owner }}/eos_connect:snapshot .
 
       # Only run tagging and pushing tasks for "push" events
+      - name: Tag image with snapshot version
+        if: github.event_name == 'push'
+        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:${{ env.VERSION }}
+
+      - name: Tag image with latest
+        if: github.event_name == 'push'
+        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:latest
+
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Tag image with develop version
-        if: github.event_name == 'push'
-        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:develop ghcr.io/${{ env.owner }}/eos_connect:${{ env.VERSION }}
-
       - name: Push Docker image to GitHub Container Registry
         if: github.event_name == 'push'
         run: |
-          docker push ghcr.io/${{ env.owner }}/eos_connect:develop
+          docker push ghcr.io/${{ env.owner }}/eos_connect:snapshot
           docker push ghcr.io/${{ env.owner }}/eos_connect:${{ env.VERSION }}
+          docker push ghcr.io/${{ env.owner }}/eos_connect:latest
 
-  cleanup_old_develops:
+#      - name: Log in to Docker Hub
+#        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+#      - name: Push image to Docker Hub
+#        run: docker push ${{ secrets.DOCKER_USERNAME }}/eos_connect:nightly
+
+  cleanup_old_snapshots:
       needs: publish_image
       runs-on: ubuntu-latest
       steps:
-        - name: Delete old develop versions
+        - name: Delete old snapshot versions
           env:
             GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           run: |

@@ -75,23 +75,10 @@ jobs:
     needs: publish_image
     runs-on: ubuntu-latest
     steps:
-      - name: Delete old develop versions
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION_PREFIX: ${{ env.VERSION_PREFIX }}
+      - name: Cleanup old Docker images
         run: |
-          # Fetch all versions of the container
-          versions=$(curl -s -H "Authorization: Bearer $GHCR_TOKEN" \
-            https://ghcr.io/v2/${{ github.repository_owner }}/eos_connect/tags/list | jq -r ".tags[] | select(startswith(\"$VERSION_PREFIX\"))" | sort -r)
-
-          # Keep the latest 3 versions
-          keep=$(echo "$versions" | head -n 3)
-
-          # Delete older versions
-          for version in $(echo "$versions" | tail -n +4); do
-            echo "Deleting version: $version"
-            digest=$(curl -s -H "Authorization: Bearer $GHCR_TOKEN" \
-              https://ghcr.io/v2/${{ github.repository_owner }}/eos_connect/manifests/$version | jq -r '.config.digest')
-            curl -X DELETE -H "Authorization: Bearer $GHCR_TOKEN" \
-              https://ghcr.io/v2/${{ github.repository_owner }}/eos_connect/manifests/$digest
+          echo "Cleaning up old Docker images..."
+          ghcr_images=$(gh api -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | startswith("${{ env.VERSION_PREFIX }}")) | .id' | tail -n +4)
+          for image_id in $ghcr_images; do
+            gh api -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" /user/packages/container/eos_connect/versions/$image_id
           done

@@ -25,6 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Pull latest changes
+        run: git pull origin develop --rebase
+
       - name: Set version string
         run: echo "VERSION=${{ env.VERSION_PREFIX }}${{ github.run_number }}" >> $GITHUB_ENV
 

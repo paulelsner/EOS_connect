@@ -37,9 +37,9 @@ jobs:
       # Only upload the image artifact for pull_request events
       - name: Upload Docker image as artifact
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: eos_connect_develop_image-${{ env.VERSION }}
+          name: eos_connect_image-${{ env.VERSION }}
           path: eos_connect_${{ env.VERSION }}.tar.gz
 
       # Only run tagging and pushing tasks for "push" events

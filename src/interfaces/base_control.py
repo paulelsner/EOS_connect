@@ -197,7 +197,8 @@ class BaseControl:
             self.current_ac_charge_demand != self.last_ac_charge_demand
         )
 
-        # override overall state if EVCC charging state is active and in mode fast charge and discharge is allowed
+        # override overall state if EVCC charging state is active and
+        # in mode fast charge and discharge is allowed
         if (
             new_state == MODE_DISCHARGE_ALLOWED
             and self.current_evcc_charging_state
@@ -206,7 +207,20 @@ class BaseControl:
             new_state = MODE_AVOID_DISCHARGE_EVCC_FAST
             logger.info(
                 "[BASE_CTRL] EVCC charging state is active,"
-                + " setting overall state to MODE_AVOID_DISCHARGE"
+                + " setting overall state to MODE_AVOID_DISCHARGE_EVCC_FAST"
+            )
+
+        # override overall state if EVCC charging state is active and
+        # in mode pv charge and discharge is allowed
+        if (
+            new_state == MODE_DISCHARGE_ALLOWED
+            and self.current_evcc_charging_state
+            and self.current_evcc_charging_mode == "pv"
+        ):
+            new_state = MODE_DISCHARGE_ALLOWED_EVCC_PV
+            logger.info(
+                "[BASE_CTRL] EVCC charging state is active,"
+                + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_PV"
             )
 
         if new_state != self.current_overall_state or grid_charge_value_changed:

@@ -606,11 +606,14 @@ def change_control_state():
     if config_manager.config["inverter"]["type"] == "fronius_gen24":
         inverter_en = True
 
+    current_overall_state = base_control.get_current_overall_state_number()
+    current_overall_state_text = base_control.get_current_overall_state()
+
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
         logger.debug("[Main] Overall state changed recently")
         # MODE_CHARGE_FROM_GRID
-        if base_control.get_current_overall_state() == 0:
+        if current_overall_state == 0:
             # get the current ac charge demand and set it to the inverter according
             # to the max dynamic charge power of the battery based on SOC
             tgt_charge_power = min(
@@ -621,59 +624,50 @@ def change_control_state():
                 inverter_interface.set_mode_force_charge(tgt_charge_power)
             logger.info(
                 "[Main] Inverter mode set to %s with %s W (_____|||||_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
                 tgt_charge_power,
             )
         # MODE_AVOID_DISCHARGE
-        elif base_control.get_current_overall_state() == 1:
+        elif current_overall_state == 1:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-----_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
             )
         # MODE_DISCHARGE_ALLOWED
-        elif base_control.get_current_overall_state() == 2:
+        elif current_overall_state == 2:
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+++++_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
             )
         # MODE_AVOID_DISCHARGE_EVCC_FAST
-        elif base_control.get_current_overall_state() == 3:
+        elif current_overall_state == 3:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-+-+-_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
             )
-        elif base_control.get_current_overall_state() == 4:
+        # MODE_DISCHARGE_ALLOWED_EVCC_PV
+        elif current_overall_state == 4:
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-+-+-_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
             )
-        elif base_control.get_current_overall_state() < 0:
+        elif current_overall_state < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
     # Log the current state if no recent changes were made
-    current_state = base_control.get_current_overall_state()
+
     logger.info(
         "[Main] Overall state not changed recently"
         + " - remaining in current state: %s  (_____OOOOO_____)",
-        base_control.get_state_mapping().get(current_state, "unknown state"),
+        current_overall_state_text,
     )
     return False
 
@@ -760,6 +754,7 @@ def get_controls():
         "state": optimization_scheduler.get_current_state(),
         "eos_connect_version": __version__,
         "timestamp": datetime.now(time_zone).isoformat(),
+        "api_version": "0.0.1"
     }
     return Response(json.dumps(response_data, indent=4), content_type="application/json")
 

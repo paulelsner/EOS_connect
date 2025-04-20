@@ -18,11 +18,11 @@ MODE_AVOID_DISCHARGE_EVCC_FAST = 3
 MODE_DISCHARGE_ALLOWED_EVCC_PV = 4
 
 state_mapping = {
-    0: "MODE_CHARGE_FROM_GRID",
-    1: "MODE_AVOID_DISCHARGE",
-    2: "MODE_DISCHARGE_ALLOWED",
-    3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
-    4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
+    0: "MODE CHARGE FROM GRID",
+    1: "MODE AVOID DISCHARGE",
+    2: "MODE DISCHARGE ALLOWED",
+    3: "MODE AVOID DISCHARGE EVCC FAST",
+    4: "MODE DISCHARGE ALLOWED EVCC PV",
 }
 
 
@@ -85,15 +85,12 @@ class BaseControl:
         """
         return self.current_discharge_allowed
 
-    def get_current_overall_state(self, number=True):
+    def get_current_overall_state(self):
         """
         Returns the current overall state.
         """
-        if number:
-            return self.current_overall_state
-        else:
-            # Return the string representation of the state
-            return state_mapping.get(self.current_overall_state, "unknown state")
+        # Return the string representation of the state
+        return state_mapping.get(self.current_overall_state, "unknown state")
 
     def get_current_overall_state_number(self):
         """

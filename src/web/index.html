@@ -538,6 +538,9 @@
             // max_charge_power_w according to optimize_request api version
             max_charge_power_w = data_request["pv_akku"] && data_request["pv_akku"].hasOwnProperty("max_ladeleistung_w") ? data_request["pv_akku"]["max_ladeleistung_w"] : data_request["pv_akku"] ? data_request["pv_akku"]["max_charge_power_w"] : 0;
             const data_response = await fetch_EOS_Connect_Data("optimize_response.json");
+            
+            await showCurrentData();
+            
             if (!data_response || !data_response["result"] || !data_response["result"]["Last_Wh_pro_Stunde"] || data_response["result"]["Last_Wh_pro_Stunde"].length === 0) {
                 document.getElementById('overlay').style.display = 'flex';
                 if(data_response["error"]){
@@ -576,8 +579,7 @@
             }
             
             showSchedule(data_request,data_response);
-            
-            await showCurrentData();           
+                   
             
             var currentHour = new Date().getHours();
             var next_charge_time = data_response["ac_charge"].slice(currentHour).findIndex((value) => value > 0);

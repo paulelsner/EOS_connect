@@ -115,7 +115,6 @@ def charging_state_callback(new_state):
     # update the base control with the new charging state
     base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
     base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
-    
     logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
     change_control_state()
 
@@ -387,14 +386,17 @@ class OptimizationScheduler:
         self.last_request_response = {
             "request": json.dumps(
                 {
-                    "state": "waiting for first optimization run",
+                    "status": "Awaiting first optimization run",
                 },
                 indent=4,
             ),
             "response": json.dumps(
                 {
-                    "state": "initializing",
-                    "message": "waiting for finishing first optimization run",
+                    "status": "starting up",
+                    "message": (
+                        "The first request has been sent to EOS and is now waiting for "
+                        "the completion of the first optimization run."
+                    ),
                 },
                 indent=4,
             ),
@@ -426,14 +428,18 @@ class OptimizationScheduler:
         Sets the current state of the optimization scheduler.
         """
         self.current_state["request_state"] = "request send"
-        self.current_state["last_request_timestamp"] = datetime.now(time_zone).isoformat()
+        self.current_state["last_request_timestamp"] = datetime.now(
+            time_zone
+        ).isoformat()
 
     def __set_state_response(self):
         """
         Sets the current state of the optimization scheduler.
         """
         self.current_state["request_state"] = "response received"
-        self.current_state["last_response_timestamp"] = datetime.now(time_zone).isoformat()
+        self.current_state["last_response_timestamp"] = datetime.now(
+            time_zone
+        ).isoformat()
 
     def __set_state_next_run(self, next_run_time):
         """
@@ -732,8 +738,8 @@ def get_controls():
     current_discharge_allowed = base_control.get_current_discharge_allowed()
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
-    current_inverter_mode = base_control.get_current_overall_state(False)
-    current_inverter_mode_num = base_control.get_current_overall_state()
+    current_inverter_mode = base_control.get_current_overall_state()
+    current_inverter_mode_num = base_control.get_current_overall_state_number()
 
     response_data = {
         "current_states": {
@@ -749,14 +755,16 @@ def get_controls():
         },
         "battery": {
             "soc": current_battery_soc,
-            "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),    
+            "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
         },
         "state": optimization_scheduler.get_current_state(),
         "eos_connect_version": __version__,
         "timestamp": datetime.now(time_zone).isoformat(),
-        "api_version": "0.0.1"
+        "api_version": "0.0.1",
     }
-    return Response(json.dumps(response_data, indent=4), content_type="application/json")
+    return Response(
+        json.dumps(response_data, indent=4), content_type="application/json"
+    )
 
 
 if __name__ == "__main__":

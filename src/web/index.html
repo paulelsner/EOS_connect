@@ -365,7 +365,7 @@
             const data_controls = await fetch_EOS_Connect_Data("current_controls.json");
             inverter_mode_text = data_controls["current_states"]["inverter_mode"];
             inverter_mode_num = data_controls["current_states"]["inverter_mode_num"];
-            inverter_mode_num = 5;
+            //inverter_mode_num = 5; // for testing
 
             // base elements at current controls
             document.getElementById('control_ac_charge').innerText = data_controls["current_states"]["current_ac_charge_demand"].toFixed(0) + " Wh";

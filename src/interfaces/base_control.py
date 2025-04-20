@@ -16,13 +16,16 @@ MODE_AVOID_DISCHARGE = 1
 MODE_DISCHARGE_ALLOWED = 2
 MODE_AVOID_DISCHARGE_EVCC_FAST = 3
 MODE_DISCHARGE_ALLOWED_EVCC_PV = 4
+MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV = 5
 
 state_mapping = {
-    0: "MODE_CHARGE_FROM_GRID",
-    1: "MODE_AVOID_DISCHARGE",
-    2: "MODE_DISCHARGE_ALLOWED",
-    3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
-    4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
+    -1: "MODE Startup",
+    0: "MODE CHARGE FROM GRID",
+    1: "MODE AVOID DISCHARGE",
+    2: "MODE DISCHARGE ALLOWED",
+    3: "MODE AVOID DISCHARGE EVCC FAST",
+    4: "MODE DISCHARGE ALLOWED EVCC PV",
+    5: "MODE DISCHARGE ALLOWED EVCC MIN+PV",
 }
 
 
@@ -38,11 +41,11 @@ class BaseControl:
         self.current_ac_charge_demand = 0
         self.last_ac_charge_demand = 0
         self.current_dc_charge_demand = 0
-        self.current_discharge_allowed = 1
+        self.current_discharge_allowed = -1
         self.current_evcc_charging_state = False
         self.current_evcc_charging_mode = False
         # startup with None to force a writing to the inverter
-        self.current_overall_state = None
+        self.current_overall_state = -1
         self.current_battery_soc = 0
         self.time_zone = timezone
         self.config = config
@@ -85,15 +88,12 @@ class BaseControl:
         """
         return self.current_discharge_allowed
 
-    def get_current_overall_state(self, number=True):
+    def get_current_overall_state(self):
         """
         Returns the current overall state.
         """
-        if number:
-            return self.current_overall_state
-        else:
-            # Return the string representation of the state
-            return state_mapping.get(self.current_overall_state, "unknown state")
+        # Return the string representation of the state
+        return state_mapping.get(self.current_overall_state, "unknown state")
 
     def get_current_overall_state_number(self):
         """
@@ -190,14 +190,17 @@ class BaseControl:
             new_state = MODE_CHARGE_FROM_GRID
         elif self.current_discharge_allowed > 0:
             new_state = MODE_DISCHARGE_ALLOWED
-        else:
+        elif self.current_discharge_allowed == 0:
             new_state = MODE_AVOID_DISCHARGE
+        else:
+            new_state = -1
         # check if the grid charge demand has changed
         grid_charge_value_changed = (
             self.current_ac_charge_demand != self.last_ac_charge_demand
         )
 
-        # override overall state if EVCC charging state is active and in mode fast charge and discharge is allowed
+        # override overall state if EVCC charging state is active and
+        # in mode fast charge and discharge is allowed
         if (
             new_state == MODE_DISCHARGE_ALLOWED
             and self.current_evcc_charging_state
@@ -206,7 +209,33 @@ class BaseControl:
             new_state = MODE_AVOID_DISCHARGE_EVCC_FAST
             logger.info(
                 "[BASE_CTRL] EVCC charging state is active,"
-                + " setting overall state to MODE_AVOID_DISCHARGE"
+                + " setting overall state to MODE_AVOID_DISCHARGE_EVCC_FAST"
+            )
+
+        # override overall state if EVCC charging state is active and
+        # in mode pv charge and discharge is allowed
+        if (
+            new_state == MODE_DISCHARGE_ALLOWED
+            and self.current_evcc_charging_state
+            and self.current_evcc_charging_mode == "pv"
+        ):
+            new_state = MODE_DISCHARGE_ALLOWED_EVCC_PV
+            logger.info(
+                "[BASE_CTRL] EVCC charging state is active,"
+                + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_PV"
+            )
+
+        # override overall state if EVCC charging state is active and
+        # in mode pv charge and discharge is allowed
+        if (
+            new_state == MODE_DISCHARGE_ALLOWED
+            and self.current_evcc_charging_state
+            and self.current_evcc_charging_mode == "minpv"
+        ):
+            new_state = MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
+            logger.info(
+                "[BASE_CTRL] EVCC charging state is active,"
+                + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV"
             )
 
         if new_state != self.current_overall_state or grid_charge_value_changed:

@@ -40,8 +40,8 @@
         <div class="top-boxes">
             <div class="top-box">
                 <div class="header"><i class="fa-solid fa-battery-full"></i> Current Controls
-                    <span class="header_notification" id="current_header_left" style="left: 10px;right: unset;">...</span>
-                    <span class="header_notification" id="current_header_right">...</span>
+                    <span class="header_notification" id="current_header_left" style="cursor: pointer;left: 10px;min-width: 20px;right: unset;">...</span>
+                    <span class="header_notification" id="current_header_right" style="min-width: 20px;">...</span>
                 </div>
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
@@ -215,7 +215,6 @@
     </div>
     <script>
         let max_charge_power_w = 0;
-        let inverter_mode = "N/A";
         let inverter_mode_num = -1;
         let chartInstance = null;
         
@@ -255,8 +254,6 @@
                 overlay.style.display = 'flex';
                 document.getElementById('overlay_menu_head').innerHTML = header;
                 document.getElementById('overlay_menu_content').innerHTML = content;
-            } else {
-                overlay.style.display = 'none';
             }
         }
 
@@ -318,20 +315,90 @@
             updateChart(data_request, data_response); // Feed the content immediately after creation
         }
 
+        function setBatteryChargingData(data_response) {
+            var currentHour = new Date().getHours();
+            var next_charge_time = data_response["ac_charge"].slice(currentHour).findIndex((value) => value > 0);
+            if (next_charge_time !== -1) {
+                next_charge_time += currentHour;
+                var next_charge_time_hour = next_charge_time % 24;
+                document.getElementById('next_charge_time').innerText = next_charge_time_hour + ":00";
+            } else {
+                document.getElementById('next_charge_time').innerText = "--:--";
+            }
+            // get the average price for the next charging
+            let next_charge_avg_price = (data_response["result"]["Electricity_price"][next_charge_time - currentHour] * 100000);
+            if (next_charge_time !== -1) {
+                document.getElementById('next_charge_avg_price').innerText = (next_charge_avg_price).toFixed(1) + " ct/kWh";
+            } else {
+                document.getElementById('next_charge_avg_price').innerText = "-- ct/kWh";
+            }
+            
+            var next_charge_amount = 0;
+            var foundFirst = false;
+            data_response["ac_charge"].slice(currentHour).forEach((value) => {
+                if (value > 0) {
+                    if (!foundFirst) {
+                        foundFirst = true;
+                    }
+                    next_charge_amount += value * max_charge_power_w;
+                } else if (foundFirst) {
+                    return; // Stop adding once a 0 is encountered after the first finding
+                }
+            });
+            if (next_charge_amount === 0) {
+                document.getElementById('next_charge_amount').innerText = "-.- kWh";
+            } else {
+                document.getElementById('next_charge_amount').innerText = (next_charge_amount / 1000).toFixed(2) + " kWh";
+            }
+            // next_charge_sum_price
+            var next_charge_sum_price = (next_charge_amount * next_charge_avg_price) / 1000;
+
+            if (next_charge_sum_price === 0) {
+                document.getElementById('next_charge_sum_price').innerText = "-.- €";
+            } else {
+                document.getElementById('next_charge_sum_price').innerText = (next_charge_sum_price / 100).toFixed(2) + " €";
+            }
+        }
+
         async function showCurrentData() {
             //console.log("------- showCurrentControls -------");
             const data_controls = await fetch_EOS_Connect_Data("current_controls.json");
+            inverter_mode_text = data_controls["current_states"]["inverter_mode"];
+            inverter_mode_num = data_controls["current_states"]["inverter_mode_num"];
+            //inverter_mode_num = 5; // for testing
+
+            // base elements at current controls
             document.getElementById('control_ac_charge').innerText = data_controls["current_states"]["current_ac_charge_demand"].toFixed(0) + " Wh";
             document.getElementById('control_dc_charge').innerText = data_controls["current_states"]["current_dc_charge_demand"].toFixed(0) + " Wh";
             document.getElementById('control_discharge_allowed').innerText = (data_controls["current_states"]["current_discharge_allowed"] === true ? "Yes" : "No");
-            inverter_mode = data_controls["current_states"]["inverter_mode"];
-            inverter_mode_num = data_controls["current_states"]["inverter_mode_num"];
-            document.getElementById('control_overall').innerText = inverter_mode;
-
+            document.getElementById('control_overall').innerText = inverter_mode_text;
             document.getElementById('battery_soc').innerText = data_controls["battery"]["soc"] + " %";
             document.getElementById('current_max_charge_dyn').innerText = data_controls["battery"]["max_charge_power_dyn"].toFixed(0) + " W";
 
-            // last result received
+            // dependent on inverter mode show the icon
+            //0: "MODE_CHARGE_FROM_GRID",
+            //1: "MODE_AVOID_DISCHARGE",
+            //2: "MODE_DISCHARGE_ALLOWED",
+            //3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
+            //4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
+            
+            const iconElement = document.getElementById('current_header_right');
+            iconElement.innerHTML = ""; // Clear previous content
+            
+            const icons = [
+                { icon: "fa-plug-circle-bolt", color: "darkred", title: "Charge from grid" },
+                { icon: "fa-lock", color: "lightgray", title: "Avoid discharge" },
+                { icon: "fa-battery-half", color: "lightgreen", title: "Discharge allowed" },
+                { icon: "fa-charging-station", color: "#3399FF", title: "Avoid discharge due to e-car fast charge" },
+                { icon: "fa-charging-station", color: "lightgreen", title: "Discharge allowed during e-car charging in pv mode" },
+                { icon: "fa-charging-station", color: "rgb(255, 144, 144)", title: "Discharge allowed during e-car charging in min+pv mode" }
+            ];
+            const { icon, color, title } = icons[inverter_mode_num] || {};
+            iconElement.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+            iconElement.style.color = color || "";
+            iconElement.title = title || "";
+
+            // energy optimization - last result received
             const timestamp_last_run = new Date(data_controls.state.last_response_timestamp);
             const timestamp_next_run = new Date(data_controls.state.next_run);
             const timestamp_last_run_formatted = timestamp_last_run.toLocaleString('de-DE', {
@@ -354,7 +421,7 @@
             }            
             document.getElementById('timestamp_next_run').innerText = minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0') + " min";
 
-            // ecar_soc
+            // car charging - current states of EVCC
             let evcc_mode = data_controls["evcc"]["charging_mode"];
             if(evcc_mode === "off") {
                 document.getElementById('evcc_mode').innerText = "Off";
@@ -368,7 +435,6 @@
                 document.getElementById('evcc_mode').innerText = "N/A";
             }
 
-
             let evcc_state = data_controls["evcc"]["charging_state"];
             if(evcc_state) {
                 document.getElementById('evcc_state').innerText = "charging";
@@ -378,6 +444,7 @@
                 document.getElementById('evcc_state').style.color = "white";
             }
             
+            // display current eos connect version
             document.getElementById('version_overlay').innerText = "EOS connect: " + data_controls["eos_connect_version"];
             
             document.getElementById('current_header_left').innerHTML = '<i class="fa-solid fa-circle-info"></i>'; // + " " + data_controls["eos_connect_version"];
@@ -385,37 +452,6 @@
             document.getElementById('current_header_left').addEventListener('click', function () {
                 overlayMenu("EOS connect version", data_controls["eos_connect_version"]);
             });
-
-            // dependent on inverter mode show the icon
-            //0: "MODE_CHARGE_FROM_GRID",
-            //1: "MODE_AVOID_DISCHARGE",
-            //2: "MODE_DISCHARGE_ALLOWED",
-            //3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
-            //4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
-            
-            const iconElement = document.getElementById('current_header_right');
-            iconElement.innerHTML = ""; // Clear previous content
-            
-            if (inverter_mode_num === 4) {
-                iconElement.innerHTML = '<i class="fa-solid fa-charging-station"></i>';
-                iconElement.style.color = "lightgreen";
-                iconElement.title = "Discharge allowed during e-car charging in pv mode";                    
-            } else if (inverter_mode_num === 3) {
-                iconElement.innerHTML = '<i class="fa-solid fa-charging-station"></i>';
-                iconElement.title = "Avoid discharge due to e-car fast charge";
-            } else if (inverter_mode_num === 2) {
-                iconElement.innerHTML = "<i class='fa-solid fa-battery-half'></i>";
-                iconElement.style.color = "lightgreen";
-                iconElement.title = "Discharge allowed";                    
-            } else if (inverter_mode_num === 1) {
-                iconElement.innerHTML = "<i class='fa-solid fa-lock'></i>";
-                iconElement.style.color = "lightgray";                           
-                iconElement.title = "Avoid discharge";
-            } else { // if 0
-                iconElement.innerHTML = "<i class='fa-solid fa-plug-circle-bolt'></i> ";
-                iconElement.style.backgroundColor = "darkred";                
-                iconElement.title = "Charge from grid";
-            }
         }
 
         function showSchedule(data_request, data_response) {
@@ -460,20 +496,29 @@
 
                 var cell2 = document.createElement('div');
                 cell2.className = 'table-cell';
-                //inverter_mode_num = 3;
                 const buttonDiv = document.createElement('div');
                 buttonDiv.style.border = "1px solid #ccc";
                 buttonDiv.style.borderRadius = "5px";
                 //buttonDiv.style.padding = "0 10px";
-                buttonDiv.style.width = "40px";
+                buttonDiv.style.width = "50px";
                 buttonDiv.style.display = "inline-block";
                 buttonDiv.style.textAlign = "center";
 
-                // if MODE_AVOID_DISCHARGE_EVCC_FAST
-                if (inverter_mode_num === 3 && index === 0) {
-                    buttonDiv.style.backgroundColor = "#3399FF";
-                    buttonDiv.style.color = "white";
-                    buttonDiv.innerHTML = "<i class='fa-solid fa-charging-station'></i>";
+                if (index === 0 && inverter_mode_num > 2) {
+                    // override first hour - if eos connect overriding eos
+                    if (inverter_mode_num === 3) { // MODE_AVOID_DISCHARGE_EVCC_FAST
+                        //buttonDiv.style.backgroundColor = "#3399FF";
+                        buttonDiv.style.color = "#3399FF";
+                        buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-lock'></i> ";
+                    } else if (inverter_mode_num === 4) { // MODE_DISCHARGE_ALLOWED_EVCC_PV
+                        //buttonDiv.style.backgroundColor = "#3399FF";
+                        buttonDiv.style.color = "lightgreen";
+                        buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-battery-half'></i> ";
+                    } else if (inverter_mode_num === 5) { //MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
+                        //buttonDiv.style.backgroundColor = "rgb(255, 144, 144)";
+                        buttonDiv.style.color = "rgb(255, 144, 144)";
+                        buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-battery-half'></i> ";
+                    }
                 } else if (discharge_allowed[(index + currentHour)] === 1) {
                     buttonDiv.style.backgroundColor = "grey";
                     buttonDiv.style.color = "lightgreen";
@@ -516,6 +561,35 @@
             });
         }
 
+        function handlingErrorInResponse(data_response) {
+            
+            if (!data_response || !data_response["result"] || !data_response["result"]["Last_Wh_pro_Stunde"] || data_response["result"]["Last_Wh_pro_Stunde"].length === 0) {
+                document.getElementById('overlay').style.display = 'flex';
+                if(data_response["error"]){
+                    if(data_response["error"] === "Request timed out"){
+                        document.getElementById('waiting_text').innerText = "No data available...";
+                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
+                    } 
+                    else if(data_response["error"].includes("422 Client Error: Unprocessable Entity")){
+                        document.getElementById('waiting_text').innerText = "Check your configuration! - EOS cannot process the request...";
+                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
+                    }
+                    else {
+                        document.getElementById('waiting_text').innerText = "No data available...";
+                        document.getElementById('waiting_error_text').innerText = "no detailed error information available - error message: " + data_response["error"];
+                    }
+                } else if(data_response["status"]) {
+                    document.getElementById('waiting_text').innerText = data_response["status"];
+                    document.getElementById('waiting_error_text').innerText = data_response["message"];
+                }
+                else {
+                    document.getElementById('waiting_text').innerText = "Waiting for first data...";
+                    document.getElementById('waiting_error_text').innerText = "";
+                }
+                return true;
+            }
+        }
+
         // function to observe changed values of doc elements from class "valueChange" and animate the change
         Array.from(document.getElementsByClassName("valueChange")).forEach(function (element) {
             const observer = new MutationObserver(function (mutationsList, observer) {
@@ -538,35 +612,14 @@
             // max_charge_power_w according to optimize_request api version
             max_charge_power_w = data_request["pv_akku"] && data_request["pv_akku"].hasOwnProperty("max_ladeleistung_w") ? data_request["pv_akku"]["max_ladeleistung_w"] : data_request["pv_akku"] ? data_request["pv_akku"]["max_charge_power_w"] : 0;
             const data_response = await fetch_EOS_Connect_Data("optimize_response.json");
-            if (!data_response || !data_response["result"] || !data_response["result"]["Last_Wh_pro_Stunde"] || data_response["result"]["Last_Wh_pro_Stunde"].length === 0) {
-                document.getElementById('overlay').style.display = 'flex';
-                if(data_response["error"]){
-                    if(data_response["error"] === "Request timed out"){
-                        document.getElementById('waiting_text').innerText = "No data available...";
-                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
-                    } 
-                    else if(data_response["error"].includes("422 Client Error: Unprocessable Entity")){
-                        document.getElementById('waiting_text').innerText = "No data available...";
-                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
-                    }
-                    else if(data_response["error"].includes("422 Client Error: Unprocessable Entity")){
-                        document.getElementById('waiting_text').innerText = "No data available...";
-                        document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
-                    }
-                    else {
-                        document.getElementById('waiting_text').innerText = "No data available...";
-                        document.getElementById('waiting_error_text').innerText = "no further error information available";
-                    }
-                } else if(data_response["state"]) {
-                    document.getElementById('waiting_text').innerText = data_response["state"];
-                    document.getElementById('waiting_error_text').innerText = data_response["message"];
-                }
-                    else {
-                    document.getElementById('waiting_text').innerText = "Waiting for first data...";
-                    document.getElementById('waiting_error_text').innerText = "";
-                }
+            
+            await showCurrentData();
+            
+            // error handling
+            if (handlingErrorInResponse(data_response)) {
                 return;
             }
+            
             if (chartInstance){
                 updateChart(data_request,data_response);
                 document.getElementById('overlay').style.display = 'none';
@@ -576,52 +629,7 @@
             }
             
             showSchedule(data_request,data_response);
-            
-            await showCurrentData();           
-            
-            var currentHour = new Date().getHours();
-            var next_charge_time = data_response["ac_charge"].slice(currentHour).findIndex((value) => value > 0);
-            if (next_charge_time !== -1) {
-                next_charge_time += currentHour;
-                var next_charge_time_hour = next_charge_time % 24;
-                document.getElementById('next_charge_time').innerText = next_charge_time_hour + ":00";
-            } else {
-                document.getElementById('next_charge_time').innerText = "--:--";
-            }
-            // get the average price for the next charging
-            let next_charge_avg_price = (data_response["result"]["Electricity_price"][next_charge_time - currentHour] * 100000);
-            if (next_charge_time !== -1) {
-                document.getElementById('next_charge_avg_price').innerText = (next_charge_avg_price).toFixed(1) + " ct/kWh";
-            } else {
-                document.getElementById('next_charge_avg_price').innerText = "-- ct/kWh";
-            }
-            
-            var next_charge_amount = 0;
-            var foundFirst = false;
-            data_response["ac_charge"].slice(currentHour).forEach((value) => {
-                if (value > 0) {
-                    if (!foundFirst) {
-                        foundFirst = true;
-                    }
-                    next_charge_amount += value * max_charge_power_w;
-                } else if (foundFirst) {
-                    return; // Stop adding once a 0 is encountered after the first finding
-                }
-            });
-            if (next_charge_amount === 0) {
-                document.getElementById('next_charge_amount').innerText = "-.- kWh";
-            } else {
-                document.getElementById('next_charge_amount').innerText = (next_charge_amount / 1000).toFixed(2) + " kWh";
-            }
-            // next_charge_sum_price
-            var next_charge_sum_price = (next_charge_amount * next_charge_avg_price) / 1000;
-
-            if (next_charge_sum_price === 0) {
-                document.getElementById('next_charge_sum_price').innerText = "-.- €";
-            } else {
-                document.getElementById('next_charge_sum_price').innerText = (next_charge_sum_price / 100).toFixed(2) + " €";
-            }
-
+            setBatteryChargingData(data_response);
             updateLegendVisibility();
         }
 

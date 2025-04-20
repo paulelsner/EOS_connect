@@ -115,7 +115,6 @@ def charging_state_callback(new_state):
     # update the base control with the new charging state
     base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
     base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
-    
     logger.info("[MAIN] EVCC Event - Charging state changed to: %s", new_state)
     change_control_state()
 
@@ -387,14 +386,17 @@ class OptimizationScheduler:
         self.last_request_response = {
             "request": json.dumps(
                 {
-                    "state": "waiting for first optimization run",
+                    "status": "Awaiting first optimization run",
                 },
                 indent=4,
             ),
             "response": json.dumps(
                 {
-                    "state": "initializing",
-                    "message": "waiting for finishing first optimization run",
+                    "status": "starting up",
+                    "message": (
+                        "The first request has been sent to EOS and is now waiting for "
+                        "the completion of the first optimization run."
+                    ),
                 },
                 indent=4,
             ),
@@ -402,7 +404,8 @@ class OptimizationScheduler:
         self.current_state = {
             "request_state": None,
             "last_request_timestamp": None,
-            "last_response_timestamp": None,
+            # initialize with startup time stamp to avoid confusion in gui
+            "last_response_timestamp": datetime.now(time_zone).isoformat(),
             "next_run": None,
         }
         self._update_thread = None
@@ -426,14 +429,18 @@ class OptimizationScheduler:
         Sets the current state of the optimization scheduler.
         """
         self.current_state["request_state"] = "request send"
-        self.current_state["last_request_timestamp"] = datetime.now(time_zone).isoformat()
+        self.current_state["last_request_timestamp"] = datetime.now(
+            time_zone
+        ).isoformat()
 
     def __set_state_response(self):
         """
         Sets the current state of the optimization scheduler.
         """
         self.current_state["request_state"] = "response received"
-        self.current_state["last_response_timestamp"] = datetime.now(time_zone).isoformat()
+        self.current_state["last_response_timestamp"] = datetime.now(
+            time_zone
+        ).isoformat()
 
     def __set_state_next_run(self, next_run_time):
         """
@@ -606,11 +613,14 @@ def change_control_state():
     if config_manager.config["inverter"]["type"] == "fronius_gen24":
         inverter_en = True
 
+    current_overall_state = base_control.get_current_overall_state_number()
+    current_overall_state_text = base_control.get_current_overall_state()
+
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
         logger.debug("[Main] Overall state changed recently")
         # MODE_CHARGE_FROM_GRID
-        if base_control.get_current_overall_state() == 0:
+        if current_overall_state == 0:
             # get the current ac charge demand and set it to the inverter according
             # to the max dynamic charge power of the battery based on SOC
             tgt_charge_power = min(
@@ -621,59 +631,58 @@ def change_control_state():
                 inverter_interface.set_mode_force_charge(tgt_charge_power)
             logger.info(
                 "[Main] Inverter mode set to %s with %s W (_____|||||_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
                 tgt_charge_power,
             )
         # MODE_AVOID_DISCHARGE
-        elif base_control.get_current_overall_state() == 1:
+        elif current_overall_state == 1:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-----_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
             )
         # MODE_DISCHARGE_ALLOWED
-        elif base_control.get_current_overall_state() == 2:
+        elif current_overall_state == 2:
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+++++_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                current_overall_state_text,
             )
         # MODE_AVOID_DISCHARGE_EVCC_FAST
-        elif base_control.get_current_overall_state() == 3:
+        elif current_overall_state == 3:
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
             logger.info(
-                "[Main] Inverter mode set to %s (_____-+-+-_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                "[Main] Inverter mode set to %s (_____+---+_____)",
+                current_overall_state_text,
             )
-        elif base_control.get_current_overall_state() == 4:
+        # MODE_DISCHARGE_ALLOWED_EVCC_PV
+        elif current_overall_state == 4:
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
-                "[Main] Inverter mode set to %s (_____-+-+-_____)",
-                base_control.get_state_mapping().get(
-                    base_control.get_current_overall_state(), "unknown state"
-                ),
+                "[Main] Inverter mode set to %s (_____-+++-_____)",
+                current_overall_state_text,
             )
-        elif base_control.get_current_overall_state() < 0:
+        # MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
+        elif current_overall_state == 5:
+            if inverter_en:
+                inverter_interface.set_mode_allow_discharge()
+            logger.info(
+                "[Main] Inverter mode set to %s (_____+-+-+_____)",
+                current_overall_state_text,
+            )
+        elif current_overall_state < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
     # Log the current state if no recent changes were made
-    current_state = base_control.get_current_overall_state()
+
     logger.info(
         "[Main] Overall state not changed recently"
         + " - remaining in current state: %s  (_____OOOOO_____)",
-        base_control.get_state_mapping().get(current_state, "unknown state"),
+        current_overall_state_text,
     )
     return False
 
@@ -738,8 +747,8 @@ def get_controls():
     current_discharge_allowed = base_control.get_current_discharge_allowed()
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
-    current_inverter_mode = base_control.get_current_overall_state(False)
-    current_inverter_mode_num = base_control.get_current_overall_state()
+    current_inverter_mode = base_control.get_current_overall_state()
+    current_inverter_mode_num = base_control.get_current_overall_state_number()
 
     response_data = {
         "current_states": {
@@ -755,13 +764,16 @@ def get_controls():
         },
         "battery": {
             "soc": current_battery_soc,
-            "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),    
+            "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
         },
         "state": optimization_scheduler.get_current_state(),
         "eos_connect_version": __version__,
         "timestamp": datetime.now(time_zone).isoformat(),
+        "api_version": "0.0.1",
     }
-    return Response(json.dumps(response_data, indent=4), content_type="application/json")
+    return Response(
+        json.dumps(response_data, indent=4), content_type="application/json"
+    )
 
 
 if __name__ == "__main__":

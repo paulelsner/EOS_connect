@@ -16,6 +16,7 @@ MODE_AVOID_DISCHARGE = 1
 MODE_DISCHARGE_ALLOWED = 2
 MODE_AVOID_DISCHARGE_EVCC_FAST = 3
 MODE_DISCHARGE_ALLOWED_EVCC_PV = 4
+MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV = 5
 
 state_mapping = {
     0: "MODE CHARGE FROM GRID",
@@ -23,6 +24,7 @@ state_mapping = {
     2: "MODE DISCHARGE ALLOWED",
     3: "MODE AVOID DISCHARGE EVCC FAST",
     4: "MODE DISCHARGE ALLOWED EVCC PV",
+    5: "MODE DISCHARGE ALLOWED EVCC MIN+PV",
 }
 
 
@@ -218,6 +220,19 @@ class BaseControl:
             logger.info(
                 "[BASE_CTRL] EVCC charging state is active,"
                 + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_PV"
+            )
+            
+        # override overall state if EVCC charging state is active and
+        # in mode pv charge and discharge is allowed
+        if (
+            new_state == MODE_DISCHARGE_ALLOWED
+            and self.current_evcc_charging_state
+            and self.current_evcc_charging_mode == "minpv"
+        ):
+            new_state = MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
+            logger.info(
+                "[BASE_CTRL] EVCC charging state is active,"
+                + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV"
             )
 
         if new_state != self.current_overall_state or grid_charge_value_changed:

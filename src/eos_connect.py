@@ -654,7 +654,7 @@ def change_control_state():
             if inverter_en:
                 inverter_interface.set_mode_avoid_discharge()
             logger.info(
-                "[Main] Inverter mode set to %s (_____-+-+-_____)",
+                "[Main] Inverter mode set to %s (_____+---+_____)",
                 current_overall_state_text,
             )
         # MODE_DISCHARGE_ALLOWED_EVCC_PV
@@ -662,7 +662,15 @@ def change_control_state():
             if inverter_en:
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
-                "[Main] Inverter mode set to %s (_____-+-+-_____)",
+                "[Main] Inverter mode set to %s (_____-+++-_____)",
+                current_overall_state_text,
+            )
+        # MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
+        elif current_overall_state == 5:
+            if inverter_en:
+                inverter_interface.set_mode_allow_discharge()
+            logger.info(
+                "[Main] Inverter mode set to %s (_____+-+-+_____)",
                 current_overall_state_text,
             )
         elif current_overall_state < 0:

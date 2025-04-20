@@ -19,6 +19,7 @@ MODE_DISCHARGE_ALLOWED_EVCC_PV = 4
 MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV = 5
 
 state_mapping = {
+    -1: "MODE Startup",
     0: "MODE CHARGE FROM GRID",
     1: "MODE AVOID DISCHARGE",
     2: "MODE DISCHARGE ALLOWED",
@@ -40,11 +41,11 @@ class BaseControl:
         self.current_ac_charge_demand = 0
         self.last_ac_charge_demand = 0
         self.current_dc_charge_demand = 0
-        self.current_discharge_allowed = 1
+        self.current_discharge_allowed = -1
         self.current_evcc_charging_state = False
         self.current_evcc_charging_mode = False
         # startup with None to force a writing to the inverter
-        self.current_overall_state = None
+        self.current_overall_state = -1
         self.current_battery_soc = 0
         self.time_zone = timezone
         self.config = config
@@ -189,8 +190,10 @@ class BaseControl:
             new_state = MODE_CHARGE_FROM_GRID
         elif self.current_discharge_allowed > 0:
             new_state = MODE_DISCHARGE_ALLOWED
-        else:
+        elif self.current_discharge_allowed == 0:
             new_state = MODE_AVOID_DISCHARGE
+        else:
+            new_state = -1
         # check if the grid charge demand has changed
         grid_charge_value_changed = (
             self.current_ac_charge_demand != self.last_ac_charge_demand
@@ -221,7 +224,7 @@ class BaseControl:
                 "[BASE_CTRL] EVCC charging state is active,"
                 + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_PV"
             )
-            
+
         # override overall state if EVCC charging state is active and
         # in mode pv charge and discharge is allowed
         if (

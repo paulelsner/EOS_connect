@@ -404,7 +404,8 @@ class OptimizationScheduler:
         self.current_state = {
             "request_state": None,
             "last_request_timestamp": None,
-            "last_response_timestamp": None,
+            # initialize with startup time stamp to avoid confusion in gui
+            "last_response_timestamp": datetime.now(time_zone).isoformat(),
             "next_run": None,
         }
         self._update_thread = None

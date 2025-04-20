@@ -276,8 +276,9 @@
             chartInstance.data.datasets[3].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map(value => (value * max_charge_power_w / 1000).toFixed(3));
             chartInstance.data.datasets[4].data = data_response["result"]["akku_soc_pro_stunde"];
             chartInstance.data.datasets[5].data = data_response["result"]["Kosten_Euro_pro_Stunde"];
-            chartInstance.data.datasets[6].data = data_response["result"]["Electricity_price"].map(value => value * 1000);
-            chartInstance.data.datasets[7].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));
+            chartInstance.data.datasets[6].data = data_response["result"]["Einnahmen_Euro_pro_Stunde"];
+            chartInstance.data.datasets[7].data = data_response["result"]["Electricity_price"].map(value => value * 1000);
+            chartInstance.data.datasets[8].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));
             chartInstance.update('none'); // Update without animation
         }
 
@@ -293,7 +294,8 @@
                 { label: 'Grid', data: [], backgroundColor: 'rgba(128, 128, 128, 0.6)', borderColor: 'rgba(211, 211, 211, 0.7)', borderWidth: 1, stack: 'combined' },
                 { label: 'AC Charge', data: [], backgroundColor: 'darkred', borderColor: 'rgba(255, 0, 0, 0.2)', borderWidth: 1, stack: 'combined' },
                 { label: 'Akku SOC', data: [], type: 'line', backgroundColor: 'blue', borderColor: 'lightblue', borderWidth: 1, yAxisID: 'y2' },
-                { label: 'Summerized Expense Grid', data: [], type: 'line', borderColor: 'lightgreen', backgroundColor: 'green', borderWidth: 1, yAxisID: 'y1', stepped: true, hidden: true },
+                { label: 'Expense', data: [], type: 'line', borderColor: 'lightgreen', backgroundColor: 'green', borderWidth: 1, yAxisID: 'y1', stepped: true, hidden: true },
+                { label: 'Income', data: [], type: 'line', borderColor: 'lightyellow', backgroundColor: 'yellow', borderWidth: 1, yAxisID: 'y1', stepped: true, hidden: true },
                 { label: 'Electricity Price', data: [], type: 'line', borderColor: 'rgba(255, 69, 0, 0.8)', backgroundColor: 'rgba(255, 165, 0, 0.2)', borderWidth: 1, yAxisID: 'y1', stepped: true },
                 //{ label: 'Discharge Allowed', data: [], type: 'line', borderColor: 'lightblue', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 0, fill: true, yAxisID: 'y3' }
                 { label: 'Discharge Allowed', data: [], type: 'line', borderColor: 'rgba(144, 238, 144, 0.3)', backgroundColor: 'rgba(144, 238, 144, 0.05)', borderWidth: 1, fill: true, yAxisID: 'y3' }

@@ -100,7 +100,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Dynamic Max Charge Power</td>
+                            <td>Dynamic Max AC Charge Power</td>
                             <td colspan="2" style="text-align: right;" id="current_max_charge_dyn">--</td>
                         </tr>
                         <!-- <tr>
@@ -237,6 +237,14 @@
         let max_charge_power_w = 0;
         let inverter_mode_num = -1;
         let chartInstance = null;
+
+        const COLOR_MODE_CHARGE_FROM_GRID = "rgb(255, 144, 144)";
+        const COLOR_MODE_AVOID_DISCHARGE = "lightgray";
+        const COLOR_MODE_DISCHARGE_ALLOWED = "lightgreen";
+        const COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST = "#3399FF";
+        const COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV = "lightgreen";
+        const COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV = "darkorange";
+
 
         function isMobile() {
             return window.innerWidth <= 768;
@@ -403,17 +411,18 @@
             //2: "MODE_DISCHARGE_ALLOWED",
             //3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
             //4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
+            //5: "MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV",
 
             const iconElement = document.getElementById('current_header_right');
             iconElement.innerHTML = ""; // Clear previous content
 
             const icons = [
-                { icon: "fa-plug-circle-bolt", color: "darkred", title: "Charge from grid" },
-                { icon: "fa-lock", color: "lightgray", title: "Avoid discharge" },
-                { icon: "fa-battery-half", color: "lightgreen", title: "Discharge allowed" },
-                { icon: "fa-charging-station", color: "#3399FF", title: "Avoid discharge due to e-car fast charge" },
-                { icon: "fa-charging-station", color: "lightgreen", title: "Discharge allowed during e-car charging in pv mode" },
-                { icon: "fa-charging-station", color: "rgb(255, 144, 144)", title: "Discharge allowed during e-car charging in min+pv mode" }
+                { icon: "fa-plug-circle-bolt", color: COLOR_MODE_CHARGE_FROM_GRID, title: "Charge from grid" },
+                { icon: "fa-lock", color: COLOR_MODE_AVOID_DISCHARGE, title: "Avoid discharge" },
+                { icon: "fa-battery-half", color: COLOR_MODE_DISCHARGE_ALLOWED, title: "Discharge allowed" },
+                { icon: "fa-charging-station", color: COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST, title: "Avoid discharge due to e-car fast charge" },
+                { icon: "fa-charging-station", color: COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV, title: "Discharge allowed during e-car charging in pv mode" },
+                { icon: "fa-charging-station", color: COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV, title: "Discharge allowed during e-car charging in min+pv mode" }
             ];
             const { icon, color, title } = icons[inverter_mode_num] || {};
             iconElement.innerHTML = `<i class="fa-solid ${icon}"></i>`;
@@ -447,12 +456,19 @@
             let evcc_mode = data_controls["evcc"]["charging_mode"];
             if (evcc_mode === "off") {
                 document.getElementById('evcc_mode').innerText = "Off";
+                document.getElementById('evcc_mode').style.color = "white";
             } else if (evcc_mode === "pv") {
                 document.getElementById('evcc_mode').innerText = "PV";
+                document.getElementById('evcc_mode').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
+                document.getElementById('evcc_state').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
             } else if (evcc_mode === "minpv") {
                 document.getElementById('evcc_mode').innerText = "Min+PV";
+                document.getElementById('evcc_mode').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
+                document.getElementById('evcc_state').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
             } else if (evcc_mode === "now") {
                 document.getElementById('evcc_mode').innerText = "Fast charge";
+                document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
             } else {
                 document.getElementById('evcc_mode').innerText = "N/A";
             }
@@ -460,7 +476,6 @@
             let evcc_state = data_controls["evcc"]["charging_state"];
             if (evcc_state) {
                 document.getElementById('evcc_state').innerText = "charging";
-                document.getElementById('evcc_state').style.color = "red";
             } else {
                 document.getElementById('evcc_state').innerText = "not charging";
                 document.getElementById('evcc_state').style.color = "white";
@@ -482,7 +497,9 @@
             var discharge_allowed = data_response["discharge_allowed"];
             var ac_charge = data_response["ac_charge"];
             // for testing
-            //ac_charge = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.78,0,0.96,0,0.5,0,0,0,0,0,0,0];
+            //discharge_allowed = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0];
+            //ac_charge = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
             ac_charge = ac_charge.map((value, index) => value * max_charge_power_w);
             var priceData = data_response["result"]["Electricity_price"];
             var expenseData = data_response["result"]["Kosten_Euro_pro_Stunde"];
@@ -521,7 +538,7 @@
                 const buttonDiv = document.createElement('div');
                 buttonDiv.style.border = "1px solid #ccc";
                 buttonDiv.style.borderRadius = "5px";
-                //buttonDiv.style.padding = "0 10px";
+                buttonDiv.style.borderColor = "darkgray";
                 buttonDiv.style.width = "50px";
                 buttonDiv.style.display = "inline-block";
                 buttonDiv.style.textAlign = "center";
@@ -530,30 +547,31 @@
                     // override first hour - if eos connect overriding eos
                     if (inverter_mode_num === 3) { // MODE_AVOID_DISCHARGE_EVCC_FAST
                         //buttonDiv.style.backgroundColor = "#3399FF";
-                        buttonDiv.style.color = "#3399FF";
+                        buttonDiv.style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
                         buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-lock'></i> ";
                     } else if (inverter_mode_num === 4) { // MODE_DISCHARGE_ALLOWED_EVCC_PV
                         //buttonDiv.style.backgroundColor = "#3399FF";
-                        buttonDiv.style.color = "lightgreen";
+                        buttonDiv.style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
                         buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-battery-half'></i> ";
                     } else if (inverter_mode_num === 5) { //MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
                         //buttonDiv.style.backgroundColor = "rgb(255, 144, 144)";
-                        buttonDiv.style.color = "rgb(255, 144, 144)";
+                        buttonDiv.style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
                         buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-battery-half'></i> ";
                     }
                 } else if (discharge_allowed[(index + currentHour)] === 1) {
-                    buttonDiv.style.backgroundColor = "grey";
-                    buttonDiv.style.color = "lightgreen";
+                    //buttonDiv.style.backgroundColor = "grey";
+                    buttonDiv.style.color = COLOR_MODE_DISCHARGE_ALLOWED;
                     buttonDiv.innerHTML = "<i class='fa-solid fa-battery-half'></i>";
                 } else if (ac_charge[(index + currentHour)]) {
-                    buttonDiv.style.backgroundColor = "darkred";
+                    //buttonDiv.style.backgroundColor = color_bat_grid_charging;
+                    buttonDiv.style.color = COLOR_MODE_CHARGE_FROM_GRID;
                     let acChargeValue = ac_charge[(index + currentHour)] === 0 ? "" : (ac_charge[(index + currentHour)] / 1000).toFixed(1) + '<span style="font-size: xx-small;"> kWh<span>';
                     buttonDiv.innerHTML = "<i class='fa-solid fa-plug-circle-bolt'></i> " + acChargeValue;
                     buttonDiv.style.padding = "0 10px";
                     buttonDiv.style.width = "";
                 } else {
-                    buttonDiv.style.backgroundColor = "";
-                    buttonDiv.style.color = "lightgray";
+                    //buttonDiv.style.backgroundColor = "";
+                    buttonDiv.style.color = COLOR_MODE_AVOID_DISCHARGE;
                     buttonDiv.innerHTML = "<i class='fa-solid fa-lock'></i>";
                 }
 

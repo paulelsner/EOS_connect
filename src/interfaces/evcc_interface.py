@@ -93,6 +93,9 @@ class EvccInterface:
         """
         Starts the background thread to periodically update the charging state.
         """
+        if self.url == "http://yourEVCCserver:7070":
+            logger.warning("[EVCC] Update service not started. URL is not set.")
+            return
         if self._update_thread is None or not self._update_thread.is_alive():
             self._stop_event.clear()
             self._update_thread = threading.Thread(
@@ -133,7 +136,7 @@ class EvccInterface:
         """
         Fetches the EVCC state from the API and returns the charging state.
         """
-        data = self.fetch_evcc_state_via_api()
+        data = self.__fetch_evcc_state_via_api()
         if not data or not isinstance(data.get("result", {}).get("loadpoints"), list):
             logger.error("[EVCC] Invalid or missing loadpoints in the response.")
             return None
@@ -172,7 +175,7 @@ class EvccInterface:
 
         return charging_state, charging_mode
 
-    def fetch_evcc_state_via_api(self):
+    def __fetch_evcc_state_via_api(self):
         """
         Fetches the state of the EVCC (Electric Vehicle Charging Controller) via its API.
 

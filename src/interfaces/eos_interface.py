@@ -149,7 +149,9 @@ class EosInterface:
             logger.error("[EOS] OPTIMIZE Request timed out after %s seconds", timeout)
             return {"error": "Request timed out - trying again with next run"}
         except requests.exceptions.RequestException as e:
-            logger.error("[EOS] OPTIMIZE Request failed: %s - response: %s", e, response)
+            logger.error(
+                "[EOS] OPTIMIZE Request failed: %s - response: %s", e, response
+            )
             return {"error": str(e)}
 
     def examine_response_to_control_data(self, optimized_response_in):
@@ -347,7 +349,6 @@ class EosInterface:
         """
         try:
             response = requests.get(self.base_url + "/v1/health", timeout=10)
-            # response = requests.get(self.base_url + "/v1/config", timeout=10)
             response.raise_for_status()
             eos_version = response.json().get("status")
             if eos_version == "alive":
@@ -365,8 +366,21 @@ class EosInterface:
                     "[EOS] HTTP error occurred while getting EOS version: %s", e
                 )
             return None
+        except requests.exceptions.ConnectTimeout:
+            logger.error(
+                "[EOS] Failed to get EOS version - Server not reachable:"+
+                " Connection to %s timed out",
+                self.base_url,
+            )
+            return "Server not reachable"
+        except requests.exceptions.ConnectionError as e:
+            logger.error(
+                "[EOS] Failed to get EOS version - Server not reachable: Connection error: %s",
+                e,
+            )
+            return "Server not reachable"
         except requests.exceptions.RequestException as e:
-            logger.error("[EOS] Failed to get EOS version: %s", e)
+            logger.error("[EOS] Failed to get EOS version - Error: %s", e)
             return None
         except json.JSONDecodeError as e:
             logger.error("[EOS] Failed to decode EOS version response: %s", e)

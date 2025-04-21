@@ -50,7 +50,7 @@ class ConfigManager:
                 ),
                 "eos": CommentedMap(
                     {
-                        "server": "192.168.1.94",  # Default EOS server address
+                        "server": "192.168.100.100",  # Default EOS server address
                         "port": 8503,  # Default port for EOS server
                         "timeout": 180,  # Default timeout for EOS optimize request
                     }

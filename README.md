@@ -111,7 +111,7 @@ The dashbaord of **EOS connect** is available at `http://localhost:8081`.
 
 With the first start of **EOS connect** a default `config.yaml` will be generated in the `\src` folder. For full documentation for the different entries go to [CONFIG_README](src/CONFIG_README.md)
 
-With the default config and a valid EOS server IP/DNS name **EOS connect** should be running out of the box.
+*Note: With the default config and a valid EOS server IP/DNS name entry ('eos -> server') - **EOS connect** should be running out of the box with some static defaults as a start point for a step-by-step commissioning.*
 
 ## Useful Information
 

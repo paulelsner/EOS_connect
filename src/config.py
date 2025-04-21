@@ -42,7 +42,7 @@ class ConfigManager:
                 "load": CommentedMap(
                     {
                         "source": "default",  # data source for load power
-                        "url": "http://<ip>:8080", # URL for openhab or homeassistant
+                        "url": "http://homeassistant:8123",  # URL for openhab or homeassistant
                         "load_sensor": "Load_Power",  # item / entity for load power data
                         "car_charge_load_sensor": "Wallbox_Power",  # item / entity wallbox power
                         "access_token": "abc123",  # access token for homeassistant
@@ -59,14 +59,14 @@ class ConfigManager:
                     {
                         "source": "default",
                         "token": "tibberBearerToken",  # token for electricity price
-                        "feed_in_price": 0.0, # feed in price for the grid
+                        "feed_in_price": 0.0,  # feed in price for the grid
                         "negative_price_switch": False,  # switch for negative price
                     }
                 ),
                 "battery": CommentedMap(
                     {
                         "source": "default",  # data source for battery soc
-                        "url": "http://<ip>:8080", # URL for openhab or homeassistant
+                        "url": "http://homeassistant:8123",  # URL for openhab or homeassistant
                         "soc_sensor": "battery_SOC",  # item / entity for battery SOC data
                         "access_token": "abc123",  # access token for homeassistant
                         "capacity_wh": 11059,
@@ -80,14 +80,14 @@ class ConfigManager:
                 "pv_forecast": [
                     CommentedMap(
                         {
-                            "name": "<user defined config>",  # Placeholder for user-defined 
+                            "name": "myPvInstallation1",  # Placeholder for user-defined
                             # configuration name
                             "lat": 47.5,  # Latitude for PV forecast @ Akkudoktor API
                             "lon": 8.5,  # Longitude for PV forecast @ Akkudoktor API
                             "azimuth": 90.0,  # Azimuth for PV forecast @ Akkudoktor API
                             "tilt": 30.0,  # Tilt for PV forecast @ Akkudoktor API
                             "power": 4600,  # Power of PV system in Wp
-                            "powerInverter": 5000,  # Inverter Power 
+                            "powerInverter": 5000,  # Inverter Power
                             "inverterEfficiency": 0.9,  # Inverter Efficiency for
                             # PV forecast @ Akkudoktor API
                             "horizont": "10,20,10,15",  # Horizont to calculate shading
@@ -96,21 +96,20 @@ class ConfigManager:
                 ],
                 "inverter": CommentedMap(
                     {
-                        "type": "fronius_gen24",
+                        "type": "default",
                         "address": "192.168.1.12",
                         "user": "customer",
                         "password": "abc123",
                         "max_grid_charge_rate": 5000,
                         "max_pv_charge_rate": 5000,
-                        "max_bat_discharge_rate": 5000
+                        "max_bat_discharge_rate": 5000,
                     }
                 ),
                 "evcc": CommentedMap(
                     {
-                        "url": "http://<ip>:7070",  # URL for EVCC server
+                        "url": "http://yourEVCCserver:7070",  # URL for EVCC server
                     }
                 ),
-
                 "refresh_time": 3,  # Default refresh time in minutes
                 "time_zone": "Europe/Berlin",  # Add default time zone
                 "eos_connect_web_port": 8081,  # Default port for EOS connect server
@@ -119,160 +118,174 @@ class ConfigManager:
         )
         # load configuration
         config.yaml_set_comment_before_after_key("load", before="Load configuration")
-        config["load"].yaml_set_comment_before_after_key(
-            "source", before="Data source for load power - openhab, homeassistant, default"
+        config["load"].yaml_add_eol_comment(
+            "Data source for load power - openhab, homeassistant,"+
+            " default (using a static load profile)",
+            "source",
         )
-        config["load"].yaml_set_comment_before_after_key(
-            "url", before="URL for openhab or homeassistant"
+        config["load"].yaml_add_eol_comment(
+            "URL for openhab or homeassistant"+
+            " (e.g. http://openhab:7070 or http://homeassistant:8123)",
+            "url",
         )
-        config["load"].yaml_set_comment_before_after_key(
-            "load_sensor", before="item / entity for load power data"
+        config["load"].yaml_add_eol_comment(
+            "item / entity for load power data in watts", "load_sensor"
         )
-        config["load"].yaml_set_comment_before_after_key(
-            "car_charge_load_sensor", before="item / entity for wallbox power data"
+        config["load"].yaml_add_eol_comment(
+            "item / entity for wallbox power data in watts or kilowatts",
+            "car_charge_load_sensor",
         )
-        config["load"].yaml_set_comment_before_after_key(
-            "access_token", before="access token for homeassistant (optional)"
+        config["load"].yaml_add_eol_comment(
+            "access token for homeassistant (optional)", "access_token"
         )
         # eos configuration
         config.yaml_set_comment_before_after_key(
             "eos", before="EOS server configuration"
         )
-        config["eos"].yaml_set_comment_before_after_key(
-            "server", before="EOS server address"
+        config["eos"].yaml_add_eol_comment("EOS server address", "server")
+        config["eos"].yaml_add_eol_comment(
+            "port for EOS server - default: 8503", "port"
         )
-        config["eos"].yaml_set_comment_before_after_key(
-            "port", before="port for EOS server - default: 8503"
-        )
-        config["eos"].yaml_set_comment_before_after_key(
-            "timeout", before="timeout for EOS optimize request in seconds - default: 180"
+        config["eos"].yaml_add_eol_comment(
+            "timeout for EOS optimize request in seconds - default: 180", "timeout"
         )
         # price configuration
         config.yaml_set_comment_before_after_key(
             "price", before="Electricity price configuration"
         )
-        config["price"].yaml_set_comment_before_after_key(
-            "source", before="data source for electricity price tibber, default (akkudoktor)"
+        config["price"].yaml_add_eol_comment(
+            "data source for electricity price tibber, default (default uses akkudoktor)",
+            "source",
         )
-        config["price"].yaml_set_comment_before_after_key(
-            "token", before="Token for electricity price"
+        config["price"].yaml_add_eol_comment("Token for electricity price", "token")
+        config["price"].yaml_add_eol_comment(
+            "feed in price for the grid in €/kWh", "feed_in_price"
         )
-        config["price"].yaml_set_comment_before_after_key(
-            "feed_in_price", before="feed in price for the grid"
-        )
-        config["price"].yaml_set_comment_before_after_key(
-            "negative_price_switch", before="switch for no payment if negative stock price"
+        config["price"].yaml_add_eol_comment(
+            "switch for no payment if negative stock price is given",
+            "negative_price_switch",
         )
         # battery configuration
-        config.yaml_set_comment_before_after_key("battery", before="battery configuration")
-        config["battery"].yaml_set_comment_before_after_key(
-            "source", before="Data source for battery soc - openhab, homeassistant, default"
+        config.yaml_set_comment_before_after_key(
+            "battery", before="battery configuration"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "url", before="URL for openhab or homeassistant"
+        config["battery"].yaml_add_eol_comment(
+            "Data source for battery soc - openhab, homeassistant, default", "source"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "soc_sensor", before="item / entity for battery SOC data"
+        config["battery"].yaml_add_eol_comment(
+            "URL for openhab or homeassistant"+
+            " (e.g. http://openhab:7070 or http://homeassistant:8123)",
+            "url",
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "access_token", before="access token for homeassistant (optional)"
+        config["battery"].yaml_add_eol_comment(
+            "item / entity for battery SOC data in [0..1]", "soc_sensor"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "capacity_wh", before="battery cpaacity in Wh"
+        config["battery"].yaml_add_eol_comment(
+            "access token for homeassistant (optional)", "access_token"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "charge_efficiency", before="efficiency for charging the battery"
+        config["battery"].yaml_add_eol_comment("battery capacity in Wh", "capacity_wh")
+        config["battery"].yaml_add_eol_comment(
+            "efficiency for charging the battery in [0..1]", "charge_efficiency"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "discharge_efficiency", before="efficiency for discharging the battery"
+        config["battery"].yaml_add_eol_comment(
+            "efficiency for discharging the battery in [0..1]", "discharge_efficiency"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "max_charge_power_w", before="max charging power in W"
+        config["battery"].yaml_add_eol_comment(
+            "max charging power in W", "max_charge_power_w"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "min_soc_percentage", before="URL for battery soc"
+        config["battery"].yaml_add_eol_comment(
+            "URL for battery soc in %", "min_soc_percentage"
         )
-        config["battery"].yaml_set_comment_before_after_key(
-            "max_soc_percentage", before="URL for battery soc"
+        config["battery"].yaml_add_eol_comment(
+            "URL for battery soc in %", "max_soc_percentage"
         )
         # pv forecast configuration
         config.yaml_set_comment_before_after_key(
-            "pv_forecast", before="List of PV forecast configurations."+
-            " Add multiple entries as needed."
+            "pv_forecast",
+            before="List of PV forecast configurations."
+            + " Add multiple entries as needed.\nSee Akkudoktor API "
+            + "(https://api.akkudoktor.net/#/pv%20generation%20calculation/getForecast) "
+            + "for more details.",
         )
         for index, pv_config in enumerate(config["pv_forecast"]):
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "lat", before="Latitude for PV forecast @ Akkudoktor API"
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "User-defined identifier for the PV installation,"
+                + " have to be unique if you use more installations",
+                "name",
             )
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "lon", before="Longitude for PV forecast @ Akkudoktor API"
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Latitude for PV forecast @ Akkudoktor API", "lat"
             )
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "azimuth", before="Azimuth for PV forecast @ Akkudoktor API"
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Longitude for PV forecast @ Akkudoktor API", "lon"
             )
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "tilt", before="Tilt for PV forecast @ Akkudoktor API"
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Azimuth for PV forecast @ Akkudoktor API", "azimuth"
             )
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "power", before="Power for PV forecast @ Akkudoktor API"
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Tilt for PV forecast @ Akkudoktor API", "tilt"
             )
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "powerInverter", before="Power Inverter for PV forecast @ Akkudoktor API"
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Power for PV forecast @ Akkudoktor API", "power"
             )
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "inverterEfficiency", before="Inverter Efficiency for PV forecast @ Akkudoktor API"
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Power Inverter for PV forecast @ Akkudoktor API", "powerInverter"
             )
-            config["pv_forecast"][index].yaml_set_comment_before_after_key(
-            "horizont", before="Horizont to calculate shading up to 360 values to describe" +
-            " shading situation for your PV."
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Inverter Efficiency for PV forecast @ Akkudoktor API",
+                "inverterEfficiency",
+            )
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Horizont to calculate shading up to 360 values"+
+                " to describe shading situation for your PV.",
+                "horizont",
             )
         # inverter configuration
         config.yaml_set_comment_before_after_key(
             "inverter", before="Inverter configuration"
         )
-        config["inverter"].yaml_set_comment_before_after_key(
-            "type", before="Type of inverter - fronius_gen24, fronius_solar_api"
+        config["inverter"].yaml_add_eol_comment(
+            "Type of inverter - fronius_gen24, default (default will disable inverter control -"+
+            " only displaying the target state) - preset: default",
+            "type",
         )
-        config["inverter"].yaml_set_comment_before_after_key(
-            "address", before="Address of the inverter"
+        config["inverter"].yaml_add_eol_comment("Address of the inverter", "address")
+        config["inverter"].yaml_add_eol_comment("Username for the inverter", "user")
+        config["inverter"].yaml_add_eol_comment("Password for the inverter", "password")
+        config["inverter"].yaml_add_eol_comment(
+            "Max grid charge rate in W - default: 5000", "max_grid_charge_rate"
         )
-        config["inverter"].yaml_set_comment_before_after_key(
-            "user", before="Username for the inverter"
+        config["inverter"].yaml_add_eol_comment(
+            "Max PV charge rate in W - default: 5000", "max_pv_charge_rate"
         )
-        config["inverter"].yaml_set_comment_before_after_key(
-            "password", before="Password for the inverter"
-        )
-        config["inverter"].yaml_set_comment_before_after_key(
-            "max_grid_charge_rate", before="Max grid charge rate in W"
-        )
-        config["inverter"].yaml_set_comment_before_after_key(
-            "max_pv_charge_rate", before="Max PV charge rate in W"
-        )
-        config["inverter"].yaml_set_comment_before_after_key(
-            "max_bat_discharge_rate", before="Max battery discharge rate in W"
+        config["inverter"].yaml_add_eol_comment(
+            "Max battery discharge rate in W (currently not used) - default: 5000",
+            "max_bat_discharge_rate",
         )
         # evcc configuration
-        config.yaml_set_comment_before_after_key(
-            "evcc", before="EVCC configuration"
-        )
-        config["evcc"].yaml_set_comment_before_after_key(
-            "url", before="URL for EVCC server"
+        config.yaml_set_comment_before_after_key("evcc", before="EVCC configuration")
+        config["evcc"].yaml_add_eol_comment(
+            "URL for EVCC server - default: http://yourEVCCserver:7070",
+            "url",
         )
         # refresh time configuration
-        config.yaml_set_comment_before_after_key(
-            "refresh_time", before="Default refresh time in minutes"
+        config.yaml_add_eol_comment(
+            "Default refresh time of EOS connect in minutes - default: 3",
+            "refresh_time",
         )
         # time zone configuration
-        config.yaml_set_comment_before_after_key(
-            "time_zone", before="Default time zone"
+        config.yaml_add_eol_comment(
+            "Default time zone - default: Europe/Berlin", "time_zone"
         )
         # eos connect web port configuration
-        config.yaml_set_comment_before_after_key(
-            "eos_connect_web_port", before="Default port for EOS connect server"
+        config.yaml_add_eol_comment(
+            "Default port for EOS connect server - default: 8081",
+            "eos_connect_web_port",
         )
         # loglevel configuration
-        config.yaml_set_comment_before_after_key(
-            "log_level", before="Log level for the application : debug, info, warning, error"
+        config.yaml_add_eol_comment(
+            "Log level for the application : debug, info, warning, error - default: info",
+            "log_level",
         )
         return config
 
@@ -312,7 +325,11 @@ class ConfigManager:
 
         if eos_timeout_seconds > refresh_time_seconds:
             logger.error(
-            ("[Config] EOS timeout (%s s) is greater than the refresh time (%s s)."
-            " Please adjust the settings."), eos_timeout_seconds, refresh_time_seconds
+                (
+                    "[Config] EOS timeout (%s s) is greater than the refresh time (%s s)."
+                    " Please adjust the settings."
+                ),
+                eos_timeout_seconds,
+                refresh_time_seconds,
             )
             sys.exit(0)

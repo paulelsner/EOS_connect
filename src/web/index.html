@@ -10,37 +10,56 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.cdnfonts.com/css/seven-segment" rel="stylesheet">
-                
+
 </head>
 
 <body>
-    <div id="overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); color: white; display: flex; justify-content: center; align-items: center; z-index: 1000;">
-        <div style="text-align: center;">
+    <div id="overlay"
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); color: white; display: flex; justify-content: center; align-items: center; z-index: 1000;">
+        <div style="text-align: center; padding: 2em;">
             <p style="font-size: 2.5em; margin-bottom: 20px; text-align: center;">EOS connect</p>
-            <p id="waiting_text" style="font-size: 1.5em; margin-bottom: 20px; text-align: center;">Waiting for first data...</p>
-            <p id="waiting_error_text" style="font-size: 1.0em; font-weight: bold;  margin-bottom: 20px; text-align: center; color:rgb(241, 177, 0)">...</p>
-            <div style="border: 4px solid white; border-top: 4px solid gray; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto 0;"></div>
+            <p id="waiting_text" style="font-size: 1.5em; margin-bottom: 20px; text-align: center;">loading ...
+            </p>
+            <p id="waiting_error_text"
+                style="font-size: 1.0em; font-weight: bold;  margin-bottom: 20px; text-align: center; color:rgb(241, 177, 0)">
+                ...</p>
+            <div
+                style="border: 4px solid white; border-top: 4px solid gray; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto 0;">
+            </div>
         </div>
-        <div id="version_overlay" style="position: absolute; bottom: 10px; right: 10px; width: 100%; text-align: right; font-size: x-small;">EOS connect: v00.00.00</div>
+        <div id="version_overlay"
+            style="position: absolute; bottom: 10px; right: 10px; width: 100%; text-align: right; font-size: x-small;">
+            EOS connect version: v00.00.00</div>
     </div>
-    <div id="overlay_menu" style="position: fixed; top: 20%; left: 20%; width: 60%; height: 60%; background-color: rgba(0, 0, 0, 0.9); color: white; display: none; justify-content: center; align-items: center; z-index: 1100; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);">
+    <div id="overlay_menu" style="display: none;">
         <div style="text-align: center; padding: 20px;">
-            <p style="font-size: 2em; margin-bottom: 20px;" id="overlay_menu_head">Menu Overlay</p>
-            <p style="font-size: 1.2em; margin-bottom: 20px;" id="overlay_menu_content">This is a centered overlay menu.</p>
-            <button onclick="document.getElementById('overlay_menu').style.display='none'" style="padding: 10px 20px; font-size: 1em; background-color: #444; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+            <p style="font-size: 1.8em; margin-bottom: 20px;">EOS connect</p>
+            <hr>
+            <p style="font-size: 1.3em; margin-bottom: 20px;" id="overlay_menu_head">Menu Overlay</p>
+            <hr style="border-color: rgba(44, 44, 44, 0.596);">
+            <p style="font-size: 1.2em; margin-bottom: 20px;" id="overlay_menu_content">This is a centered overlay menu.
+            </p>
+            <button onclick="document.getElementById('overlay_menu').style.display='none'"
+                style="padding: 10px 20px; font-size: 1em; background-color: #444; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
         </div>
     </div>
     <style>
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
     <div class="container">
         <div class="top-boxes">
             <div class="top-box">
                 <div class="header"><i class="fa-solid fa-battery-full"></i> Current Controls
-                    <span class="header_notification" id="current_header_left" style="cursor: pointer;left: 10px;min-width: 20px;right: unset;">...</span>
+                    <span class="header_notification" id="current_header_left"
+                        style="cursor: pointer;left: 10px;min-width: 20px;right: unset;">...</span>
                     <span class="header_notification" id="current_header_right" style="min-width: 20px;">...</span>
                 </div>
                 <div class="content">
@@ -83,7 +102,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Dynamic Max Charge Power</td>
+                            <td>Dynamic Max AC Charge Power</td>
                             <td colspan="2" style="text-align: right;" id="current_max_charge_dyn">--</td>
                         </tr>
                         <!-- <tr>
@@ -126,8 +145,9 @@
                     <span class="header_notification" id="evcc_mode" style="left: 10px;right: unset;">...</span>
                     <span class="header_notification" id="evcc_state">...</span>
                 </div>
-                <div class="content">
-                    <table style="width: 100%; text-align: left;padding-top: 10px;">
+                <div class="content" style="text-align: center;">
+                    <i>detail view - not implemented yet</i>
+                    <!-- <table style="width: 100%; text-align: left;padding-top: 10px;">
                         <tr>
                             <th style="text-align: left;"></th>
                             <th style="text-align: center;"></th>
@@ -162,14 +182,18 @@
                             <td style="text-align: left;"> </td>
                             <td class="valueChange" style="text-align: right;" id="current_load_price"> </td>
                         </tr>
-                    </table>
+                    </table> -->
                 </div>
             </div>
         </div>
         <div class="bottom-boxes">
             <div class="left-box">
-                <div class="header"><i class="fa-solid fa-chart-column"></i> Energy Optimization
-                    <span class="header_notification" id="timestamp_next_run" style="left: 10px;right: unset;">00:00:00</span>
+                <div class="header"><i class="fa-solid fa-chart-column"></i> Optimization
+                    <span class="header_notification" id="timestamp_next_run"
+                        style="left: 10px;right: unset;">00:00:00</span>
+                    <span class="header_notification" id="mobileview_rotate" style="right: 5.8em; background-color: inherit;" title="Rotate your device to landscape for a better view">
+                        <i class="fa-solid fa-mobile-screen-button"></i> <i class="fa-solid fa-rotate"></i>
+                    </span>
                     <span class="header_notification" id="timestamp_last_run">00:00:00</span>
                 </div>
                 <div class="content">
@@ -177,13 +201,15 @@
                 </div>
             </div>
             <div class="right-box">
-                <div class="header"><i class="fa-solid fa-calendar-days"></i><span id="load_schedule_header"> Schedule next 24 hours</span></div>
+                <div class="header"><i class="fa-solid fa-calendar-days"></i><span id="load_schedule_header"> Schedule
+                        next 24 hours</span></div>
                 <div class="content">
                     <div id="discharge_scheduler" class="table">
                         <div class="table-header">
                             <div class="table-row">
                                 <div class="table-cell">time</div>
-                                <div class="table-cell">Control<br><i style="font-size: smaller;"></i>target state</i></div>
+                                <div class="table-cell">Control<br><i style="font-size: smaller;"></i>target state</i>
+                                </div>
                                 <div class="table-cell">Price<br><i style="font-size: smaller;">ct/kWh</i></div>
                                 <div class="table-cell">Expense<br><i style="font-size: smaller;">€</i></div>
                                 <div class="table-cell">Income<br><i style="font-size: smaller;">€</i></div>
@@ -217,7 +243,15 @@
         let max_charge_power_w = 0;
         let inverter_mode_num = -1;
         let chartInstance = null;
-        
+
+        const COLOR_MODE_CHARGE_FROM_GRID = "rgb(255, 144, 144)";
+        const COLOR_MODE_AVOID_DISCHARGE = "lightgray";
+        const COLOR_MODE_DISCHARGE_ALLOWED = "lightgreen";
+        const COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST = "#3399FF";
+        const COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV = "lightgreen";
+        const COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV = "darkorange";
+
+
         function isMobile() {
             return window.innerWidth <= 768;
         }
@@ -228,12 +262,12 @@
                 if (!chartInstance.options.scales.y.ticks.font)
                     chartInstance.options.scales.y.ticks.font = {};
                 chartInstance.options.scales.y.ticks.font.size = isMobile() ? 8 : 12; // Adjust font size based on screen size
-                
+
                 if (!chartInstance.options.scales.y1.ticks.font)
                     chartInstance.options.scales.y1.ticks.font = {};
-                    chartInstance.options.scales.y1.ticks.font.size = isMobile() ? 8 : 12; // Adjust font size based on screen size
+                chartInstance.options.scales.y1.ticks.font.size = isMobile() ? 8 : 12; // Adjust font size based on screen size
                 if (!chartInstance.options.scales.y2.ticks.font)
-                    chartInstance.options.scales.y2.ticks.font = {};                
+                    chartInstance.options.scales.y2.ticks.font = {};
                 chartInstance.options.scales.y2.ticks.font.size = isMobile() ? 8 : 12; // Adjust font size based on screen size
                 if (!chartInstance.options.scales.x.ticks.font)
                     chartInstance.options.scales.x.ticks.font = {};
@@ -241,7 +275,7 @@
                 chartInstance.options.scales.y.title.display = !isMobile();
                 chartInstance.options.scales.y1.title.display = !isMobile();
                 chartInstance.options.scales.y2.title.display = !isMobile();
-                
+
                 chartInstance.update();
             }
         }
@@ -265,52 +299,54 @@
 
         function updateChart(data_request, data_response) {
             const currentHour = new Date().getHours();
-        
+
             chartInstance.data.labels = Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length }, (_, i) => `${(currentHour + i) % 24}:00`);
             chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"].map(value => (value / 1000).toFixed(3));
             chartInstance.data.datasets[1].data = data_request["ems"]["pv_prognose_wh"].slice(currentHour).concat(data_request["ems"]["pv_prognose_wh"].slice(24, 48)).map(value => (value / 1000).toFixed(3));
             chartInstance.data.datasets[2].data = data_response["result"]["Netzbezug_Wh_pro_Stunde"].map((value, index) => {
-            const acChargeValue = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map(value => value * max_charge_power_w);
-            return ((value - acChargeValue[index]) / 1000).toFixed(3);
+                const acChargeValue = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map(value => value * max_charge_power_w);
+                return ((value - acChargeValue[index]) / 1000).toFixed(3);
             });
             chartInstance.data.datasets[3].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map(value => (value * max_charge_power_w / 1000).toFixed(3));
             chartInstance.data.datasets[4].data = data_response["result"]["akku_soc_pro_stunde"];
             chartInstance.data.datasets[5].data = data_response["result"]["Kosten_Euro_pro_Stunde"];
-            chartInstance.data.datasets[6].data = data_response["result"]["Electricity_price"].map(value => value * 1000);
-            chartInstance.data.datasets[7].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));
+            chartInstance.data.datasets[6].data = data_response["result"]["Einnahmen_Euro_pro_Stunde"];
+            chartInstance.data.datasets[7].data = data_response["result"]["Electricity_price"].map(value => value * 1000);
+            chartInstance.data.datasets[8].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));
             chartInstance.update('none'); // Update without animation
         }
 
         function createChart(data_request, data_response) {
             const ctx = document.getElementById('energyChart').getContext('2d');
             chartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: [],
-                datasets: [
-                { label: 'Load', data: [], backgroundColor: 'rgba(75, 192, 192, 0.2)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 },
-                { label: 'PV forecast', data: [], backgroundColor: '#FFA500', borderColor: '#FF991C', borderWidth: 1, stack: 'combined' },
-                { label: 'Grid', data: [], backgroundColor: 'rgba(128, 128, 128, 0.6)', borderColor: 'rgba(211, 211, 211, 0.7)', borderWidth: 1, stack: 'combined' },
-                { label: 'AC Charge', data: [], backgroundColor: 'darkred', borderColor: 'rgba(255, 0, 0, 0.2)', borderWidth: 1, stack: 'combined' },
-                { label: 'Akku SOC', data: [], type: 'line', backgroundColor: 'blue', borderColor: 'lightblue', borderWidth: 1, yAxisID: 'y2' },
-                { label: 'Summerized Expense Grid', data: [], type: 'line', borderColor: 'lightgreen', backgroundColor: 'green', borderWidth: 1, yAxisID: 'y1', stepped: true, hidden: true },
-                { label: 'Electricity Price', data: [], type: 'line', borderColor: 'rgba(255, 69, 0, 0.8)', backgroundColor: 'rgba(255, 165, 0, 0.2)', borderWidth: 1, yAxisID: 'y1', stepped: true },
-                //{ label: 'Discharge Allowed', data: [], type: 'line', borderColor: 'lightblue', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 0, fill: true, yAxisID: 'y3' }
-                { label: 'Discharge Allowed', data: [], type: 'line', borderColor: 'rgba(144, 238, 144, 0.3)', backgroundColor: 'rgba(144, 238, 144, 0.05)', borderWidth: 1, fill: true, yAxisID: 'y3' }
-                ]
-            },
-            options: {
-                scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'Energy (kWh)', color: 'lightgray' }, grid: { color: 'rgb(54, 54, 54)' }, ticks: { color: 'lightgray' } },
-                y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Price (€)', color: 'lightgray' }, grid: { drawOnChartArea: false }, ticks: { color: 'lightgray', callback: value => value.toFixed(2) } },
-                y2: { beginAtZero: true, position: 'right', title: { display: true, text: 'Akku SOC (%)', color: 'darkgray' }, grid: { drawOnChartArea: false }, ticks: { color: 'darkgray', callback: value => value.toFixed(0) } },
-                y3: { beginAtZero: true, position: 'right', display: false, title: { display: true, text: 'AC Charge', color: 'darkgray' }, grid: { drawOnChartArea: false }, ticks: { color: 'darkgray', callback: value => value.toFixed(2) } },
-                x: { grid: { color: 'rgb(54, 54, 54)' }, ticks: { color: 'lightgray', font: { size: 10 } } }
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Load', data: [], backgroundColor: 'rgba(75, 192, 192, 0.2)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 },
+                        { label: 'PV forecast', data: [], backgroundColor: '#FFA500', borderColor: '#FF991C', borderWidth: 1, stack: 'combined' },
+                        { label: 'Grid', data: [], backgroundColor: 'rgba(128, 128, 128, 0.6)', borderColor: 'rgba(211, 211, 211, 0.7)', borderWidth: 1, stack: 'combined' },
+                        { label: 'AC Charge', data: [], backgroundColor: 'darkred', borderColor: 'rgba(255, 0, 0, 0.2)', borderWidth: 1, stack: 'combined' },
+                        { label: 'Akku SOC', data: [], type: 'line', backgroundColor: 'blue', borderColor: 'lightblue', borderWidth: 1, yAxisID: 'y2' },
+                        { label: 'Expense', data: [], type: 'line', borderColor: 'lightgreen', backgroundColor: 'green', borderWidth: 1, yAxisID: 'y1', stepped: true, hidden: true },
+                        { label: 'Income', data: [], type: 'line', borderColor: 'lightyellow', backgroundColor: 'yellow', borderWidth: 1, yAxisID: 'y1', stepped: true, hidden: true },
+                        { label: 'Electricity Price', data: [], type: 'line', borderColor: 'rgba(255, 69, 0, 0.8)', backgroundColor: 'rgba(255, 165, 0, 0.2)', borderWidth: 1, yAxisID: 'y1', stepped: true },
+                        //{ label: 'Discharge Allowed', data: [], type: 'line', borderColor: 'lightblue', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 0, fill: true, yAxisID: 'y3' }
+                        { label: 'Discharge Allowed', data: [], type: 'line', borderColor: 'rgba(144, 238, 144, 0.3)', backgroundColor: 'rgba(144, 238, 144, 0.05)', borderWidth: 1, fill: true, yAxisID: 'y3' }
+                    ]
                 },
-                plugins: {
-                legend: { display: !isMobile(), labels: { color: 'lightgray' } }
-                },
-            }
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Energy (kWh)', color: 'lightgray' }, grid: { color: 'rgb(54, 54, 54)' }, ticks: { color: 'lightgray' } },
+                        y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Price (€)', color: 'lightgray' }, grid: { drawOnChartArea: false }, ticks: { color: 'lightgray', callback: value => value.toFixed(2) } },
+                        y2: { beginAtZero: true, position: 'right', title: { display: true, text: 'Akku SOC (%)', color: 'darkgray' }, grid: { drawOnChartArea: false }, ticks: { color: 'darkgray', callback: value => value.toFixed(0) } },
+                        y3: { beginAtZero: true, position: 'right', display: false, title: { display: true, text: 'AC Charge', color: 'darkgray' }, grid: { drawOnChartArea: false }, ticks: { color: 'darkgray', callback: value => value.toFixed(2) } },
+                        x: { grid: { color: 'rgb(54, 54, 54)' }, ticks: { color: 'lightgray', font: { size: 10 } } }
+                    },
+                    plugins: {
+                        legend: { display: !isMobile(), labels: { color: 'lightgray' } }
+                    },
+                }
             });
             updateChart(data_request, data_response); // Feed the content immediately after creation
         }
@@ -332,7 +368,7 @@
             } else {
                 document.getElementById('next_charge_avg_price').innerText = "-- ct/kWh";
             }
-            
+
             var next_charge_amount = 0;
             var foundFirst = false;
             data_response["ac_charge"].slice(currentHour).forEach((value) => {
@@ -381,17 +417,18 @@
             //2: "MODE_DISCHARGE_ALLOWED",
             //3: "MODE_AVOID_DISCHARGE_EVCC_FAST",
             //4: "MODE_DISCHARGE_ALLOWED_EVCC_PV",
-            
+            //5: "MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV",
+
             const iconElement = document.getElementById('current_header_right');
             iconElement.innerHTML = ""; // Clear previous content
-            
+
             const icons = [
-                { icon: "fa-plug-circle-bolt", color: "darkred", title: "Charge from grid" },
-                { icon: "fa-lock", color: "lightgray", title: "Avoid discharge" },
-                { icon: "fa-battery-half", color: "lightgreen", title: "Discharge allowed" },
-                { icon: "fa-charging-station", color: "#3399FF", title: "Avoid discharge due to e-car fast charge" },
-                { icon: "fa-charging-station", color: "lightgreen", title: "Discharge allowed during e-car charging in pv mode" },
-                { icon: "fa-charging-station", color: "rgb(255, 144, 144)", title: "Discharge allowed during e-car charging in min+pv mode" }
+                { icon: "fa-plug-circle-bolt", color: COLOR_MODE_CHARGE_FROM_GRID, title: "Charge from grid" },
+                { icon: "fa-lock", color: COLOR_MODE_AVOID_DISCHARGE, title: "Avoid discharge" },
+                { icon: "fa-battery-half", color: COLOR_MODE_DISCHARGE_ALLOWED, title: "Discharge allowed" },
+                { icon: "fa-charging-station", color: COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST, title: "Avoid discharge due to e-car fast charge" },
+                { icon: "fa-charging-station", color: COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV, title: "Discharge allowed during e-car charging in pv mode" },
+                { icon: "fa-charging-station", color: COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV, title: "Discharge allowed during e-car charging in min+pv mode" }
             ];
             const { icon, color, title } = icons[inverter_mode_num] || {};
             iconElement.innerHTML = `<i class="fa-solid ${icon}"></i>`;
@@ -411,46 +448,61 @@
             let time_to_next_run = Math.floor((timestamp_next_run - new Date()) / 1000);
             let minutes = Math.floor(Math.abs(time_to_next_run) / 60); // Correct calculation for minutes
             let seconds = Math.abs(time_to_next_run % 60);
-            if(time_to_next_run < 0) {
+            if (time_to_next_run < 0) {
                 document.getElementById('timestamp_next_run').style.color = "lightgreen";
                 // add alt text to the time field
                 document.getElementById('timestamp_next_run').title = "current optimization running for " + minutes.toString().padStart(2, '0') + " min and " + seconds.toString().padStart(2, '0') + " sec";
             } else {
                 document.getElementById('timestamp_next_run').style.color = "orange";
                 document.getElementById('timestamp_next_run').title = "next optimization run in " + minutes.toString().padStart(2, '0') + " min and " + seconds.toString().padStart(2, '0') + " sec";
-            }            
+            }
             document.getElementById('timestamp_next_run').innerText = minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0') + " min";
 
             // car charging - current states of EVCC
             let evcc_mode = data_controls["evcc"]["charging_mode"];
-            if(evcc_mode === "off") {
+            if (evcc_mode === "off") {
                 document.getElementById('evcc_mode').innerText = "Off";
-            } else if(evcc_mode === "pv") {
-                document.getElementById('evcc_mode').innerText = "PV"; 
-            } else if(evcc_mode === "minpv") {
+                document.getElementById('evcc_mode').style.color = "white";
+            } else if (evcc_mode === "pv") {
+                document.getElementById('evcc_mode').innerText = "PV";
+                document.getElementById('evcc_mode').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
+                document.getElementById('evcc_state').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
+            } else if (evcc_mode === "minpv") {
                 document.getElementById('evcc_mode').innerText = "Min+PV";
-            } else if(evcc_mode === "now") {
+                document.getElementById('evcc_mode').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
+                document.getElementById('evcc_state').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
+            } else if (evcc_mode === "now") {
                 document.getElementById('evcc_mode').innerText = "Fast charge";
+                document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
             } else {
                 document.getElementById('evcc_mode').innerText = "N/A";
             }
 
             let evcc_state = data_controls["evcc"]["charging_state"];
-            if(evcc_state) {
+            if (evcc_state) {
                 document.getElementById('evcc_state').innerText = "charging";
-                document.getElementById('evcc_state').style.color = "red";
             } else {
                 document.getElementById('evcc_state').innerText = "not charging";
                 document.getElementById('evcc_state').style.color = "white";
             }
-            
+
             // display current eos connect version
-            document.getElementById('version_overlay').innerText = "EOS connect: " + data_controls["eos_connect_version"];
-            
+            document.getElementById('version_overlay').innerText = "EOS connect version: " + data_controls["eos_connect_version"];
+
             document.getElementById('current_header_left').innerHTML = '<i class="fa-solid fa-circle-info"></i>'; // + " " + data_controls["eos_connect_version"];
             document.getElementById('current_header_left').title = "EOS connect version: " + data_controls["eos_connect_version"];
             document.getElementById('current_header_left').addEventListener('click', function () {
-                overlayMenu("EOS connect version", data_controls["eos_connect_version"]);
+                overlayMenu(
+                    "version",
+                    '<i style="font-size: smaller;">currently installed:</i><br><br>' + data_controls["eos_connect_version"] + "<br><br>" + 
+                    "<hr style='border-color: rgba(44, 44, 44, 0.596);'>" +
+                    '<div style="font-size: 2em;">' +
+                        '<a href="https://github.com/ohAnd/EOS_connect" target="_blank" style="padding-right: 20px; color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-brands fa-square-github"></i></a>' +
+                        '<a href="https://github.com/ohAnd/ha_addons/blob/master/eos_connect/CHANGELOG.md" target="_blank"  style="padding-right: 20px; color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-solid fa-file-invoice"></i></a>' +
+                        '<a href="https://github.com/ohAnd/EOS_connect/issues" target="_blank"  style="color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-solid fa-bug"></i></a>' +                           
+                    "</div>"
+                );
             });
         }
 
@@ -460,7 +512,9 @@
             var discharge_allowed = data_response["discharge_allowed"];
             var ac_charge = data_response["ac_charge"];
             // for testing
-            //ac_charge = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.78,0,0.96,0,0.5,0,0,0,0,0,0,0];
+            //discharge_allowed = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0];
+            //ac_charge = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
             ac_charge = ac_charge.map((value, index) => value * max_charge_power_w);
             var priceData = data_response["result"]["Electricity_price"];
             var expenseData = data_response["result"]["Kosten_Euro_pro_Stunde"];
@@ -499,7 +553,7 @@
                 const buttonDiv = document.createElement('div');
                 buttonDiv.style.border = "1px solid #ccc";
                 buttonDiv.style.borderRadius = "5px";
-                //buttonDiv.style.padding = "0 10px";
+                buttonDiv.style.borderColor = "darkgray";
                 buttonDiv.style.width = "50px";
                 buttonDiv.style.display = "inline-block";
                 buttonDiv.style.textAlign = "center";
@@ -508,30 +562,31 @@
                     // override first hour - if eos connect overriding eos
                     if (inverter_mode_num === 3) { // MODE_AVOID_DISCHARGE_EVCC_FAST
                         //buttonDiv.style.backgroundColor = "#3399FF";
-                        buttonDiv.style.color = "#3399FF";
+                        buttonDiv.style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
                         buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-lock'></i> ";
                     } else if (inverter_mode_num === 4) { // MODE_DISCHARGE_ALLOWED_EVCC_PV
                         //buttonDiv.style.backgroundColor = "#3399FF";
-                        buttonDiv.style.color = "lightgreen";
+                        buttonDiv.style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
                         buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-battery-half'></i> ";
                     } else if (inverter_mode_num === 5) { //MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
                         //buttonDiv.style.backgroundColor = "rgb(255, 144, 144)";
-                        buttonDiv.style.color = "rgb(255, 144, 144)";
+                        buttonDiv.style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
                         buttonDiv.innerHTML = " <i class='fa-solid fa-charging-station'></i> <i class='fa-solid fa-battery-half'></i> ";
                     }
                 } else if (discharge_allowed[(index + currentHour)] === 1) {
-                    buttonDiv.style.backgroundColor = "grey";
-                    buttonDiv.style.color = "lightgreen";
+                    //buttonDiv.style.backgroundColor = "grey";
+                    buttonDiv.style.color = COLOR_MODE_DISCHARGE_ALLOWED;
                     buttonDiv.innerHTML = "<i class='fa-solid fa-battery-half'></i>";
                 } else if (ac_charge[(index + currentHour)]) {
-                    buttonDiv.style.backgroundColor = "darkred";
+                    //buttonDiv.style.backgroundColor = color_bat_grid_charging;
+                    buttonDiv.style.color = COLOR_MODE_CHARGE_FROM_GRID;
                     let acChargeValue = ac_charge[(index + currentHour)] === 0 ? "" : (ac_charge[(index + currentHour)] / 1000).toFixed(1) + '<span style="font-size: xx-small;"> kWh<span>';
                     buttonDiv.innerHTML = "<i class='fa-solid fa-plug-circle-bolt'></i> " + acChargeValue;
                     buttonDiv.style.padding = "0 10px";
                     buttonDiv.style.width = "";
                 } else {
-                    buttonDiv.style.backgroundColor = "";
-                    buttonDiv.style.color = "lightgray";
+                    //buttonDiv.style.backgroundColor = "";
+                    buttonDiv.style.color = COLOR_MODE_AVOID_DISCHARGE;
                     buttonDiv.innerHTML = "<i class='fa-solid fa-lock'></i>";
                 }
 
@@ -562,15 +617,15 @@
         }
 
         function handlingErrorInResponse(data_response) {
-            
+
             if (!data_response || !data_response["result"] || !data_response["result"]["Last_Wh_pro_Stunde"] || data_response["result"]["Last_Wh_pro_Stunde"].length === 0) {
                 document.getElementById('overlay').style.display = 'flex';
-                if(data_response["error"]){
-                    if(data_response["error"] === "Request timed out"){
-                        document.getElementById('waiting_text').innerText = "No data available...";
+                if (data_response["error"]) {
+                    if (data_response["error"].includes("Request timed out")) {
+                        document.getElementById('waiting_text').innerText = "No processing possible - connection to EOS server timed out";
                         document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
-                    } 
-                    else if(data_response["error"].includes("422 Client Error: Unprocessable Entity")){
+                    }
+                    else if (data_response["error"].includes("422 Client Error: Unprocessable Entity")) {
                         document.getElementById('waiting_text').innerText = "Check your configuration! - EOS cannot process the request...";
                         document.getElementById('waiting_error_text').innerText = "Error: " + data_response["error"];
                     }
@@ -578,7 +633,7 @@
                         document.getElementById('waiting_text').innerText = "No data available...";
                         document.getElementById('waiting_error_text').innerText = "no detailed error information available - error message: " + data_response["error"];
                     }
-                } else if(data_response["status"]) {
+                } else if (data_response["status"]) {
                     document.getElementById('waiting_text').innerText = data_response["status"];
                     document.getElementById('waiting_error_text').innerText = data_response["message"];
                 }
@@ -612,23 +667,23 @@
             // max_charge_power_w according to optimize_request api version
             max_charge_power_w = data_request["pv_akku"] && data_request["pv_akku"].hasOwnProperty("max_ladeleistung_w") ? data_request["pv_akku"]["max_ladeleistung_w"] : data_request["pv_akku"] ? data_request["pv_akku"]["max_charge_power_w"] : 0;
             const data_response = await fetch_EOS_Connect_Data("optimize_response.json");
-            
+
             await showCurrentData();
-            
+
             // error handling
             if (handlingErrorInResponse(data_response)) {
                 return;
             }
-            
-            if (chartInstance){
-                updateChart(data_request,data_response);
+
+            if (chartInstance) {
+                updateChart(data_request, data_response);
                 document.getElementById('overlay').style.display = 'none';
             } else {
-                createChart(data_request,data_response);
+                createChart(data_request, data_response);
                 document.getElementById('overlay').style.display = 'none';
             }
-            
-            showSchedule(data_request,data_response);
+
+            showSchedule(data_request, data_response);
             setBatteryChargingData(data_response);
             updateLegendVisibility();
         }

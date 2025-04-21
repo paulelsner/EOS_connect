@@ -59,14 +59,14 @@ This project is in its early stages and is actively being developed and enhanced
 
 ### Base
 
-EOS Connect is a self-running system that periodically collects:
+**EOS Connect** is a self-running system that periodically collects:
 - Local energy consumption data.
 - PV solar forecasts for the next 48 hours.
 - Upcoming energy prices.
 
 Using this data, a request is sent to EOS, which creates a model predicting the energy needs based on different energy sources and loads (grid, battery, PV).
 
-EOS Connect waits for the response from EOS (e.g., ~2 min 15 sec for a full 48-hour prediction on a Raspberry Pi 5). After receiving the response, it is analyzed to extract the necessary values.
+**EOS Connect** waits for the response from EOS (e.g., ~2 min 15 sec for a full 48-hour prediction on a Raspberry Pi 5). After receiving the response, it is analyzed to extract the necessary values.
 
 Finally, the system sets up the inverter based on the following states:
 - `MODE_CHARGE_FROM_GRID` with a specific target charging power (based on your configuration).
@@ -103,11 +103,15 @@ Energy price forecasts are retrieved from the chosen source (TIBBER or AKKUDOKTO
 
 ## Webpage Example
 
+The dashbaord of **EOS connect** is available at `http://localhost:8081`.
+
 ![webpage screenshot](doc/screenshot.PNG)
 
 ## Configuration
 
-Configuration is described here [CONFIG_README](src/CONFIG_README.md)
+With the first start of **EOS connect** a default `config.yaml` will be generated in the `\src` folder. For full documentation for the different entries go to [CONFIG_README](src/CONFIG_README.md)
+
+*Note: With the default config and a valid EOS server IP/DNS name entry ('eos -> server') - **EOS connect** should be running out of the box with some static defaults as a start point for a step-by-step commissioning.*
 
 ## Useful Information
 

@@ -1,1 +1,1 @@
-__version__ = 'develop-v0.1.36'
+__version__ = 'snapshot-v0.1.8'

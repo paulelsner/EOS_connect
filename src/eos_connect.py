@@ -140,7 +140,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("url", ""),
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
-    config_manager.config.get("battery", {}).get("max_charge_power_w", ""),
+    config_manager.config.get("battery", {})
 )
 
 price_interface = PriceInterface(
@@ -301,7 +301,7 @@ def create_optimize_request():
                 "max_charge_power_w"
             ],
             "initial_soc_percentage": round(
-                battery_interface.battery_request_current_soc()
+                battery_interface.get_current_soc()
             ),
             "min_soc_percentage": config_manager.config["battery"][
                 "min_soc_percentage"
@@ -458,7 +458,7 @@ class OptimizationScheduler:
                 target=self._update_state_loop, daemon=True
             )
             self._update_thread.start()
-            logger.info("[BATTERY-IF] Update service started.")
+            logger.info("[OPTIMIZATION] Update service started.")
 
     def shutdown(self):
         """
@@ -764,6 +764,7 @@ def get_controls():
         },
         "battery": {
             "soc": current_battery_soc,
+            "usable_capacity": battery_interface.get_current_usable_capacity(),
             "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
         },
         "state": optimization_scheduler.get_current_state(),

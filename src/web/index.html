@@ -69,55 +69,35 @@
                             <th style="text-align: right;" id="control_overall"></th>
                         </tr>
                         <tr>
-                            <td colspan="3">
+                            <td colspan="2">
                                 <hr>
                             </td>
                         </tr>
                         <tr>
                             <td>AC Charge</td>
-                            <td colspan="2" style="text-align: right;" id="control_ac_charge">--</td>
+                            <td style="text-align: right;" id="control_ac_charge">--</td>
                         </tr>
                         <tr>
                             <td>DC Charge</td>
-                            <td colspan="2" style="text-align: right;" id="control_dc_charge">--</td>
+                            <td style="text-align: right;" id="control_dc_charge">--</td>
                         </tr>
                         <tr>
                             <td>Discharge Allowed</td>
-                            <td colspan="2" style="text-align: right;" id="control_discharge_allowed">--</td>
+                            <td style="text-align: right;" id="control_discharge_allowed">--</td>
                         </tr>
                     </table>
                 </div>
             </div>
             <div class="top-box">
-                <div class="header"><i class="fa-solid fa-battery-full"></i></i> Battery State</div>
-                <div class="content">
-                    <table style="width: 100%; text-align: left;padding-top: 10px;">
-                        <tr>
-                            <th style="text-align: left;">SOC</th>
-                            <th style="text-align: right;" id="battery_soc">-- %</th>
-                        </tr>
-                        <tr>
-                            <td colspan="3">
-                                <hr>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Dynamic Max AC Charge Power</td>
-                            <td colspan="2" style="text-align: right;" id="current_max_charge_dyn">--</td>
-                        </tr>
-                        <!-- <tr>
-                            <td>...</td>
-                            <td colspan="2" style="text-align: right;" id="last_charge_amount">--</td>
-                        </tr> -->
-                    </table>
+                <div class="header"><i id="battery_icon_main"></i> Battery State
+                    <span class="header_notification" id="battery_usable_capacity"
+                        style="cursor: pointer;left: 10px;min-width: 20px;right: unset;">...</span>
+                    <span class="header_notification" id="battery_soc" style="min-width: 20px;">...</span>
                 </div>
-            </div>
-            <div class="top-box">
-                <div class="header"><i class="fa-solid fa-battery-full"></i></i> Next Charge</div>
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
-                        <tr>
-                            <th style="text-align: left;">Planned Time</th>
+                        <tr id="next_charge_header">
+                            <th style="text-align: left;">Next AC Charge</th>
                             <th style="text-align: right;" id="next_charge_time">... next charge time</th>
                         </tr>
                         <tr>
@@ -125,23 +105,25 @@
                                 <hr>
                             </td>
                         </tr>
-                        <tr>
-                            <td>Avg Price</td>
+                        <tr id="next_charge_summary">
+                            <td>Needed Energy</td>
+                            <td colspan="2" style="text-align: right;"><span id="next_charge_amount">... kWh</span> /
+                                <span id="next_charge_sum_price">... €</span>
+                            </td>
+                        </tr>
+                        <tr id="next_charge_summary_2">
+                            <td>Avg AC Charging Price</td>
                             <td colspan="2" style="text-align: right;" id="next_charge_avg_price">... kWh</td>
                         </tr>
                         <tr>
-                            <td>Needed Energy</td>
-                            <td colspan="2" style="text-align: right;" id="next_charge_amount">... kWh</td>
-                        </tr>
-                        <tr>
-                            <td>Charging Price</td>
-                            <td colspan="2" style="text-align: right;" id="next_charge_sum_price">... €</td>
+                            <td><i>Dynamic Max AC Charge Power</i></td>
+                            <td colspan="2" style="text-align: right;" id="current_max_charge_dyn">--</td>
                         </tr>
                     </table>
                 </div>
             </div>
             <div class="top-box">
-                <div class="header"><i class="fa-solid fa-car-battery"></i> eCar Charging
+                <div class="header"><i class="fa-solid fa-charging-station"></i> eCar Charging
                     <span class="header_notification" id="evcc_mode" style="left: 10px;right: unset;">...</span>
                     <span class="header_notification" id="evcc_state">...</span>
                 </div>
@@ -185,13 +167,43 @@
                     </table> -->
                 </div>
             </div>
+            <div class="top-box">
+                <div class="header"><i class="fa-solid fa-chart-pie"></i> Statistics
+                    <span class="header_notification" id="statistics_header_left"
+                        style="cursor: pointer;left: 10px;min-width: 20px;right: unset;">...</span>
+                    <span class="header_notification" id="statistics_header_right" style="min-width: 20px;">...</span>
+                </div>
+                <div class="content">
+                    <table style="width: 100%; text-align: left;padding-top: 10px;">
+                        <tr>
+                            <th style="text-align: left;">Expense (rest of the day)</th>
+                            <th style="text-align: right;" id="expense_summary"> 0.00 €</th>
+                        </tr>
+                        <tr>
+                            <td colspan="3">
+                                <hr>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Income</td>
+                            <td colspan="2" style="text-align: right;" id="income_summary">0.00 €</td>
+                        </tr>
+                        <tr>
+                            <td>Feed In</td>
+                            <td colspan="2" style="text-align: right;" id="feed_in_summary">0.0 kWh</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
         </div>
         <div class="bottom-boxes">
             <div class="left-box">
                 <div class="header"><i class="fa-solid fa-chart-column"></i> Optimization
                     <span class="header_notification" id="timestamp_next_run"
                         style="left: 10px;right: unset;">00:00:00</span>
-                    <span class="header_notification" id="mobileview_rotate" style="right: 5.8em; background-color: inherit;" title="Rotate your device to landscape for a better view">
+                    <span class="header_notification" id="mobileview_rotate"
+                        style="right: 6.0em; background-color: inherit;"
+                        title="Rotate your device to landscape for a better view">
                         <i class="fa-solid fa-mobile-screen-button"></i> <i class="fa-solid fa-rotate"></i>
                     </span>
                     <span class="header_notification" id="timestamp_last_run">00:00:00</span>
@@ -291,6 +303,20 @@
             }
         }
 
+        function getBatteryIcon(soc_value) {
+            if (soc_value > 90) {
+                return '<i class="fa-solid fa-battery-full"></i>';
+            } else if (soc_value > 70) {
+                return '<i class="fa-solid fa-battery-three-quarters"></i>';
+            } else if (soc_value > 50) {
+                return '<i class="fa-solid fa-battery-half"></i>';
+            } else if (soc_value > 30) {
+                return '<i class="fa-solid fa-battery-quarter"></i>';
+            } else {
+                return '<i class="fa-solid fa-battery-empty"></i>';
+            }
+        }
+
         async function fetch_EOS_Connect_Data(filename) {
             const response = await fetch('json/' + filename + '?nocache=' + new Date().getTime());
             const data = await response.json();
@@ -352,8 +378,13 @@
         }
 
         function setBatteryChargingData(data_response) {
+            // planned charging
             var currentHour = new Date().getHours();
-            var next_charge_time = data_response["ac_charge"].slice(currentHour).findIndex((value) => value > 0);
+            price_data = data_response["result"]["Electricity_price"];
+            ac_charge = data_response["ac_charge"];
+            //ac_charge = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+            var next_charge_time = ac_charge.slice(currentHour).findIndex((value) => value > 0);
             if (next_charge_time !== -1) {
                 next_charge_time += currentHour;
                 var next_charge_time_hour = next_charge_time % 24;
@@ -361,38 +392,50 @@
             } else {
                 document.getElementById('next_charge_time').innerText = "--:--";
             }
-            // get the average price for the next charging
-            let next_charge_avg_price = (data_response["result"]["Electricity_price"][next_charge_time - currentHour] * 100000);
-            if (next_charge_time !== -1) {
-                document.getElementById('next_charge_avg_price').innerText = (next_charge_avg_price).toFixed(1) + " ct/kWh";
-            } else {
-                document.getElementById('next_charge_avg_price').innerText = "-- ct/kWh";
-            }
 
+            // calculate the average price for the next charging hours based on ac_charge
+            // and calculate the next charge amount
             var next_charge_amount = 0;
+            let total_price = 0;
+            let total_price_count = 0;
             var foundFirst = false;
-            data_response["ac_charge"].slice(currentHour).forEach((value) => {
+            for (let index = 0; index < ac_charge.slice(currentHour).length; index++) {
+                const value = ac_charge[currentHour + index];
+
                 if (value > 0) {
                     if (!foundFirst) {
                         foundFirst = true;
                     }
+                    let current_hour_amount = value * max_charge_power_w;
+                    let current_hour_price = price_data[index] * current_hour_amount; // Convert to ct/kWh
+                    total_price += current_hour_price;
+                    total_price_count += 1;
                     next_charge_amount += value * max_charge_power_w;
                 } else if (foundFirst) {
-                    return; // Stop adding once a 0 is encountered after the first finding
+                    break; // Stop the loop once a 0 is encountered after the first non-zero value
                 }
-            });
-            if (next_charge_amount === 0) {
-                document.getElementById('next_charge_amount').innerText = "-.- kWh";
-            } else {
-                document.getElementById('next_charge_amount').innerText = (next_charge_amount / 1000).toFixed(2) + " kWh";
             }
-            // next_charge_sum_price
-            var next_charge_sum_price = (next_charge_amount * next_charge_avg_price) / 1000;
 
-            if (next_charge_sum_price === 0) {
-                document.getElementById('next_charge_sum_price').innerText = "-.- €";
+            let next_charge_avg_price = total_price / next_charge_amount * 100000;
+
+            if (next_charge_amount === 0) {
+                //document.getElementById('next_charge_header').style.display = "none";
+                document.getElementById('next_charge_time').innerText = "not planned";
+                document.getElementById('next_charge_summary').style.display = "none";
+                document.getElementById('next_charge_summary_2').style.display = "none";
+
             } else {
-                document.getElementById('next_charge_sum_price').innerText = (next_charge_sum_price / 100).toFixed(2) + " €";
+                document.getElementById('next_charge_amount').innerText = (next_charge_amount / 1000).toFixed(1) + " kWh";
+                // next_charge_sum_price
+                document.getElementById('next_charge_sum_price').innerText = total_price.toFixed(2) + " €";
+
+                if (next_charge_time !== -1) {
+                    document.getElementById('next_charge_avg_price').innerText = (next_charge_avg_price).toFixed(1) + " ct/kWh";
+                }
+
+                document.getElementById('next_charge_header').style.display = "";
+                document.getElementById('next_charge_summary').style.display = "";
+                document.getElementById('next_charge_summary_2').style.display = "";
             }
         }
 
@@ -404,13 +447,18 @@
             //inverter_mode_num = 5; // for testing
 
             // base elements at current controls
-            document.getElementById('control_ac_charge').innerText = data_controls["current_states"]["current_ac_charge_demand"].toFixed(0) + " Wh";
-            document.getElementById('control_dc_charge').innerText = data_controls["current_states"]["current_dc_charge_demand"].toFixed(0) + " Wh";
+            document.getElementById('control_ac_charge').innerText = (data_controls["current_states"]["current_ac_charge_demand"] / 1000).toFixed(1) + " kW";
+            document.getElementById('control_dc_charge').innerText = (data_controls["current_states"]["current_dc_charge_demand"] / 1000).toFixed(1) + " kW";
             document.getElementById('control_discharge_allowed').innerText = (data_controls["current_states"]["current_discharge_allowed"] === true ? "Yes" : "No");
-            document.getElementById('control_overall').innerText = inverter_mode_text;
+            document.getElementById('control_overall').innerText = inverter_mode_text.replace("MODE ", "");
             document.getElementById('battery_soc').innerText = data_controls["battery"]["soc"] + " %";
-            document.getElementById('current_max_charge_dyn').innerText = data_controls["battery"]["max_charge_power_dyn"].toFixed(0) + " W";
-
+            // set battery icon
+            document.getElementById('battery_icon_main').innerHTML = getBatteryIcon(data_controls["battery"]["soc"]);
+            document.getElementById('current_max_charge_dyn').innerHTML = "<i>" + data_controls["battery"]["max_charge_power_dyn"].toFixed(0) + " W</i>";
+            // set battery usable energy
+            document.getElementById('battery_usable_capacity').innerHTML = '<i class="fa-solid fa-database"></i> ' + (data_controls["battery"]["usable_capacity"]/1000).toFixed(1) + ' <span style="font-size: 0.6em;">kWh</span>';
+            document.getElementById('battery_usable_capacity').title = "usable capacity: " + (data_controls["battery"]["usable_capacity"]/1000).toFixed(1) + " kWh";
+            
             // dependent on inverter mode show the icon
             //0: "MODE_CHARGE_FROM_GRID",
             //1: "MODE_AVOID_DISCHARGE",
@@ -495,15 +543,46 @@
             document.getElementById('current_header_left').addEventListener('click', function () {
                 overlayMenu(
                     "version",
-                    '<i style="font-size: smaller;">currently installed:</i><br><br>' + data_controls["eos_connect_version"] + "<br><br>" + 
+                    '<i style="font-size: smaller;">currently installed:</i><br><br>' + data_controls["eos_connect_version"] + "<br><br>" +
                     "<hr style='border-color: rgba(44, 44, 44, 0.596);'>" +
                     '<div style="font-size: 2em;">' +
-                        '<a href="https://github.com/ohAnd/EOS_connect" target="_blank" style="padding-right: 20px; color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-brands fa-square-github"></i></a>' +
-                        '<a href="https://github.com/ohAnd/ha_addons/blob/master/eos_connect/CHANGELOG.md" target="_blank"  style="padding-right: 20px; color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-solid fa-file-invoice"></i></a>' +
-                        '<a href="https://github.com/ohAnd/EOS_connect/issues" target="_blank"  style="color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-solid fa-bug"></i></a>' +                           
+                    '<a href="https://github.com/ohAnd/EOS_connect" target="_blank" style="padding-right: 20px; color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-brands fa-square-github"></i></a>' +
+                    '<a href="https://github.com/ohAnd/ha_addons/blob/master/eos_connect/CHANGELOG.md" target="_blank"  style="padding-right: 20px; color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-solid fa-file-invoice"></i></a>' +
+                    '<a href="https://github.com/ohAnd/EOS_connect/issues" target="_blank"  style="color: inherit; onmousedown="this.style.color=\'#551A8B\'" onmouseup="this.style.color=\'inherit\'""><i class="fa-solid fa-bug"></i></a>' +
                     "</div>"
                 );
             });
+        }
+
+        function showStatistics(data_request, data_response) {
+            // set the values for solar yield today and tomorrow
+            let yield_today = data_request["ems"]["pv_prognose_wh"].slice(0, 24).reduce((acc, value) => acc + value, 0) / 1000;
+            let yield_tomorrow = data_request["ems"]["pv_prognose_wh"].slice(24, 48).reduce((acc, value) => acc + value, 0) / 1000;
+            document.getElementById('statistics_header_left').innerHTML = '<i class="fa-solid fa-solar-panel"></i> ' + yield_today.toFixed(1) + ' <span style="font-size: 0.6em;">kWh</span>';
+            document.getElementById('statistics_header_left').title = "Solar yield for today";
+            document.getElementById('statistics_header_right').innerHTML =  + yield_tomorrow.toFixed(1) + ' <span style="font-size: 0.6em;">kWh</span>' + ' <i class="fa-solid fa-solar-panel"></i> ';
+            document.getElementById('statistics_header_right').title = "Solar yield for tomorrow";
+
+            // set expense and income for today and tomorrow
+            expense_data = data_response["result"]["Kosten_Euro_pro_Stunde"];
+            income_data = data_response["result"]["Einnahmen_Euro_pro_Stunde"];
+            feed_in_data = data_response["result"]["Netzeinspeisung_Wh_pro_Stunde"];
+            
+            let currentHour = new Date().getHours();
+            let expense_today = expense_data.slice(0, 24 - currentHour).reduce((acc, value) => acc + value, 0).toFixed(2);
+            document.getElementById('expense_summary').innerText = expense_today + " €";
+            document.getElementById('expense_summary').title = "Expense for the rest of the day";
+
+            // set income for rest of the day
+            let income_today = income_data.slice(0, 24 - currentHour).reduce((acc, value) => acc + value, 0).toFixed(2);
+            document.getElementById('income_summary').innerText = income_today + " €";
+            document.getElementById('income_summary').title = "Income for the rest of the day";
+
+            // set feed in for rest of the day
+            let feed_in_today = feed_in_data.slice(0, 24 - currentHour).reduce((acc, value) => acc + value, 0) / 1000;
+            document.getElementById('feed_in_summary').innerText = feed_in_today.toFixed(1) + " kWh";
+            document.getElementById('feed_in_summary').title = "Feed in for the rest of the day";
+                        
         }
 
         function showSchedule(data_request, data_response) {
@@ -683,6 +762,7 @@
                 document.getElementById('overlay').style.display = 'none';
             }
 
+            showStatistics(data_request, data_response);
             showSchedule(data_request, data_response);
             setBatteryChargingData(data_response);
             updateLegendVisibility();

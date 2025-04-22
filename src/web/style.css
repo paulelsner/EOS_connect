@@ -139,6 +139,10 @@ th {
         font-size: 1.5em;
     }
 
+    .top-box  > .content {
+        font-size: 1.2em;
+    }
+
     /* .left-box > .header {
         font-size: 1.3em;
     } */
@@ -154,8 +158,12 @@ th {
         height: auto;
     }
 
-    .right-box {
+    /* .right-box {
         font-size: smaller;
+    } */
+
+    .right-box > .content{
+        font-size: 1.2em;
     }
 
     #overlay_menu {

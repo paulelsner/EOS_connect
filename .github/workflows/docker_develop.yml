@@ -14,7 +14,8 @@ on:
   workflow_dispatch: # allows manual triggering of the workflow
 
 env:
-  VERSION_PREFIX: develop-v0.1.
+  VERSION_PREFIX: 0.1.
+  VERSION_SUFFIX: -develop
 
 jobs:
   publish_image:
@@ -27,7 +28,7 @@ jobs:
         run: git pull origin develop --rebase
 
       - name: Set version string
-        run: echo "VERSION=${{ env.VERSION_PREFIX }}${{ github.run_number }}" >> $GITHUB_ENV
+        run: echo "VERSION=${{ env.VERSION_PREFIX }}${{ github.run_number }}${{env.VERSION_SUFFIX}}" >> $GITHUB_ENV
 
       - name: Write version to file
         run: echo "__version__ = '${{ env.VERSION }}'" > src/version.py
@@ -78,7 +79,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Cleaning up old Docker images..."
-          ghcr_images=$(gh api -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | startswith("${{ env.VERSION_PREFIX }}")) | .id' | tail -n +4)
+            ghcr_images=$(gh api -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | endswith("${{ env.VERSION_SUFFIX }}")) | .id' | tail -n +4)
           for image_id in $ghcr_images; do
             gh api -X DELETE -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions/$image_id
           done

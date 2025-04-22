@@ -11,12 +11,12 @@ name: Main - build image and push
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  # pull_request:
+  #   branches: [ "main" ]
   workflow_dispatch: # allows manual triggering of the workflow
 
 env:
-  VERSION_PREFIX: snapshot-v0.1.
+  VERSION_PREFIX: 0.1.
 
 jobs:
   publish_image:
@@ -46,7 +46,7 @@ jobs:
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Build image
-        run: docker build -t ghcr.io/${{ env.owner }}/eos_connect:snapshot .
+        run: docker build -t ghcr.io/${{ env.owner }}/eos_connect:release .
 
       # Only upload the image artifact for pull_request events
       - name: Upload Docker image as artifact
@@ -61,18 +61,17 @@ jobs:
         if: github.event_name == 'push'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Tag image with snapshot version
+      - name: Tag image with release version
         if: github.event_name == 'push'
-        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:${{ env.VERSION }}
+        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:release ghcr.io/${{ env.owner }}/eos_connect:${{ env.VERSION }}
 
       - name: Tag image with latest
         if: github.event_name == 'push'
-        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:snapshot ghcr.io/${{ env.owner }}/eos_connect:latest
+        run: docker tag ghcr.io/${{ env.owner }}/eos_connect:release ghcr.io/${{ env.owner }}/eos_connect:latest
 
       - name: Push Docker image to GitHub Container Registry
         if: github.event_name == 'push'
         run: |
-          docker push ghcr.io/${{ env.owner }}/eos_connect:snapshot
           docker push ghcr.io/${{ env.owner }}/eos_connect:${{ env.VERSION }}
           docker push ghcr.io/${{ env.owner }}/eos_connect:latest
 
@@ -81,16 +80,16 @@ jobs:
 #      - name: Push image to Docker Hub
 #        run: docker push ${{ secrets.DOCKER_USERNAME }}/eos_connect:nightly
 
-  cleanup_old_develops:
-    needs: publish_image
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cleanup old Docker images
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Cleaning up old Docker images..."
-          ghcr_images=$(gh api -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | startswith("${{ env.VERSION_PREFIX }}")) | .id' | tail -n +4)
-          for image_id in $ghcr_images; do
-            gh api -X DELETE -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions/$image_id
-          done
+  # cleanup_old_develops:
+  #   needs: publish_image
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Cleanup old Docker images
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         echo "Cleaning up old Docker images..."
+  #         ghcr_images=$(gh api -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions | jq -r '.[] | select(.metadata.container.tags[] | startswith("${{ env.VERSION_PREFIX }}")) | .id' | tail -n +4)
+  #         for image_id in $ghcr_images; do
+  #           gh api -X DELETE -H "Authorization: token $GH_TOKEN" /user/packages/container/eos_connect/versions/$image_id
+  #         done

@@ -63,19 +63,21 @@ class BatteryInterface:
             Fetches the current SOC of the battery based on the configured source.
     """
 
-    def __init__(self, src, url, soc_sensor, access_token, max_charge_power_w):
+    def __init__(self, src, url, soc_sensor, access_token, battery_data):
         self.src = src
         self.url = url
         self.soc_sensor = soc_sensor
         self.access_token = access_token
-        self.max_charge_power_fix = max_charge_power_w
+        self.max_charge_power_fix = battery_data.get("max_charge_power_w", 0)
+        self.battery_data = battery_data
         self.current_soc = 0
+        self.current_usable_capacity = 0
         self.update_interval = 30
         self._update_thread = None
         self._stop_event = threading.Event()
         self.start_update_service()
 
-    def fetch_soc_data_from_openhab(self):
+    def __fetch_soc_data_from_openhab(self):
         """
         Fetches the State of Charge (SOC) data for the battery from the OpenHAB server.
 
@@ -115,7 +117,7 @@ class BatteryInterface:
             )
             return soc  # Default SOC value in case of request failure
 
-    def fetch_soc_data_from_homeassistant(self):
+    def __fetch_soc_data_from_homeassistant(self):
         """
         Fetches the state of charge (SOC) data from the Home Assistant API.
         This method sends a GET request to the Home Assistant API to retrieve the SOC
@@ -165,7 +167,7 @@ class BatteryInterface:
             )
             return soc  # Default SOC value in case of request failure
 
-    def battery_request_current_soc(self):
+    def __battery_request_current_soc(self):
         """
         Fetch the current state of charge (SOC) of the battery from OpenHAB.
         """
@@ -174,10 +176,10 @@ class BatteryInterface:
             logger.debug("[BATTERY-IF] source set to default with start SOC = 5%")
             return 5
         if self.src == "openhab":
-            self.current_soc = self.fetch_soc_data_from_openhab()
+            self.current_soc = self.__fetch_soc_data_from_openhab()
             return self.current_soc
         if self.src == "homeassistant":
-            self.current_soc = self.fetch_soc_data_from_homeassistant()
+            self.current_soc = self.__fetch_soc_data_from_homeassistant()
             return self.current_soc
         logger.error(
             "[BATTERY-IF] source currently not supported. Using default start SOC = 5%."
@@ -190,6 +192,12 @@ class BatteryInterface:
         """
         return self.current_soc
 
+    def get_current_usable_capacity(self):
+        """
+        Returns the current usable capacity of the battery.
+        """
+        return round(self.current_usable_capacity, 2)
+
     def get_max_charge_power_dyn(self, soc=None):
         """
         Calculates the maximum charge power of the battery depending on the SOC.
@@ -199,7 +207,7 @@ class BatteryInterface:
         - If SOC >= 95%, the maximum charge power is fixed at 500W.
 
         Args:
-            soc (float, optional): The state of charge to use for calculation. 
+            soc (float, optional): The state of charge to use for calculation.
                        If None, the current SOC is used.
 
         Returns:
@@ -243,7 +251,12 @@ class BatteryInterface:
         """
         while not self._stop_event.is_set():
             try:
-                self.battery_request_current_soc()
+                self.__battery_request_current_soc()
+                self.current_usable_capacity = (
+                    self.battery_data.get("capacity_wh", 0)
+                    * self.battery_data.get("discharge_efficiency",1.0)
+                    * (self.current_soc - self.battery_data.get("min_soc_percentage",0)) / 100
+                )
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 logger.error("[BATTERY-IF] Error while updating state: %s", e)
                 # Break the sleep interval into smaller chunks to allow immediate shutdown

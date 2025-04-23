@@ -140,7 +140,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("url", ""),
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
-    config_manager.config.get("battery", {})
+    config_manager.config.get("battery", {}),
 )
 
 price_interface = PriceInterface(
@@ -300,9 +300,7 @@ def create_optimize_request():
             "max_charge_power_w": config_manager.config["battery"][
                 "max_charge_power_w"
             ],
-            "initial_soc_percentage": round(
-                battery_interface.get_current_soc()
-            ),
+            "initial_soc_percentage": round(battery_interface.get_current_soc()),
             "min_soc_percentage": config_manager.config["battery"][
                 "min_soc_percentage"
             ],
@@ -761,6 +759,7 @@ def get_controls():
         "evcc": {
             "charging_state": base_control.get_current_evcc_charging_state(),
             "charging_mode": base_control.get_current_evcc_charging_mode(),
+            "current_session": evcc_interface.get_current_detail_data(),
         },
         "battery": {
             "soc": current_battery_soc,

@@ -1,5 +1,5 @@
 """
-fork from https://github.com/ohAnd/batcontrol/blob/main/src/batcontrol/inverter/fronius.py
+fork from https://github.com/muexxl/batcontrol/blob/main/src/batcontrol/inverter/fronius.py
 
 This module provides a class `FroniusWR` for handling Fronius GEN24 Inverters.
 It includes methods for interacting with the inverter's API, managing battery
@@ -75,6 +75,7 @@ class FroniusWR():
         self.nonce = 0
         self.user = config['user']
         self.password = config['password']
+        self.inverter_version = config['version']
         self.previous_battery_config = self.get_battery_config()
         self.previous_backup_power_config = None
         # default values
@@ -163,6 +164,8 @@ class FroniusWR():
     def get_battery_config(self):
         """ Get battery configuration from inverter and keep a backup."""
         path = '/config/batteries'
+        if self.inverter_version == '>=1.36.5-1':
+            path = '/api/config/batteries'
         response = self.send_request(path, auth=True)
         if not response:
             logger.error(
@@ -197,6 +200,8 @@ class FroniusWR():
             path = '/config/powerunit'
         else:
             path = '/config/setup/powerunit'
+        if self.inverter_version == '>=1.36.5-1':
+            path = '/api/config/powerunit'
 
         response = self.send_request(path, auth=True)
         if not response:
@@ -227,6 +232,8 @@ class FroniusWR():
                     f"Unable to restore settings. Parameter {key} is missing"
                 )
         path = '/config/batteries'
+        if self.inverter_version == '>=1.36.5-1':
+            path = '/api/config/batteries'
         payload = json.dumps(settings)
         logger.info(
             '[Inverter] Restoring previous battery configuration: %s ',
@@ -257,6 +264,8 @@ class FroniusWR():
         else:
             payload = '{"HYB_EVU_CHARGEFROMGRID": false}'
         path = '/config/batteries'
+        if self.inverter_version == '>=1.36.5-1':
+            path = '/api/config/batteries'
         response = self.send_request(
             path, method='POST', payload=payload, auth=True)
         response_dict = json.loads(response.text)
@@ -273,6 +282,8 @@ class FroniusWR():
         else:
             payload = '{"SolarAPIv1Enabled": false}'
         path = '/config/solar_api'
+        if self.inverter_version == '>=1.36.5-1':
+            path = '/api/config/solar_api'
         response = self.send_request(
             path, method='POST', payload=payload, auth=True)
         response_dict = json.loads(response.text)
@@ -285,6 +296,8 @@ class FroniusWR():
     def set_wr_parameters(self, minsoc, maxsoc, allow_grid_charging, grid_power):
         """set power at grid-connection point negative values for Feed-In"""
         path = '/config/batteries'
+        if self.inverter_version == '>=1.36.5-1':
+            path = '/api/config/batteries'
         if not isinstance(allow_grid_charging , bool):
             raise RuntimeError(
                 f'Expected type: bool actual type: {type(allow_grid_charging)}')
@@ -331,7 +344,10 @@ class FroniusWR():
 
     def get_time_of_use(self):
         """ Get time of use configuration from inverter and keep a backup."""
-        response = self.send_request('/config/timeofuse', auth=True)
+        if self.inverter_version == '>=1.36.5-1':
+            response = self.send_request('/api/config/timeofuse', auth=True)
+        else:
+            response = self.send_request('/config/timeofuse', auth=True)
         if not response:
             return None
 
@@ -454,9 +470,15 @@ class FroniusWR():
             'timeofuse': timeofuselist
         }
         payload = json.dumps(config)
-        response = self.send_request(
-            '/config/timeofuse', method='POST', payload=payload, auth=True
-            )
+        if self.inverter_version == '>=1.36.5-1':
+            response = self.send_request(
+                '/api/config/timeofuse', method='POST', payload=payload, auth=True
+                )
+        else:
+            response = self.send_request(
+                '/config/timeofuse', method='POST', payload=payload, auth=True
+                )
+        
         response_dict = json.loads(response.text)
         expected_write_successes = ['timeofuse']
         for expected_write_success in expected_write_successes:
@@ -684,6 +706,8 @@ class FroniusWR():
             settings['HYB_EM_POWER'] = power
 
         path = '/config/batteries'
+        if self.inverter_version == '>=1.36.5-1':
+            path = '/api/config/batteries'
         payload = json.dumps(settings)
         logger.info(
             '[Inverter] Setting EM mode %s , power %s',

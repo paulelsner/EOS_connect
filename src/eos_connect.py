@@ -97,6 +97,7 @@ if config_manager.config["inverter"]["type"] == "fronius_gen24":
         "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
         "user": config_manager.config["inverter"]["user"],
         "password": config_manager.config["inverter"]["password"],
+        "version": config_manager.config["inverter"]["version"],
     }
     inverter_interface = FroniusWR(inverter_config)
 else:

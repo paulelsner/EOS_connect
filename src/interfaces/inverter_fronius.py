@@ -571,7 +571,7 @@ class FroniusWR():
     def login(self):
         """Login to Fronius API"""
         logger.debug("[Inverter] Logging in")
-        path = '/commands/Login'
+        path = self.api_praefix + '/commands/Login'
         self.cnonce = "NaN"
         self.ncvalue_num = 1
         self.login_attempts = 0
@@ -603,7 +603,7 @@ class FroniusWR():
 
     def logout(self):
         """Logout from Fronius API"""
-        path = '/commands/Logout'
+        path = self.api_praefix + '/commands/Logout'
         response = self.send_request(path, auth=True)
         if not response:
             logger.warning('[Inverter] Logout failed. No response from server')

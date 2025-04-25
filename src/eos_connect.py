@@ -22,6 +22,7 @@ from interfaces.inverter_fronius import FroniusWR
 from interfaces.evcc_interface import EvccInterface
 from interfaces.eos_interface import EosInterface
 from interfaces.price_interface import PriceInterface
+from interfaces.mqtt_interface import MqttInterface
 
 EOS_TGT_DURATION = 48
 EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
@@ -119,6 +120,10 @@ def charging_state_callback(new_state):
     change_control_state()
 
 
+mqtt_interface = MqttInterface(
+    config_manager.config["mqtt"]
+)
+
 evcc_interface = EvccInterface(
     url=config_manager.config["evcc"]["url"],
     update_interval=10,
@@ -140,7 +145,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("url", ""),
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
-    config_manager.config.get("battery", {})
+    config_manager.config.get("battery", {}),
 )
 
 price_interface = PriceInterface(
@@ -300,9 +305,7 @@ def create_optimize_request():
             "max_charge_power_w": config_manager.config["battery"][
                 "max_charge_power_w"
             ],
-            "initial_soc_percentage": round(
-                battery_interface.get_current_soc()
-            ),
+            "initial_soc_percentage": round(battery_interface.get_current_soc()),
             "min_soc_percentage": config_manager.config["battery"][
                 "min_soc_percentage"
             ],
@@ -525,6 +528,13 @@ class OptimizationScheduler:
         ) as file:
             json.dump(json_optimize_input, file, indent=4)
 
+        mqtt_interface.update_publish_topics(
+        {
+            "optimization/state": {
+                "value": self.get_current_state()["request_state"]
+            }
+        }
+    )
         optimized_response = eos_interface.eos_set_optimize_request(
             json_optimize_input, config_manager.config["eos"]["timeout"]
         )
@@ -560,6 +570,14 @@ class OptimizationScheduler:
         sleeptime = (next_eval - loop_now).total_seconds()
         minutes, seconds = divmod(sleeptime, 60)
         self.__set_state_next_run(next_eval.astimezone(time_zone).isoformat())
+        mqtt_interface.update_publish_topics(
+            {
+                "optimization/last_run": {
+                    "value": self.get_current_state()["last_response_timestamp"]},
+                "optimization/next_run": {
+                    "value": self.get_current_state()["next_run"]},
+            }
+        )
         logger.info(
             "[Main] Next optimization at %s. Sleeping for %d min %.0f seconds\n",
             next_eval.strftime("%H:%M:%S"),
@@ -585,6 +603,19 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
     base_control.set_current_ac_charge_demand(ac_charge_demand_rel)
     base_control.set_current_dc_charge_demand(dc_charge_demand_rel)
     base_control.set_current_discharge_allowed(bool(discharge_allowed))
+    mqtt_interface.update_publish_topics(
+        {
+            "control/eos_ac_charge_demand": {
+                "value": base_control.get_current_ac_charge_demand()
+            },
+            "control/eos_dc_charge_demand": {
+                "value": base_control.get_current_dc_charge_demand()
+            },
+            "control/eos_discharge_allowed": {
+                "value": base_control.get_current_discharge_allowed()
+            }
+        }
+    )
     # set the current battery state of charge
     base_control.set_current_battery_soc(battery_interface.get_current_soc())
     # getting the current charging state from evcc
@@ -615,6 +646,23 @@ def change_control_state():
 
     current_overall_state = base_control.get_current_overall_state_number()
     current_overall_state_text = base_control.get_current_overall_state()
+
+    mqtt_interface.update_publish_topics(
+        {
+            "control/overall_state": {
+                "value": base_control.get_current_overall_state_number()
+                },
+            "optimization/state": {
+                "value": optimization_scheduler.get_current_state()["request_state"]
+            },
+            "control/override_remain_time": { "value": "01:00" },
+            "battery/soc": {"value": battery_interface.get_current_soc()},
+            "battery/remaining_energy": {
+                "value": battery_interface.get_current_usable_capacity()
+            },
+            "status": {"value": "online"},
+        }
+    )
 
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
@@ -761,6 +809,7 @@ def get_controls():
         "evcc": {
             "charging_state": base_control.get_current_evcc_charging_state(),
             "charging_mode": base_control.get_current_evcc_charging_mode(),
+            "current_session": evcc_interface.get_current_detail_data(),
         },
         "battery": {
             "soc": current_battery_soc,
@@ -799,6 +848,7 @@ if __name__ == "__main__":
             and inverter_interface is not None
         ):
             inverter_interface.shutdown()
+        mqtt_interface.shutdown()
         evcc_interface.shutdown()
         battery_interface.shutdown()
         logger.info("[Main] Server stopped")

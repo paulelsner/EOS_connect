@@ -175,6 +175,44 @@ pv_forecast:
 
 ---
 
+### **MQTT Configuration**
+
+The `mqtt` section allows you to configure the MQTT broker and Home Assistant MQTT Auto Discovery settings.
+
+#### **Parameters**
+
+- **`mqtt.enabled`**:  
+  Enable or disable MQTT functionality.  
+  - `true`: Enable MQTT.  
+  - `false`: Disable MQTT.  
+
+- **`mqtt.broker`**:  
+  The address of the MQTT broker (e.g., `localhost` or `192.168.1.10`).
+
+- **`mqtt.port`**:  
+  The port of the MQTT broker. Default: `1883`.
+
+- **`mqtt.user`**:  
+  The username for authenticating with the MQTT broker (optional).
+
+- **`mqtt.password`**:  
+  The password for authenticating with the MQTT broker (optional).
+
+- **`mqtt.tls`**:  
+  Enable or disable TLS for secure MQTT connections.  
+  - `true`: Use TLS for secure connections.  
+  - `false`: Do not use TLS.  
+
+- **`mqtt.ha_mqtt_auto_discovery`**:  
+  Enable or disable Home Assistant MQTT Auto Discovery.  
+  - `true`: Enable Auto Discovery.  
+  - `false`: Disable Auto Discovery.  
+
+- **`mqtt.ha_mqtt_auto_discovery_prefix`**:  
+  The prefix for Home Assistant MQTT Auto Discovery topics. Default: `homeassistant`.
+
+---
+
 ### **Other Configuration Settings**
 
 - **`refresh_time`**:  
@@ -253,6 +291,15 @@ inverter:
 # EVCC configuration
 evcc:
   url: http://yourEVCCserver:7070  # URL for EVCC server - default: http://yourEVCCserver:7070
+mqtt:
+  enabled: false # Enable MQTT - default: false
+  broker: localhost # URL for MQTT server - default: mqtt://yourMQTTserver
+  port: 1883 # Port for MQTT server - default: 1883
+  user: mqtt_user # Username for MQTT server - default: mqtt
+  password: mqtt_password # Password for MQTT server - default: mqtt
+  tls: false # Use TLS for MQTT server - default: false
+  ha_mqtt_auto_discovery: true # Enable Home Assistant MQTT auto discovery - default: true
+  ha_mqtt_auto_discovery_prefix: homeassistant # Prefix for Home Assistant MQTT auto discovery - default: homeassistant
 refresh_time: 3 # Default refresh time of EOS connect in minutes - default: 3
 time_zone: Europe/Berlin # Default time zone - default: Europe/Berlin
 eos_connect_web_port: 8081 # Default port for EOS connect server - default: 8081

@@ -72,7 +72,7 @@ class BaseControl:
 
     def get_current_ac_charge_demand(self):
         """
-        Returns the current AC charge demand.
+        Returns the current AC charge demand calculated based on maximum battery charge power.
         """
         return self.current_ac_charge_demand
 

@@ -123,6 +123,10 @@ th {
     display: none;
 }
 
+.valueChange {
+    transition: color 2s ease-out;
+}
+
 /* Media Queries for Smartphones */
 @media (max-width: 768px) {
     .top-boxes {

@@ -1,12 +1,12 @@
 """
 This module provides the `EvccInterface` class, which serves as an interface to interact
 with the Electric Vehicle Charging Controller (EVCC) API. The class enables periodic
-fetching of the charging state and charging mode, and triggers a callback when either
-state changes.
+fetching of the charging state, charging mode, and detailed vehicle data, and triggers
+a callback when either state or mode changes.
 
 Classes:
-    EvccInterface: A class to interact with the EVCC API, manage charging state and mode
-                   updates, and handle state change callbacks.
+    EvccInterface: A class to interact with the EVCC API, manage charging state, mode,
+                   and detailed data updates, and handle state change callbacks.
 
 Dependencies:
     - logging: For logging messages and errors.
@@ -18,7 +18,7 @@ Usage:
     Create an instance of the `EvccInterface` class by providing the EVCC API URL,
     an optional update interval, and a callback function to handle charging state or
     mode changes. The class will automatically start a background thread to periodically
-    fetch the charging state and mode from the API.
+    fetch the charging state, mode, and detailed data from the API.
 """
 
 import logging
@@ -36,7 +36,7 @@ class EvccInterface:
     (Electric Vehicle Charging Controller) API.
     It periodically fetches the charging state and mode, and triggers a callback when
     either the state or mode changes.
-    
+
     Attributes:
         last_known_charging_state (bool): The last known charging state.
         last_known_charging_mode (str): The last known charging mode.
@@ -45,7 +45,7 @@ class EvccInterface:
         _update_thread (threading.Thread):   The background thread for updating
                                              the charging state and mode.
         _stop_event (threading.Event):       An event to signal the thread to stop.
-    
+
     Methods:
         __init__(url, update_interval=15, on_charging_state_change=None):
         get_charging_state():
@@ -64,14 +64,27 @@ class EvccInterface:
 
         Args:
             url (str): The base URL for the EVCC API.
-            update_interval (int): The interval (in seconds) for updating the charging state.
-            on_charging_state_change (callable): A callback function to be called when the
-            charging state changes.
+            update_interval (int, optional): The interval (in seconds) for updating
+            the charging state. Defaults to 15.
+            on_charging_state_change (callable, optional): A callback function to be called
+            when the charging state or mode changes. Defaults to None.
         """
         self.url = url
         self.last_known_charging_state = False
         # off, pv, pvmin, now
         self.last_known_charging_mode = None
+        self.current_detail_data = {
+            "connected": False,
+            "chargeDuration": 0,
+            "chargeRemainingDuration": 0,
+            "chargedEnergy": 0,
+            "chargeRemainingEnergy": 0,
+            "sessionEnergy": 0,
+            "vehicleSoc": 0,
+            "vehicleRange": 0,
+            "vehicleOdometer": 0,
+            "vehicleName": "",
+        }
         self.update_interval = update_interval
         self.on_charging_state_change = on_charging_state_change  # Store the callback
         self._update_thread = None
@@ -83,11 +96,18 @@ class EvccInterface:
         Returns the last known charging state.
         """
         return self.last_known_charging_state
+
     def get_charging_mode(self):
         """
         Returns the last known charging mode.
         """
         return self.last_known_charging_mode
+
+    def get_current_detail_data(self):
+        """
+        Returns the current detail data of the EVCC.
+        """
+        return self.current_detail_data
 
     def start_update_service(self):
         """
@@ -134,7 +154,7 @@ class EvccInterface:
 
     def __request_charging_state(self):
         """
-        Fetches the EVCC state from the API and returns the charging state.
+        Fetches the EVCC state from the API and updates the charging state and mode.
         """
         data = self.__fetch_evcc_state_via_api()
         if not data or not isinstance(data.get("result", {}).get("loadpoints"), list):
@@ -161,10 +181,33 @@ class EvccInterface:
             logger.error(
                 "[EVCC] Charging mode is not a valid state."
                 + " Expected one of ['off', 'pv', 'minpv', 'now']. Got: %s",
-                charging_mode
+                charging_mode,
             )
             return None
-        logger.debug("[EVCC] Charging state: %s - Charging mode: %s", charging_mode, charging_state)
+
+        vehicle_name = (
+            data.get("result", {})
+            .get("vehicles", {})
+            .get(loadpoint.get("vehicleName", ""), {})
+            .get("title", "")
+        )
+        self.current_detail_data = {
+            "connected": loadpoint.get("connected", False),
+            "chargeDuration": loadpoint.get("chargeDuration", 0),
+            "chargeRemainingDuration": loadpoint.get("chargeRemainingDuration", 0),
+            "chargedEnergy": loadpoint.get("chargedEnergy", 0),
+            "chargeRemainingEnergy": loadpoint.get("chargeRemainingEnergy", 0),
+            "sessionEnergy": loadpoint.get("sessionEnergy", 0),
+            "vehicleSoc": loadpoint.get("vehicleSoc", 0),
+            "vehicleRange": loadpoint.get("vehicleRange", 0),
+            "vehicleOdometer": loadpoint.get("vehicleOdometer", 0),
+            "vehicleName": vehicle_name,
+        }
+        logger.debug(
+            "[EVCC] Charging state: %s - Charging mode: %s",
+            charging_mode,
+            charging_state,
+        )
         # Check if the charging state has changed
         if charging_mode != self.last_known_charging_mode:
             logger.info("[EVCC] Charging mode changed to: %s", charging_mode)

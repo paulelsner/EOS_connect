@@ -1,5 +1,5 @@
 """
-fork from https://github.com/ohAnd/batcontrol/blob/main/src/batcontrol/inverter/fronius.py
+fork from https://github.com/muexxl/batcontrol/blob/main/src/batcontrol/inverter/fronius.py
 
 This module provides a class `FroniusWR` for handling Fronius GEN24 Inverters.
 It includes methods for interacting with the inverter's API, managing battery
@@ -75,6 +75,16 @@ class FroniusWR():
         self.nonce = 0
         self.user = config['user']
         self.password = config['password']
+        self.inverter_sw_revision = {
+            'major': 0,
+            'minor': 0,
+            'patch': 0,
+            'build': 0
+        }
+        self.api_praefix = '' # default empty string
+        self.__get_current_inverter_sw_version()
+        self.__set_api_praefix()
+
         self.previous_battery_config = self.get_battery_config()
         self.previous_backup_power_config = None
         # default values
@@ -162,7 +172,7 @@ class FroniusWR():
 
     def get_battery_config(self):
         """ Get battery configuration from inverter and keep a backup."""
-        path = '/config/batteries'
+        path = self.api_praefix + '/config/batteries'
         response = self.send_request(path, auth=True)
         if not response:
             logger.error(
@@ -194,7 +204,7 @@ class FroniusWR():
         Returns: dict with backup power configuration
         """
         if path_version == 'latest':
-            path = '/config/powerunit'
+            path = self.api_praefix + '/config/powerunit'
         else:
             path = '/config/setup/powerunit'
 
@@ -226,7 +236,7 @@ class FroniusWR():
                 raise RuntimeError(
                     f"Unable to restore settings. Parameter {key} is missing"
                 )
-        path = '/config/batteries'
+        path = self.api_praefix + '/config/batteries'
         payload = json.dumps(settings)
         logger.info(
             '[Inverter] Restoring previous battery configuration: %s ',
@@ -256,7 +266,7 @@ class FroniusWR():
             payload = '{"HYB_EVU_CHARGEFROMGRID": true}'
         else:
             payload = '{"HYB_EVU_CHARGEFROMGRID": false}'
-        path = '/config/batteries'
+        path = self.api_praefix + '/config/batteries'
         response = self.send_request(
             path, method='POST', payload=payload, auth=True)
         response_dict = json.loads(response.text)
@@ -272,7 +282,7 @@ class FroniusWR():
             payload = '{"SolarAPIv1Enabled": true}'
         else:
             payload = '{"SolarAPIv1Enabled": false}'
-        path = '/config/solar_api'
+        path = self.api_praefix + '/config/solar_api'
         response = self.send_request(
             path, method='POST', payload=payload, auth=True)
         response_dict = json.loads(response.text)
@@ -284,7 +294,7 @@ class FroniusWR():
 
     def set_wr_parameters(self, minsoc, maxsoc, allow_grid_charging, grid_power):
         """set power at grid-connection point negative values for Feed-In"""
-        path = '/config/batteries'
+        path = self.api_praefix + '/config/batteries'
         if not isinstance(allow_grid_charging , bool):
             raise RuntimeError(
                 f'Expected type: bool actual type: {type(allow_grid_charging)}')
@@ -331,7 +341,7 @@ class FroniusWR():
 
     def get_time_of_use(self):
         """ Get time of use configuration from inverter and keep a backup."""
-        response = self.send_request('/config/timeofuse', auth=True)
+        response = self.send_request(self.api_praefix + '/config/timeofuse', auth=True)
         if not response:
             return None
 
@@ -455,7 +465,7 @@ class FroniusWR():
         }
         payload = json.dumps(config)
         response = self.send_request(
-            '/config/timeofuse', method='POST', payload=payload, auth=True
+                self.api_praefix + '/config/timeofuse', method='POST', payload=payload, auth=True
             )
         response_dict = json.loads(response.text)
         expected_write_successes = ['timeofuse']
@@ -561,7 +571,7 @@ class FroniusWR():
     def login(self):
         """Login to Fronius API"""
         logger.debug("[Inverter] Logging in")
-        path = '/commands/Login'
+        path = self.api_praefix + '/commands/Login'
         self.cnonce = "NaN"
         self.ncvalue_num = 1
         self.login_attempts = 0
@@ -593,7 +603,7 @@ class FroniusWR():
 
     def logout(self):
         """Logout from Fronius API"""
-        path = '/commands/Logout'
+        path = self.api_praefix + '/commands/Logout'
         response = self.send_request(path, auth=True)
         if not response:
             logger.warning('[Inverter] Logout failed. No response from server')
@@ -683,7 +693,7 @@ class FroniusWR():
         if power is not None:
             settings['HYB_EM_POWER'] = power
 
-        path = '/config/batteries'
+        path = self.api_praefix + '/config/batteries'
         payload = json.dumps(settings)
         logger.info(
             '[Inverter] Setting EM mode %s , power %s',
@@ -721,6 +731,39 @@ class FroniusWR():
         self.restore_time_of_use_config()
         self.logout()
 
+    def __get_current_inverter_sw_version(self):
+        """Get the current version of the inverter."""
+        path = '/status/version'
+        response = self.send_request(path)
+        if not response:
+            logger.error(
+                '[Inverter] Failed to get current version. Returning default value'
+                )
+            return 99.0
+        result = json.loads(response.text)
+        version_string = result.get('swrevisions').get('GEN24')
+        version_parts = version_string.split('-')[0].split('.')
+        self.inverter_sw_revision = {
+            'major': int(version_parts[0]),
+            'minor': int(version_parts[1]),
+            'patch': int(version_parts[2]),
+            'build': int(version_string.split('-')[1])
+        }
+        logger.info("[Inverter] Current sw revision: %s", self.inverter_sw_revision)
+        return True
+
+    def __set_api_praefix(self):
+        """Set the API prefix based on the inverter version."""
+        if (self.inverter_sw_revision['major'],
+            self.inverter_sw_revision['minor'],
+            self.inverter_sw_revision['patch'],
+            self.inverter_sw_revision['build']) < (1, 36, 5, 1):
+            self.api_praefix = ''
+            logger.info("[Inverter] Using API prefix: '%s'", self.api_praefix)
+        else:
+            self.api_praefix = '/api'
+            logger.info("[Inverter] Using API prefix: '%s'", self.api_praefix)
+        return True
     # def activate_mqtt(self, api_mqtt_api):
     #     """
     #     Activates MQTT for the inverter.

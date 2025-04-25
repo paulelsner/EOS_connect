@@ -110,6 +110,21 @@ class ConfigManager:
                         "url": "http://yourEVCCserver:7070",  # URL for EVCC server
                     }
                 ),
+                "mqtt": CommentedMap(
+                    {
+                        "enabled": False, # Enable MQTT - default: false
+                        # URL for MQTT server - default: mqtt://yourMQTTserver
+                        "broker": "homeassistant",
+                        "port": 1883, # Port for MQTT server - default: 1883
+                        "user": "username", # Username for MQTT server - default: mqtt
+                        "password": "password", # Password for MQTT server - default: mqtt
+                        "tls": False, # Use TLS for MQTT server - default: false
+                        # Enable Home Assistant MQTT auto discovery - default: true
+                        "ha_mqtt_auto_discovery": True,
+                        # Prefix for Home Assistant MQTT auto discovery - default: homeassistant
+                        "ha_mqtt_auto_discovery_prefix": "homeassistant",
+                    }
+                ),
                 "refresh_time": 3,  # Default refresh time in minutes
                 "time_zone": "Europe/Berlin",  # Add default time zone
                 "eos_connect_web_port": 8081,  # Default port for EOS connect server
@@ -268,6 +283,37 @@ class ConfigManager:
             "URL for EVCC server - default: http://yourEVCCserver:7070",
             "url",
         )
+        # mqtt configuration
+        config.yaml_set_comment_before_after_key(
+            "mqtt", before="MQTT configuration"
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "Enable MQTT - default: false", "enabled"
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "URL for MQTT server - default: mqtt://yourMQTTserver", "broker"
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "Port for MQTT server - default: 1883", "port"
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "Username for MQTT server - default: mqtt", "user"
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "Password for MQTT server - default: mqtt", "password"
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "Use TLS for MQTT server - default: false", "tls"
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "Enable Home Assistant MQTT auto discovery - default: true",
+            "ha_mqtt_auto_discovery",
+        )
+        config["mqtt"].yaml_add_eol_comment(
+            "Prefix for Home Assistant MQTT auto discovery - default: homeassistant",
+            "ha_mqtt_auto_discovery_prefix",
+        )
+
         # refresh time configuration
         config.yaml_add_eol_comment(
             "Default refresh time of EOS connect in minutes - default: 3",

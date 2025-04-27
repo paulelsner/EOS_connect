@@ -84,6 +84,7 @@ class EvccInterface:
             "vehicleRange": 0,
             "vehicleOdometer": 0,
             "vehicleName": "",
+            "smartCostActive": False,
         }
         self.update_interval = update_interval
         self.on_charging_state_change = on_charging_state_change  # Store the callback
@@ -202,7 +203,11 @@ class EvccInterface:
             "vehicleRange": loadpoint.get("vehicleRange", 0),
             "vehicleOdometer": loadpoint.get("vehicleOdometer", 0),
             "vehicleName": vehicle_name,
+            "smartCostActive": loadpoint.get("smartCostActive", False),
         }
+        # override charging mode if pv and smartcost is active
+        if charging_mode in ('pv', 'minpv') and self.current_detail_data["smartCostActive"]:
+            charging_mode = charging_mode + "+now"
         logger.debug(
             "[EVCC] Charging state: %s - Charging mode: %s",
             charging_mode,

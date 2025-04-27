@@ -204,7 +204,7 @@ class BaseControl:
         if (
             new_state == MODE_DISCHARGE_ALLOWED
             and self.current_evcc_charging_state
-            and self.current_evcc_charging_mode == "now"
+            and self.current_evcc_charging_mode in ('now', 'pv+now','minpv+now')
         ):
             new_state = MODE_AVOID_DISCHARGE_EVCC_FAST
             logger.info(

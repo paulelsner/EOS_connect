@@ -473,6 +473,12 @@
                     document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
                     document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
                 }
+            } else if (evcc_mode === "pv+now" || evcc_mode === "minpv+now") {
+                document.getElementById('evcc_mode').innerText = "Smart Cost Fast";
+                if (evcc_state) {
+                    document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                    document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                }
             } else {
                 document.getElementById('evcc_mode').innerText = "N/A";
                 document.getElementById('evcc_mode').style.color = "white";
@@ -501,9 +507,9 @@
                 let hours = Math.floor(chargeDuration / 3600);
                 let minutes = Math.floor((chargeDuration % 3600) / 60);
                 writeIfValueChanged('ecar_charging_duration', hours.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0'));
-                let chargeRemainingDuration = data_controls["evcc"]["current_session"]["chargeRemainingDuration"];
-                let remainingHours = Math.floor(chargeRemainingDuration / 60);
-                let remainingMinutes = chargeRemainingDuration % 60;
+                let chargeRemainingDuration = data_controls["evcc"]["current_session"]["chargeRemainingDuration"];                
+                let remainingHours = Math.floor(chargeRemainingDuration / 3600);
+                let remainingMinutes = Math.floor((chargeRemainingDuration % 3600) / 60);
                 writeIfValueChanged('ecar_charging_duration_remain', remainingHours.toString().padStart(2, '0') + ":" + remainingMinutes.toString().padStart(2, '0'));
             }
             else {
@@ -529,7 +535,7 @@
             document.getElementById('battery_soc').innerText = data_controls["battery"]["soc"] + " %";
             // set battery icon
             document.getElementById('battery_icon_main').innerHTML = getBatteryIcon(data_controls["battery"]["soc"]);
-            document.getElementById('current_max_charge_dyn').innerHTML = "<i>" + data_controls["battery"]["max_charge_power_dyn"].toFixed(0) + " W</i>";
+            document.getElementById('current_max_charge_dyn').innerHTML = "<i>" + (data_controls["battery"]["max_charge_power_dyn"] / 1000).toFixed(1) + " kW</i>";
             // set battery usable energy
             document.getElementById('battery_usable_capacity').innerHTML = '<i class="fa-solid fa-database"></i> ' + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + ' <span style="font-size: 0.6em;">kWh</span>';
             document.getElementById('battery_usable_capacity').title = "usable capacity: " + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + " kWh";

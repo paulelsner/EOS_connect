@@ -473,6 +473,12 @@
                     document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
                     document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
                 }
+            } else if (evcc_mode === "pv+now" || evcc_mode === "minpv+now") {
+                document.getElementById('evcc_mode').innerText = "Smart Cost Fast";
+                if (evcc_state) {
+                    document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                    document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                }
             } else {
                 document.getElementById('evcc_mode').innerText = "N/A";
                 document.getElementById('evcc_mode').style.color = "white";

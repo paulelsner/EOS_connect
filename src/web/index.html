@@ -501,9 +501,9 @@
                 let hours = Math.floor(chargeDuration / 3600);
                 let minutes = Math.floor((chargeDuration % 3600) / 60);
                 writeIfValueChanged('ecar_charging_duration', hours.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0'));
-                let chargeRemainingDuration = data_controls["evcc"]["current_session"]["chargeRemainingDuration"];
-                let remainingHours = Math.floor(chargeRemainingDuration / 60);
-                let remainingMinutes = chargeRemainingDuration % 60;
+                let chargeRemainingDuration = data_controls["evcc"]["current_session"]["chargeRemainingDuration"];                
+                let remainingHours = Math.floor(chargeRemainingDuration / 3600);
+                let remainingMinutes = Math.floor((chargeRemainingDuration % 3600) / 60);
                 writeIfValueChanged('ecar_charging_duration_remain', remainingHours.toString().padStart(2, '0') + ":" + remainingMinutes.toString().padStart(2, '0'));
             }
             else {

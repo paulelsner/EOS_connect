@@ -32,14 +32,14 @@
             EOS connect version: v00.00.00</div>
     </div>
     <div id="overlay_menu" style="display: none;">
-        <div style="text-align: center; padding: 20px;">
+        <div id="overlay_menu_content_wrapper" style="text-align: center; padding: 20px;">
             <p style="font-size: 1.8em; margin-bottom: 20px;">EOS connect</p>
             <hr>
             <p style="font-size: 1.3em; margin-bottom: 20px;" id="overlay_menu_head">Menu Overlay</p>
             <hr style="border-color: rgba(44, 44, 44, 0.596);">
             <p style="font-size: 1.2em; margin-bottom: 20px;" id="overlay_menu_content">This is a centered overlay menu.
             </p>
-            <button onclick="document.getElementById('overlay_menu').style.display='none'"
+            <button id="overlay_menu_close" onclick="closeOverlayMenu(true)"
                 style="padding: 10px 20px; font-size: 1em; background-color: #444; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
         </div>
     </div>
@@ -56,11 +56,12 @@
     </style>
     <div class="container">
         <div class="top-boxes">
-            <div class="top-box">
+            <div class="top-box" id="current_controls_box">
                 <div class="header"><i class="fa-solid fa-battery-full"></i> Current Controls
                     <span class="header_notification" id="current_header_left"
                         style="cursor: pointer;left: 10px;min-width: 20px;right: unset;">...</span>
-                    <span class="header_notification" id="current_header_right" style="min-width: 20px;">...</span>
+                    <span class="header_notification" id="current_header_right"
+                        style="cursor: pointer;min-width: 20px;">...</span>
                 </div>
                 <div class="content">
                     <table style="width: 100%; text-align: left;padding-top: 10px;">
@@ -74,15 +75,15 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>AC Charge</td>
+                            <td id="control_ac_charge_desc">AC Charge</td>
                             <td style="text-align: right;" id="control_ac_charge">--</td>
                         </tr>
                         <tr>
-                            <td>DC Charge</td>
+                            <td id="control_dc_charge_desc">DC Charge</td>
                             <td style="text-align: right;" id="control_dc_charge">--</td>
                         </tr>
                         <tr>
-                            <td>Discharge Allowed</td>
+                            <td id="control_discharge_allowed_desc">Discharge Allowed</td>
                             <td style="text-align: right;" id="control_discharge_allowed">--</td>
                         </tr>
                     </table>
@@ -132,33 +133,47 @@
                     <table style="width: 100%; text-align: left;padding-top: 10px;" id="ecar_charging_table">
                         <tr>
                             <!-- <th style="text-align: left;">Vehicle</th> -->
-                            <th style="text-align: left; cursor: help;" colspan="2"  title="name of vehicle in EVCC"><i class="fa-solid fa-car"></i> <span id="ecar_charging_name">...</span></th>
+                            <th style="text-align: left; cursor: help;" colspan="2" title="name of vehicle in EVCC"><i
+                                    class="fa-solid fa-car"></i> <span id="ecar_charging_name">...</span></th>
                             <!-- <th style="text-align: right;">SOC </th> -->
-                            <th class="valueChange" style="text-align: right; cursor: help;" colspan="2" title="eCar SOC"><span id="ecar_charging_soc">--.- %</span> <i class="fa-solid fa-car-battery"></i></th>
+                            <th class="valueChange" style="text-align: right; cursor: help;" colspan="2"
+                                title="eCar SOC"><span id="ecar_charging_soc">--.- %</span> <i
+                                    class="fa-solid fa-car-battery"></i></th>
                         </tr>
                         <tr>
                             <td colspan="4">
                                 <hr>
                             </td>
                         </tr>
-                        <tr>                          
-                            <td style="text-align: right; cursor: help;" class="valueChange" id="ecar_charging_odometer" title="current vehicle mileage">--- km</td>
+                        <tr>
+                            <td style="text-align: right; cursor: help;" class="valueChange" id="ecar_charging_odometer"
+                                title="current vehicle mileage">--- km</td>
                             <td style="text-align: right;"><i class="fa-solid fa-gauge"> </i></td>
-                            <td style="text-align: left; border-left-width: 1px; border-left-style: solid;"> <i class="fa-solid fa-road"></i></td>
-                            <td style="text-align: left; cursor: help;" class="valueChange" style="text-align: right;" id="ecar_charging_range"  title="current vehicle range">--- km</td>
+                            <td style="text-align: left; border-left-width: 1px; border-left-style: solid;"> <i
+                                    class="fa-solid fa-road"></i></td>
+                            <td style="text-align: left; cursor: help;" class="valueChange" style="text-align: right;"
+                                id="ecar_charging_range" title="current vehicle range">--- km</td>
                         </tr>
                         <tr>
-                            <td style="text-align: right; cursor: help;" class="valueChange" id="ecar_charging_charged" title="already charged energy">0.00 kWh</td>
-                            <td style="text-align: right;"><i class="fa-solid fa-right-long"> <i class="fa-solid fa-bolt"> </i></td>                            
-                            <td style="text-align: left; border-left-width: 1px; border-left-style: solid;"> <i class="fa-solid fa-bolt"> </i> <i class="fa-solid fa-check"></i></td>
-                            <td style="text-align: left; cursor: help;" class="valueChange" id="ecar_charging_charged_remain" title="remaining energy to charge">0.00
+                            <td style="text-align: right; cursor: help;" class="valueChange" id="ecar_charging_charged"
+                                title="already charged energy">0.00 kWh</td>
+                            <td style="text-align: right;"><i class="fa-solid fa-right-long"> <i
+                                        class="fa-solid fa-bolt"> </i></td>
+                            <td style="text-align: left; border-left-width: 1px; border-left-style: solid;"> <i
+                                    class="fa-solid fa-bolt"> </i> <i class="fa-solid fa-check"></i></td>
+                            <td style="text-align: left; cursor: help;" class="valueChange"
+                                id="ecar_charging_charged_remain" title="remaining energy to charge">0.00
                                 kWh</td>
                         </tr>
                         <tr>
-                            <td style="text-align: right; cursor: help;" class="valueChange" id="ecar_charging_duration" title="current duration of charging">00:00</td>
-                            <td style="text-align: right;"><i class="fa-solid fa-right-long"></i> <i class="fa-solid fa-stopwatch"></i> </td>
-                            <td style="text-align: left; border-left-width: 1px; border-left-style: solid;"> <i class="fa-solid fa-clock"></i> <i class="fa-solid fa-check"></i></td>
-                            <td style="text-align: left; cursor: help;" class="valueChange"id="ecar_charging_duration_remain" title="remaining time until charging is done">00:00
+                            <td style="text-align: right; cursor: help;" class="valueChange" id="ecar_charging_duration"
+                                title="current duration of charging">00:00</td>
+                            <td style="text-align: right;"><i class="fa-solid fa-right-long"></i> <i
+                                    class="fa-solid fa-stopwatch"></i> </td>
+                            <td style="text-align: left; border-left-width: 1px; border-left-style: solid;"> <i
+                                    class="fa-solid fa-clock"></i> <i class="fa-solid fa-check"></i></td>
+                            <td style="text-align: left; cursor: help;" class="valueChange"
+                                id="ecar_charging_duration_remain" title="remaining time until charging is done">00:00
                             </td>
                         </tr>
                     </table>
@@ -252,6 +267,7 @@
         let max_charge_power_w = 0;
         let inverter_mode_num = -1;
         let chartInstance = null;
+        let menuControlEventListener = null;
 
         const COLOR_MODE_CHARGE_FROM_GRID = "rgb(255, 144, 144)";
         const COLOR_MODE_AVOID_DISCHARGE = "lightgray";
@@ -302,12 +318,31 @@
             }
         }
 
-        function overlayMenu(header, content) {
+        function overlayMenu(header, content, close = true) {
             const overlay = document.getElementById('overlay_menu');
             if (overlay.style.display === 'none') {
                 overlay.style.display = 'flex';
                 document.getElementById('overlay_menu_head').innerHTML = header;
                 document.getElementById('overlay_menu_content').innerHTML = content;
+                document.getElementById('overlay_menu_close').style.display = close ? '' : 'none';
+            }
+        }
+
+        function closeOverlayMenu(direct = true) {
+            const overlay = document.getElementById('overlay_menu');
+            if (overlay.style.display === 'flex') {
+                if (direct) {
+                    overlayMenu('', '', false);
+                    overlay.style.display = 'none';
+                } else {
+                    overlay.style.transition = 'opacity 1s';
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlayMenu('', '', false);
+                        overlay.style.display = 'none';
+                        overlay.style.opacity = '1';
+                    }, 250);
+                }
             }
         }
 
@@ -484,7 +519,7 @@
                 document.getElementById('evcc_mode').style.color = "white";
             }
 
-            
+
             if (evcc_state) {
                 document.getElementById('evcc_state').innerText = "charging";
             } else {
@@ -492,10 +527,10 @@
                 document.getElementById('evcc_state').style.color = "white";
             }
 
-            if(data_controls["evcc"]["current_session"]["connected"]) {
+            if (data_controls["evcc"]["current_session"]["connected"]) {
                 document.getElementById('ecar_charging_table').style.display = "";
                 document.getElementById('ecar_charging_table_off').style.display = "none";
-            
+
                 // fill current session data
                 writeIfValueChanged('ecar_charging_name', data_controls["evcc"]["current_session"]["vehicleName"]);
                 writeIfValueChanged('ecar_charging_soc', (data_controls["evcc"]["current_session"]["vehicleSoc"]).toFixed(1) + " %");
@@ -507,7 +542,7 @@
                 let hours = Math.floor(chargeDuration / 3600);
                 let minutes = Math.floor((chargeDuration % 3600) / 60);
                 writeIfValueChanged('ecar_charging_duration', hours.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0'));
-                let chargeRemainingDuration = data_controls["evcc"]["current_session"]["chargeRemainingDuration"];                
+                let chargeRemainingDuration = data_controls["evcc"]["current_session"]["chargeRemainingDuration"];
                 let remainingHours = Math.floor(chargeRemainingDuration / 3600);
                 let remainingMinutes = Math.floor((chargeRemainingDuration % 3600) / 60);
                 writeIfValueChanged('ecar_charging_duration_remain', remainingHours.toString().padStart(2, '0') + ":" + remainingMinutes.toString().padStart(2, '0'));
@@ -518,6 +553,77 @@
             }
         }
 
+        function adjustGridChargePower(delta) {
+            const input = document.getElementById("grid_charge_power");
+            let newValue = parseFloat(input.value) + delta;
+            newValue = Math.max(parseFloat(input.min), Math.min(parseFloat(input.max), newValue));
+            input.value = newValue.toFixed(1);
+        }
+
+        function menu_controls_override(icons, ac_charge_max, auto_active) {
+            const buttons =
+                icons.map((icon, index) => {
+                    if (index > 2) return; // without special evcc modes
+                    const isDisabled = index === inverter_mode_num;
+                    return '<button id="mode_' + index + '" class="button" style="' +
+                        'cursor: ' + (isDisabled ? 'not-allowed' : 'pointer') + '; ' +
+                        'font-size: 0.8em; padding: 0.15em 0.3em; margin: 10px; color: ' + (isDisabled ? 'gray' : icon.color) + '; ' +
+                        'transition: color 0.3s; background-color: ' + (isDisabled ? '#333' : 'rgb(58, 58, 58)') + '; border-radius: 10px; border: 1px solid ' + (isDisabled ? 'gray' : icon.color) + ';"' +
+                        (isDisabled ? ' disabled' : ' onmouseover="this.style.color=\'white\'" onmouseout="this.style.color=\'' + icon.color + '\'" onmousedown="this.style.color=\'#000000\'" ' +
+                            'onmouseup="this.style.color=\'' + icon.color + '\'" onclick="handleModeChange(' + index + ')"') + '>' +
+                        '<i class="fa-solid ' + icon.icon + '"></i>' +
+                        '</button>'
+                }).join('') +
+                (auto_active ?
+                    '<br><span style="font-size: x-small; margin: 40px;"><i>Back To Automatic</i></span><br>' +
+                    '<button id="mode_auto" class="button" style="' +
+                    'font-size: 0.8em; padding: 0.15em 0.3em; margin: 10px; color: green; transition: color 0.3s; background-color: rgb(58, 58, 58); ' +
+                    'border-radius: 10px; border: 1px solid grey;cursor: pointer;' +
+                    ' onmouseover="this.style.color=\'white\'" onmouseout="this.style.color=\'green\'" onmousedown="this.style.color=\'#000000\'" ' +
+                    'onmouseup="this.style.color=\'green\'" onclick="handleModeChange(\'-1\')"' +
+                    '>' +
+                    '<i class="fa-solid fa-clock-rotate-left"></i></i></button>' : ''
+                );
+
+            const duration_entry =
+                '<select id="duration_time" style="padding: 10px; font-size: 1em; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;">' +
+                Array.from({ length: 48 }, (_, i) => {
+                    const hours = Math.floor((i + 1) / 2);
+                    const minutes = ((i + 1) % 2) * 30;
+                    const timeLabel = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                    return `<option value="${timeLabel}" ${hours === 2 && minutes === 0 ? 'selected' : ''}>${timeLabel}</option>`;
+                }).join('') +
+                '</select>';
+            const ac_charge_power =
+                '<div style="display: flex; justify-content: center; align-items: center; margin-top: 10px; padding-bottom: 10px;">' +
+                '<button onclick="adjustGridChargePower(-0.1)" style="padding: 10px; font-size: 1em; margin-right: 10px; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;'+
+                'transition: color 0.3s;" ' +
+                'onmouseover="this.style.color=\'gray\'" onmouseout="this.style.color=\'white\'" onmousedown="this.style.backgroundColor=\'lightblue\'" onmouseup="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+ 
+                'ontouchstart="this.style.backgroundColor=\'lightblue\'" ontouchend="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+
+                '">-</button>' +
+                '<input id="grid_charge_power" type="number" step="0.25" min="0.5" max="' + ac_charge_max.toFixed(1) + '" value="' + ac_charge_max.toFixed(1) + '" style="padding: 10px; font-size: 1em; text-align: center; width: 1.4em; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;">' +
+                '<button onclick="adjustGridChargePower(0.1)" style="padding: 10px; font-size: 1em; margin-left: 10px; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;"'+
+                'transition: color 0.3s;" ' +
+                'onmouseover="this.style.color=\'gray\'" onmouseout="this.style.color=\'white\'" onmousedown="this.style.backgroundColor=\'lightblue\'" onmouseup="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+ 
+                'ontouchstart="this.style.backgroundColor=\'lightblue\'" ontouchend="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+
+                '>+</button>' +
+//                '<span style="font-size: 1.5em; padding-left: 5px;"> kW</span>' +
+                '</div>';
+            const content =
+                '<div style="font-size: 2em;">' +
+                buttons +
+                '</div>' +
+                "<hr style='border-color: rgba(44, 44, 44, 0.596);'>" +
+                'Duration <br>' +
+                '<div style="display: flex; justify-content: center; align-items: center; margin-top: 10px; padding-bottom: 10px;">' +
+                duration_entry +
+                '</div>' +
+                "<hr style='border-color: rgba(44, 44, 44, 0.596);'>" +
+                'Grid Charge Power (kW)<br>' +
+                ac_charge_power;
+            overlayMenu("Override Current Controls", content);
+        }
+
         async function showCurrentData() {
             //console.log("------- showCurrentControls -------");
             const data_controls = await fetch_EOS_Connect_Data("current_controls.json");
@@ -526,12 +632,39 @@
             inverter_mode_text = data_controls["current_states"]["inverter_mode"];
             inverter_mode_num = data_controls["current_states"]["inverter_mode_num"];
             //inverter_mode_num = 5; // for testing
+            override_active = data_controls["current_states"]["override_active"];
+            override_end_time = data_controls["current_states"]["override_end_time"];
+            if (override_active) {
+                inverter_mode_text = '<i class="fa-solid fa-triangle-exclamation"></i> ' + inverter_mode_text;
+                document.getElementById('control_ac_charge_desc').innerText = "Override Active";
+                document.getElementById('control_ac_charge_desc').style.color = "orange";
+                const overrideEndTimeFormatted = new Date(override_end_time * 1000).toLocaleString(navigator.language, { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('control_ac_charge').innerText = "until " + overrideEndTimeFormatted;
+                document.getElementById('control_ac_charge').style.color = "orange";
+                if (inverter_mode_num === 0) {
+                    document.getElementById('control_dc_charge_desc').innerText = "AC Charge Power";
+                    document.getElementById('control_dc_charge').innerText = (data_controls["current_states"]["current_ac_charge_demand"] / 1000).toFixed(1) + " kW";
+                } else {
+                    document.getElementById('control_dc_charge_desc').innerText = "";
+                    document.getElementById('control_dc_charge').innerText = "";
+                }
+                document.getElementById('control_discharge_allowed_desc').innerText = "";
+                document.getElementById('control_discharge_allowed').innerText = "";
+                document.getElementById('current_controls_box').style.border = "1px solid orange";
+            } else {
+                inverter_mode_text = inverter_mode_text.replace("MODE ", "");
+                document.getElementById('control_ac_charge_desc').innerText = "AC Charge";
+                document.getElementById('control_ac_charge_desc').style.color = "";
+                document.getElementById('control_ac_charge').innerText = (data_controls["current_states"]["current_ac_charge_demand"] / 1000).toFixed(1) + " kW";
+                document.getElementById('control_ac_charge').style.color = "";
+                document.getElementById('control_dc_charge_desc').innerText = "DC Charge";
+                document.getElementById('control_dc_charge').innerText = (data_controls["current_states"]["current_dc_charge_demand"] / 1000).toFixed(1) + " kW";
+                document.getElementById('control_discharge_allowed_desc').innerText = "Discharge allowed";
+                document.getElementById('control_discharge_allowed').innerText = (data_controls["current_states"]["current_discharge_allowed"] === true ? "Yes" : "No");
+                document.getElementById('current_controls_box').style.border = "";
+            }
 
-            // base elements at current controls
-            document.getElementById('control_ac_charge').innerText = (data_controls["current_states"]["current_ac_charge_demand"] / 1000).toFixed(1) + " kW";
-            document.getElementById('control_dc_charge').innerText = (data_controls["current_states"]["current_dc_charge_demand"] / 1000).toFixed(1) + " kW";
-            document.getElementById('control_discharge_allowed').innerText = (data_controls["current_states"]["current_discharge_allowed"] === true ? "Yes" : "No");
-            document.getElementById('control_overall').innerText = inverter_mode_text.replace("MODE ", "");
+            document.getElementById('control_overall').innerHTML = inverter_mode_text.replace("MODE ", "");
             document.getElementById('battery_soc').innerText = data_controls["battery"]["soc"] + " %";
             // set battery icon
             document.getElementById('battery_icon_main').innerHTML = getBatteryIcon(data_controls["battery"]["soc"]);
@@ -564,10 +697,30 @@
             iconElement.style.color = color || "";
             iconElement.title = title || "";
 
+            if (override_active) {
+                iconElement.innerHTML = '<i style="color:orange;" class="fa-solid fa-triangle-exclamation"></i> ' + iconElement.innerHTML;
+            }
+
+            const updatedMaxChargePower = data_controls["battery"]["max_charge_power_dyn"] / 1000;
+            newListener = function () {
+                console.log("Override active: " + override_active + " - Max charge power: " + updatedMaxChargePower);
+                menu_controls_override(icons, updatedMaxChargePower, override_active);
+            };
+
+            // Remove the old listener if it exists
+            if (menuControlEventListener) {
+                iconElement.removeEventListener('click', menuControlEventListener);
+            }
+
+            // Add the new listener
+            menuControlEventListener = newListener;
+            iconElement.addEventListener('click', menuControlEventListener);
+
+
             // energy optimization - last result received
             const timestamp_last_run = new Date(data_controls.state.last_response_timestamp);
             const timestamp_next_run = new Date(data_controls.state.next_run);
-            const timestamp_last_run_formatted = timestamp_last_run.toLocaleString('de-DE', {
+            const timestamp_last_run_formatted = timestamp_last_run.toLocaleString(navigator.language, {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
@@ -604,6 +757,28 @@
                     "</div>"
                 );
             });
+        }
+
+        function handleModeChange(mode) {
+            const duration = document.getElementById('duration_time').value;
+            const gridChargePower = document.getElementById('grid_charge_power').value;
+            const data_controls = { "mode": mode, "duration": duration, "grid_charge_power": parseFloat(gridChargePower) };
+            //console.log("handleModeChange", data_controls);
+            setOverrideControl(data_controls)
+                .then((result) => {
+                    //console.log("Override control set successfully:", result);
+                    closeOverlayMenu();
+                    overlayMenu('<span style="color:orange;">Success</span>', "Mode changed successfully.", false);
+                    setTimeout(() => {
+                        closeOverlayMenu(false);
+                    }, 2000); // Close the overlay after 2 seconds
+                })
+                .catch((error) => {
+                    overlayMenu("Error", `Failed to change mode: ${error.message}`);
+                    setTimeout(() => {
+                        overlayMenu("", "");
+                    }, 2000); // Close the overlay after 2 seconds
+                });
         }
 
         function showStatistics(data_request, data_response) {
@@ -776,6 +951,27 @@
             }
         }
 
+        async function setOverrideControl(data_controls) {
+            try {
+                const response = await fetch('/controls/mode_override', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data_controls)
+                });
+
+                if (!response.ok) {
+                    const errorMessage = await response.text();
+                    throw new Error(`Error ${response.status}: ${errorMessage}`);
+                }
+
+                return await response.json(); // Return the parsed JSON response
+            } catch (error) {
+                console.error("Failed to set override control:", error);
+                throw error; // Re-throw the error to handle it in the calling function
+            }
+        }
         // function to observe changed values of doc elements from class "valueChange" and animate the change
         Array.from(document.getElementsByClassName("valueChange")).forEach(function (element) {
             const observer = new MutationObserver(function (mutationsList, observer) {
@@ -821,7 +1017,7 @@
         }
 
         init();
-        setInterval(init, 5000);
+        setInterval(init, 1000);
     </script>
 </body>
 

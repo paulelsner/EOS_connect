@@ -283,6 +283,13 @@ class LoadInterface:
             # print(f'HA Energy Orig: {energy}')
             # print(f'HA Car load energy: {car_load_energy}')
             energy = energy - car_load_energy
+            if energy < 0:
+                logger.error(
+                    "[LOAD-IF] DATA ERROR Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    current_hour,
+                    round(energy, 1),
+                    round(car_load_energy, 1),
+                )
             # print(f'HA Energy Final: {energy}')
             if energy == 0:
                 current_hour += timedelta(hours=1)
@@ -382,7 +389,15 @@ class LoadInterface:
             car_load_energy = abs(self.process_energy_data({"data": car_load_data}))
             # print(f'HA Car load data: {car_load_data} --- {energy}')
             car_load_energy = max(car_load_energy, 0)  # prevent negative values
-            energy = energy - car_load_energy
+            if car_load_energy < energy:
+                energy = energy - car_load_energy
+            else:
+                logger.error(
+                    "[LOAD-IF] DATA ERROR load smaller than car load - Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    current_hour,
+                    round(energy, 1),
+                    round(car_load_energy, 1),
+                )
             if energy == 0:
                 current_hour += timedelta(hours=1)
                 continue

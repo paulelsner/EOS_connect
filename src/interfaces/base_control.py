@@ -5,7 +5,8 @@ discharge permissions, and overall system state.
 """
 
 import logging
-from time import time
+import time
+import threading
 from datetime import datetime
 
 logger = logging.getLogger("__main__")
@@ -39,6 +40,7 @@ class BaseControl:
 
     def __init__(self, config, timezone):
         self.current_ac_charge_demand = 0
+        self.current_ac_charge_demand_no_override = 0
         self.last_ac_charge_demand = 0
         self.current_dc_charge_demand = 0
         self.current_discharge_allowed = -1
@@ -46,22 +48,28 @@ class BaseControl:
         self.current_evcc_charging_mode = False
         # startup with None to force a writing to the inverter
         self.current_overall_state = -1
+        self.override_active = False
+        self.override_end_time = 0
         self.current_battery_soc = 0
         self.time_zone = timezone
         self.config = config
         self._state_change_timestamps = []
+        self.update_interval = 15  # seconds
+        self._update_thread = None
+        self._stop_event = threading.Event()
+        self.__start_update_service()
 
-    def get_state_mapping(self):
+    def get_state_mapping(self, num_mode):
         """
         Returns the state mapping dictionary.
         """
-        return state_mapping
+        return state_mapping.get(num_mode, "unknown state")
 
     def was_overall_state_changed_recently(self, time_window_seconds):
         """
         Checks if the overall state was changed within the last `time_window_seconds`.
         """
-        current_time = time()
+        current_time = time.time()
         # Remove timestamps older than the time window
         self._state_change_timestamps = [
             ts
@@ -119,22 +127,40 @@ class BaseControl:
         """
         return self.current_evcc_charging_mode
 
+    def get_override_active_and_endtime(self):
+        """
+        Returns whether the override is active.
+        """
+        return self.override_active, self.override_end_time
+
     def set_current_ac_charge_demand(self, value_relative):
         """
         Sets the current AC charge demand.
         """
         current_hour = datetime.now(self.time_zone).hour
-        self.current_ac_charge_demand = (
+        current_charge_demand = (
             value_relative * self.config["battery"]["max_charge_power_w"]
         )
-        logger.debug(
-            "[BASE_CTRL] set AC charge demand for current hour %s:00 -> %s Wh -"
-            + " based on max charge power %s W",
-            current_hour,
-            self.current_ac_charge_demand,
-            self.config["battery"]["max_charge_power_w"],
-        )
-        self.set_current_overall_state()
+        # store the current charge demand without override
+        self.current_ac_charge_demand_no_override = current_charge_demand
+        if not self.override_active:
+            self.current_ac_charge_demand = current_charge_demand
+            logger.debug(
+                "[BASE_CTRL] set AC charge demand for current hour %s:00 -> %s Wh -"
+                + " based on max charge power %s W",
+                current_hour,
+                self.current_ac_charge_demand,
+                self.config["battery"]["max_charge_power_w"],
+            )
+        else:
+            logger.debug(
+                "[BASE_CTRL] OVERRIDE remain AC charge demand for current hour %s:00 -> %s Wh -"
+                + " based on max charge power %s W",
+                current_hour,
+                self.current_ac_charge_demand,
+                self.config["battery"]["max_charge_power_w"],
+            )
+        self.__set_current_overall_state()
 
     def set_current_dc_charge_demand(self, value_relative):
         """
@@ -151,7 +177,7 @@ class BaseControl:
             self.current_dc_charge_demand,
             self.config["battery"]["max_charge_power_w"],
         )
-        self.set_current_overall_state()
+        self.__set_current_overall_state()
 
     def set_current_discharge_allowed(self, value):
         """
@@ -164,7 +190,7 @@ class BaseControl:
             current_hour,
             self.current_discharge_allowed,
         )
-        self.set_current_overall_state()
+        self.__set_current_overall_state()
 
     def set_current_evcc_charging_state(self, value):
         """
@@ -172,7 +198,7 @@ class BaseControl:
         """
         self.current_evcc_charging_state = value
         # logger.debug("[BASE_CTRL] set current EVCC charging state to %s", value)
-        self.set_current_overall_state()
+        self.__set_current_overall_state()
 
     def set_current_evcc_charging_mode(self, value):
         """
@@ -180,12 +206,19 @@ class BaseControl:
         """
         self.current_evcc_charging_mode = value
         # logger.debug("[BASE_CTRL] set current EVCC charging mode to %s", value)
-        self.set_current_overall_state()
+        self.__set_current_overall_state()
 
-    def set_current_overall_state(self):
+    def __set_current_overall_state(self):
         """
         Sets the current overall state and logs the timestamp if it changes.
         """
+        if self.override_active:
+            # check if the override end time is reached
+            if time.time() > self.override_end_time:
+                logger.info("[BASE_CTRL] OVERRIDE end time reached, clearing override")
+                self.clear_mode_override()
+                return
+            return
         if self.current_ac_charge_demand > 0:
             new_state = MODE_CHARGE_FROM_GRID
         elif self.current_discharge_allowed > 0:
@@ -204,7 +237,7 @@ class BaseControl:
         if (
             new_state == MODE_DISCHARGE_ALLOWED
             and self.current_evcc_charging_state
-            and self.current_evcc_charging_mode in ('now', 'pv+now','minpv+now')
+            and self.current_evcc_charging_mode in ("now", "pv+now", "minpv+now")
         ):
             new_state = MODE_AVOID_DISCHARGE_EVCC_FAST
             logger.info(
@@ -239,7 +272,7 @@ class BaseControl:
             )
 
         if new_state != self.current_overall_state or grid_charge_value_changed:
-            self._state_change_timestamps.append(time())
+            self._state_change_timestamps.append(time.time())
             # Limit the size of the state change timestamps to avoid memory overrun
             max_timestamps = 1000  # Adjust this value as needed
             if len(self._state_change_timestamps) > max_timestamps:
@@ -265,3 +298,90 @@ class BaseControl:
         """
         self.current_battery_soc = value
         # logger.debug("[BASE_CTRL] set current battery SOC to %s", value)
+
+    def set_mode_override(self, mode, duration, charge_rate):
+        """
+        Sets the current overall state to a specific mode.
+        """
+        # switch back to EOS given demands
+        if mode == -1:
+            self.clear_mode_override()
+            return
+        # duration comes in 00:00, 00:30, 01:00, 01:30 format
+        # convert to seconds
+        duration_seconds = 0
+        if 0 <= duration <= 12 * 60:
+            duration_seconds = duration * 60
+            # duration_seconds = duration * 60 / 10
+        else:
+            logger.error("[BASE_CTRL] OVERRIDE invalid duration %s", duration)
+            return
+
+        if mode >= 0 or mode <= 2:
+            self.current_overall_state = mode
+            self.override_active = True
+            self.override_end_time = (time.time() + duration_seconds) // 60 * 60
+            self._state_change_timestamps.append(time.time())
+            logger.info(
+                "[BASE_CTRL] OVERRIDE set overall state to %s with endtime %s",
+                state_mapping[mode],
+                datetime.fromtimestamp(
+                    self.override_end_time, self.time_zone
+                ).isoformat(),
+            )
+            if charge_rate > 0 and mode == MODE_CHARGE_FROM_GRID:
+                self.current_ac_charge_demand = charge_rate * 1000
+                logger.info(
+                    "[BASE_CTRL] OVERRIDE set AC charge demand to %s",
+                    self.current_ac_charge_demand,
+                )
+        else:
+            logger.error("[BASE_CTRL] OVERRIDE invalid mode %s", mode)
+
+    def clear_mode_override(self):
+        """
+        Clears the current mode overrideand trigger a state change.
+        """
+        self.override_active = False
+        self.override_end_time = 0
+        self.current_ac_charge_demand = self.current_ac_charge_demand_no_override
+        self.__set_current_overall_state()
+        # reset the override end time to 0
+        logger.info("[BASE_CTRL] cleared mode override")
+
+    def __start_update_service(self):
+        """
+        Starts the background thread to periodically update the charging state.
+        """
+        if self._update_thread is None or not self._update_thread.is_alive():
+            self._stop_event.clear()
+            self._update_thread = threading.Thread(
+                target=self.__update_base_control_loop, daemon=True
+            )
+            self._update_thread.start()
+            logger.info("[BASE_CTRL] Update service started.")
+
+    def shutdown(self):
+        """
+        Stops the background thread and shuts down the update service.
+        """
+        if self._update_thread and self._update_thread.is_alive():
+            self._stop_event.set()
+            self._update_thread.join()
+            logger.info("[BASE_CTRL] Update service stopped.")
+
+    def __update_base_control_loop(self):
+        """
+        The loop that runs in the background thread to update the charging state.
+        """
+        while not self._stop_event.is_set():
+            self.__set_current_overall_state()
+
+            sleep_interval = self.update_interval
+            while sleep_interval > 0:
+                if self._stop_event.is_set():
+                    return  # Exit immediately if stop event is set
+                time.sleep(min(1, sleep_interval))  # Sleep in 1-second chunks
+                sleep_interval -= 1
+
+        self.__start_update_service()

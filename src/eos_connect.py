@@ -11,7 +11,7 @@ import json
 import threading
 import pytz
 import requests
-from flask import Flask, Response, render_template_string
+from flask import Flask, Response, render_template_string, request
 from gevent.pywsgi import WSGIServer
 from version import __version__
 from config import ConfigManager
@@ -120,9 +120,7 @@ def charging_state_callback(new_state):
     change_control_state()
 
 
-mqtt_interface = MqttInterface(
-    config_manager.config["mqtt"]
-)
+mqtt_interface = MqttInterface(config_manager.config["mqtt"])
 
 evcc_interface = EvccInterface(
     url=config_manager.config["evcc"]["url"],
@@ -529,12 +527,8 @@ class OptimizationScheduler:
             json.dump(json_optimize_input, file, indent=4)
 
         mqtt_interface.update_publish_topics(
-        {
-            "optimization/state": {
-                "value": self.get_current_state()["request_state"]
-            }
-        }
-    )
+            {"optimization/state": {"value": self.get_current_state()["request_state"]}}
+        )
         optimized_response = eos_interface.eos_set_optimize_request(
             json_optimize_input, config_manager.config["eos"]["timeout"]
         )
@@ -573,9 +567,11 @@ class OptimizationScheduler:
         mqtt_interface.update_publish_topics(
             {
                 "optimization/last_run": {
-                    "value": self.get_current_state()["last_response_timestamp"]},
+                    "value": self.get_current_state()["last_response_timestamp"]
+                },
                 "optimization/next_run": {
-                    "value": self.get_current_state()["next_run"]},
+                    "value": self.get_current_state()["next_run"]
+                },
             }
         )
         logger.info(
@@ -613,7 +609,7 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
             },
             "control/eos_discharge_allowed": {
                 "value": base_control.get_current_discharge_allowed()
-            }
+            },
         }
     )
     # set the current battery state of charge
@@ -651,11 +647,11 @@ def change_control_state():
         {
             "control/overall_state": {
                 "value": base_control.get_current_overall_state_number()
-                },
+            },
             "optimization/state": {
                 "value": optimization_scheduler.get_current_state()["request_state"]
             },
-            "control/override_remain_time": { "value": "01:00" },
+            "control/override_remain_time": {"value": "01:00"},
             "battery/soc": {"value": battery_interface.get_current_soc()},
             "battery/remaining_energy": {
                 "value": battery_interface.get_current_usable_capacity()
@@ -805,6 +801,8 @@ def get_controls():
             "current_discharge_allowed": current_discharge_allowed,
             "inverter_mode": current_inverter_mode,
             "inverter_mode_num": current_inverter_mode_num,
+            "override_active": base_control.get_override_active_and_endtime()[0],
+            "override_end_time": base_control.get_override_active_and_endtime()[1],
         },
         "evcc": {
             "charging_state": base_control.get_current_evcc_charging_state(),
@@ -815,6 +813,9 @@ def get_controls():
             "soc": current_battery_soc,
             "usable_capacity": battery_interface.get_current_usable_capacity(),
             "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
+            "max_grid_charge_rate": config_manager.config["inverter"][
+                "max_grid_charge_rate"
+            ],
         },
         "state": optimization_scheduler.get_current_state(),
         "eos_connect_version": __version__,
@@ -825,6 +826,112 @@ def get_controls():
         json.dumps(response_data, indent=4), content_type="application/json"
     )
 
+
+@app.route("/controls/mode_override", methods=["POST"])
+def handle_mode_override():
+    """
+    Handles a POST request to override the inverter mode.
+
+    Expects a JSON payload with the following structure:
+    {
+        "mode": <int>,  # The mode to override (0, 1, 2, etc.)
+        "duration": <int>  # Duration in minutes for the override
+    }
+
+    Returns:
+        A JSON response indicating success or failure.
+    """
+    try:
+        data = request.get_json()
+        if (
+            not data
+            or "mode" not in data
+            or "duration" not in data
+            or "grid_charge_power" not in data
+        ):
+            return Response(
+                json.dumps({"error": "Invalid payload"}),
+                status=400,
+                content_type="application/json",
+            )
+
+        mode = int(data["mode"])
+        duration_string = data["duration"]  # 00:00, 00:30, 01:00 ...
+        duration_hh = duration_string.split(":")[0]
+        duration_mm = duration_string.split(":")[1]
+        duration = int(duration_hh) * 60 + int(duration_mm)
+        grid_charge_power = float(data["grid_charge_power"])
+
+        # Validate mode and duration
+        if mode < -1 or mode > 2:
+            return Response(
+                json.dumps({"error": "Invalid mode value"}),
+                status=400,
+                content_type="application/json",
+            )
+        if duration <= 0 and duration <= 12 * 60:
+            return Response(
+                json.dumps(
+                    {
+                        "error": "Duration must be greater than 0 and less/ equal than 12 hours"
+                    }
+                ),
+                status=400,
+                content_type="application/json",
+            )
+        if (
+            grid_charge_power < 0.5
+            and grid_charge_power
+            <= config_manager.config["inverter"]["max_grid_charge_rate"] / 1000
+        ):
+            return Response(
+                json.dumps(
+                    {
+                        "error": "Grid charge power must be greater than 0"
+                        + " and less / equal than max grid charge rate"
+                    }
+                ),
+                status=400,
+                content_type="application/json",
+            )
+
+        # Apply the override
+        base_control.set_mode_override(mode, duration, grid_charge_power)
+        change_control_state()
+        if mode == -1:
+            logger.info("[Main] Mode override deactivated")
+        else:
+            logger.info(
+                "[Main] Mode override applied: mode=%s, duration=%d minutes",
+                base_control.get_state_mapping(mode),
+                duration,
+            )
+
+        return Response(
+            json.dumps({"status": "success", "message": "Mode override applied"}),
+            content_type="application/json",
+        )
+    except ValueError as e:
+        logger.error("[Main] Value error in mode override: %s", e)
+        return Response(
+            json.dumps({"error": "Invalid input"}),
+            status=400,
+            content_type="application/json",
+        )
+    except TypeError as e:
+        logger.error("[Main] Type error in mode override: %s", e)
+        return Response(
+            json.dumps({"error": "Invalid data type"}),
+            status=400,
+            content_type="application/json",
+        )
+    except KeyError as e:
+        logger.error("[Main] Key error in mode override: %s", e)
+        return Response(
+            json.dumps({"error": "Missing or invalid key in input data"}),
+            status=400,
+            content_type="application/json",
+        )
 
 if __name__ == "__main__":
     http_server = WSGIServer(
@@ -839,6 +946,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("[Main] Shutting down EOS connect")
         optimization_scheduler.shutdown()
+        base_control.shutdown()
         http_server.stop()
         logger.info("[Main] HTTP server stopped")
 

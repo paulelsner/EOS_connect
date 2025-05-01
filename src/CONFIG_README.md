@@ -17,8 +17,7 @@ A default config file will be created with the first start, if there is no `conf
 
 - **`load.load_sensor`**:  
   Item/entity name for load power data (OpenHAB item/Home Assistant sensor).  
-  Must be in watts.  
-  **Hint**: For Home Assistant, negative values are expected for persisted data.
+  Must be in watts.
 
 - **`load.car_charge_load_sensor`**:  
   Item/entity name for wallbox power data.  

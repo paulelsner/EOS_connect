@@ -198,7 +198,56 @@ class BatteryInterface:
         """
         return round(self.current_usable_capacity, 2)
 
-    def get_max_charge_power_dyn(self, soc=None):
+    def get_max_charge_power_dyn(self, soc=None, min_charge_power=500):
+        """
+        Calculates the maximum charge power of the battery dynamically based on SOC
+        using a decay function that incorporates the C-rate.
+
+        The formula reduces the charge power as SOC increases:
+        - At low SOC, the charge power is close to the maximum C-rate (e.g., 1C).
+        - As SOC approaches 100%, the charge power decreases exponentially.
+        - The charge power is never less than the specified minimum value.
+
+        Args:
+            soc (float, optional): The state of charge to use for calculation.
+                                If None, the current SOC is used.
+            min_charge_power (float): The minimum charge power in watts.
+
+        Returns:
+            float: The dynamically calculated maximum charge power in watts.
+        """
+        if soc is None:
+            soc = self.current_soc
+
+        # Get the battery capacity in watt-hours
+        battery_capacity_wh = self.battery_data.get("capacity_wh", 0)
+
+        if battery_capacity_wh <= 0:
+            logger.warning("[BATTERY-IF] Battery capacity is not set or invalid.")
+            return min_charge_power
+
+        # Ensure SOC is within valid bounds
+        if soc < 0 or soc > 100:
+            logger.warning("[BATTERY-IF] Invalid SOC value: %s. Returning minimum charge power.", soc)
+            return min_charge_power
+
+        # Define the maximum C-rate (e.g., 1C at low SOC)
+        max_c_rate = 1.0  # 1C means charging at full capacity per hour
+        min_c_rate = 0.1  # Minimum C-rate at high SOC (e.g., 10% of capacity)
+
+        # Decay function: C-rate decreases exponentially with SOC
+        c_rate = min_c_rate + (max_c_rate - min_c_rate) * (1 - (soc / 100) ** 2)
+
+        # Calculate the maximum charge power in watts
+        max_charge_power = c_rate * battery_capacity_wh
+
+        # Ensure the charge power does not exceed the fixed maximum charge power
+        max_charge_power = min(max_charge_power, self.max_charge_power_fix)
+
+        # Ensure the charge power is not less than the minimum charge power
+        return max(max_charge_power, min_charge_power)
+
+    def get_max_charge_power_dyn_stat(self, soc=None):
         """
         Calculates the maximum charge power of the battery depending on the SOC.
 

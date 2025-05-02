@@ -688,7 +688,12 @@ def change_control_state():
             )
         # MODE_DISCHARGE_ALLOWED
         elif current_overall_state == 2:
+            tgt_charge_power = min(
+                base_control.get_current_dc_charge_demand(),
+                round(battery_interface.get_max_charge_power_dyn()),
+            )
             if inverter_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_charge_power)
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+++++_____)",

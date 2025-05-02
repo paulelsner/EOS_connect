@@ -43,6 +43,7 @@ class BaseControl:
         self.current_ac_charge_demand_no_override = 0
         self.last_ac_charge_demand = 0
         self.current_dc_charge_demand = 0
+        self.last_dc_charge_demand = 0
         self.current_discharge_allowed = -1
         self.current_evcc_charging_state = False
         self.current_evcc_charging_mode = False
@@ -231,6 +232,9 @@ class BaseControl:
         grid_charge_value_changed = (
             self.current_ac_charge_demand != self.last_ac_charge_demand
         )
+        pv_charge_value_changed = (
+            self.current_dc_charge_demand != self.last_dc_charge_demand
+        )
 
         # override overall state if EVCC charging state is active and
         # in mode fast charge and discharge is allowed
@@ -271,7 +275,7 @@ class BaseControl:
                 + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV"
             )
 
-        if new_state != self.current_overall_state or grid_charge_value_changed:
+        if new_state != self.current_overall_state or grid_charge_value_changed or pv_charge_value_changed:
             self._state_change_timestamps.append(time.time())
             # Limit the size of the state change timestamps to avoid memory overrun
             max_timestamps = 1000  # Adjust this value as needed
@@ -281,6 +285,11 @@ class BaseControl:
                 logger.info(
                     "[BASE_CTRL] AC charge demand changed to %s",
                     self.current_ac_charge_demand,
+                )
+            elif pv_charge_value_changed:
+                logger.info(
+                    "[BASE_CTRL] DC charge demand changed to %s",
+                    self.current_dc_charge_demand,
                 )
             else:
                 logger.debug(

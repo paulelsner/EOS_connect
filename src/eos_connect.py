@@ -656,6 +656,9 @@ def change_control_state():
             "battery/remaining_energy": {
                 "value": battery_interface.get_current_usable_capacity()
             },
+            "battery/dyn_max_charge_power": {
+                "value": battery_interface.get_max_charge_power_dyn()
+            },
             "status": {"value": "online"},
         }
     )

@@ -228,7 +228,10 @@ class BatteryInterface:
 
         # Ensure SOC is within valid bounds
         if soc < 0 or soc > 100:
-            logger.warning("[BATTERY-IF] Invalid SOC value: %s. Returning minimum charge power.", soc)
+            logger.warning(
+                "[BATTERY-IF] Invalid SOC value: %s. Returning minimum charge power.",
+                soc,
+            )
             return min_charge_power
 
         # Define the maximum C-rate (e.g., 1C at low SOC)
@@ -243,6 +246,9 @@ class BatteryInterface:
 
         # Ensure the charge power does not exceed the fixed maximum charge power
         max_charge_power = min(max_charge_power, self.max_charge_power_fix)
+
+        # Round the charge power to the nearest 10 watts
+        max_charge_power = round(max_charge_power / 10) * 10
 
         # Ensure the charge power is not less than the minimum charge power
         return max(max_charge_power, min_charge_power)
@@ -303,8 +309,12 @@ class BatteryInterface:
                 self.__battery_request_current_soc()
                 self.current_usable_capacity = (
                     self.battery_data.get("capacity_wh", 0)
-                    * self.battery_data.get("discharge_efficiency",1.0)
-                    * (self.current_soc - self.battery_data.get("min_soc_percentage",0)) / 100
+                    * self.battery_data.get("discharge_efficiency", 1.0)
+                    * (
+                        self.current_soc
+                        - self.battery_data.get("min_soc_percentage", 0)
+                    )
+                    / 100
                 )
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 logger.error("[BATTERY-IF] Error while updating state: %s", e)

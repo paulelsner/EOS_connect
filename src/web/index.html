@@ -668,7 +668,7 @@
             document.getElementById('battery_soc').innerText = data_controls["battery"]["soc"] + " %";
             // set battery icon
             document.getElementById('battery_icon_main').innerHTML = getBatteryIcon(data_controls["battery"]["soc"]);
-            document.getElementById('current_max_charge_dyn').innerHTML = "<i>" + (data_controls["battery"]["max_charge_power_dyn"] / 1000).toFixed(1) + " kW</i>";
+            document.getElementById('current_max_charge_dyn').innerHTML = "<i>" + (data_controls["battery"]["max_charge_power_dyn"] / 1000).toFixed(2) + " kW</i>";
             // set battery usable energy
             document.getElementById('battery_usable_capacity').innerHTML = '<i class="fa-solid fa-database"></i> ' + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + ' <span style="font-size: 0.6em;">kWh</span>';
             document.getElementById('battery_usable_capacity').title = "usable capacity: " + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + " kWh";

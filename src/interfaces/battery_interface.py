@@ -236,10 +236,17 @@ class BatteryInterface:
 
         # Define the maximum C-rate (e.g., 1C at low SOC)
         max_c_rate = 1.0  # 1C means charging at full capacity per hour
-        min_c_rate = 0.1  # Minimum C-rate at high SOC (e.g., 10% of capacity)
+        min_c_rate = 0.05  # Minimum C-rate at high SOC (e.g., 5% of capacity)
 
-        # Decay function: C-rate decreases exponentially with SOC
-        c_rate = min_c_rate + (max_c_rate - min_c_rate) * (1 - (soc / 100) ** 2)
+        if soc <= 50:
+            # Linear decrease of C-rate up to 50% SOC
+            c_rate = max_c_rate
+        else:
+            # Logarithmic decrease of C-rate after 50% SOC
+            c_rate = max(
+            min_c_rate,
+            max_c_rate * (1 - (soc - 50) / 60) ** 2
+            )
 
         # Calculate the maximum charge power in watts
         max_charge_power = c_rate * battery_capacity_wh
@@ -247,8 +254,8 @@ class BatteryInterface:
         # Ensure the charge power does not exceed the fixed maximum charge power
         max_charge_power = min(max_charge_power, self.max_charge_power_fix)
 
-        # Round the charge power to the nearest 10 watts
-        max_charge_power = round(max_charge_power / 10) * 10
+        # Round the charge power to the nearest 50 watts
+        max_charge_power = round(max_charge_power / 50) * 50
 
         # Ensure the charge power is not less than the minimum charge power
         return max(max_charge_power, min_charge_power)

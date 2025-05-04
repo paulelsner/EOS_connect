@@ -20,6 +20,7 @@ MODE_DISCHARGE_ALLOWED_EVCC_PV = 4
 MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV = 5
 
 state_mapping = {
+    -2: "BACK TO AUTO",
     -1: "MODE Startup",
     0: "MODE CHARGE FROM GRID",
     1: "MODE AVOID DISCHARGE",
@@ -40,10 +41,11 @@ class BaseControl:
 
     def __init__(self, config, timezone):
         self.current_ac_charge_demand = 0
-        self.current_ac_charge_demand_no_override = 0
         self.last_ac_charge_demand = 0
+        self.current_ac_charge_demand_no_override = 0
         self.current_dc_charge_demand = 0
         self.last_dc_charge_demand = 0
+        self.current_dc_charge_demand_no_override = 0
         self.current_discharge_allowed = -1
         self.current_evcc_charging_state = False
         self.current_evcc_charging_mode = False
@@ -132,7 +134,7 @@ class BaseControl:
         """
         Returns whether the override is active.
         """
-        return self.override_active, self.override_end_time
+        return self.override_active, int(self.override_end_time)
 
     def set_current_ac_charge_demand(self, value_relative):
         """
@@ -155,7 +157,7 @@ class BaseControl:
             )
         else:
             logger.debug(
-                "[BASE_CTRL] OVERRIDE remain AC charge demand for current hour %s:00 -> %s Wh -"
+                "[BASE_CTRL] OVERRIDE AC charge demand for current hour %s:00 -> %s Wh -"
                 + " based on max charge power %s W",
                 current_hour,
                 self.current_ac_charge_demand,
@@ -168,16 +170,29 @@ class BaseControl:
         Sets the current DC charge demand.
         """
         current_hour = datetime.now(self.time_zone).hour
-        self.current_dc_charge_demand = (
+        current_charge_demand = (
             value_relative * self.config["battery"]["max_charge_power_w"]
         )
-        logger.debug(
-            "[BASE_CTRL] set DC charge demand for current hour %s:00 -> %s Wh -"
-            + " based on max charge power %s W",
-            current_hour,
-            self.current_dc_charge_demand,
-            self.config["battery"]["max_charge_power_w"],
-        )
+        # store the current charge demand without override
+        self.current_dc_charge_demand_no_override = current_charge_demand
+        if not self.override_active:
+            self.current_dc_charge_demand = current_charge_demand
+            logger.debug(
+                "[BASE_CTRL] set DC charge demand for current hour %s:00 -> %s Wh -"
+                + " based on max charge power %s W",
+                current_hour,
+                self.current_dc_charge_demand,
+                self.config["battery"]["max_charge_power_w"],
+            )
+        else:
+            logger.debug(
+                "[BASE_CTRL] OVERRIDE DC charge demand for current hour %s:00 -> %s Wh -"
+                + " based on max charge power %s W",
+                current_hour,
+                self.current_dc_charge_demand,
+                self.config["battery"]["max_charge_power_w"],
+            )
+        
         self.__set_current_overall_state()
 
     def set_current_discharge_allowed(self, value):
@@ -232,7 +247,7 @@ class BaseControl:
         grid_charge_value_changed = (
             self.current_ac_charge_demand != self.last_ac_charge_demand
         )
-        pv_charge_value_changed = (
+        dc_charge_value_changed = (
             self.current_dc_charge_demand != self.last_dc_charge_demand
         )
 
@@ -275,7 +290,11 @@ class BaseControl:
                 + " setting overall state to MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV"
             )
 
-        if new_state != self.current_overall_state or grid_charge_value_changed or pv_charge_value_changed:
+        if (
+            new_state != self.current_overall_state
+            or grid_charge_value_changed
+            or dc_charge_value_changed
+        ):
             self._state_change_timestamps.append(time.time())
             # Limit the size of the state change timestamps to avoid memory overrun
             max_timestamps = 1000  # Adjust this value as needed
@@ -286,7 +305,7 @@ class BaseControl:
                     "[BASE_CTRL] AC charge demand changed to %s",
                     self.current_ac_charge_demand,
                 )
-            elif pv_charge_value_changed:
+            elif dc_charge_value_changed:
                 logger.info(
                     "[BASE_CTRL] DC charge demand changed to %s",
                     self.current_dc_charge_demand,
@@ -298,6 +317,8 @@ class BaseControl:
                 )
         # store the last AC charge demand for comparison
         self.last_ac_charge_demand = self.current_ac_charge_demand
+        # store the last DC charge demand for comparison
+        self.last_dc_charge_demand = self.current_dc_charge_demand
 
         self.current_overall_state = new_state
 
@@ -313,10 +334,9 @@ class BaseControl:
         Sets the current overall state to a specific mode.
         """
         # switch back to EOS given demands
-        if mode == -1:
+        if mode == -2:
             self.clear_mode_override()
             return
-        # duration comes in 00:00, 00:30, 01:00, 01:30 format
         # convert to seconds
         duration_seconds = 0
         if 0 <= duration <= 12 * 60:
@@ -344,6 +364,12 @@ class BaseControl:
                     "[BASE_CTRL] OVERRIDE set AC charge demand to %s",
                     self.current_ac_charge_demand,
                 )
+            if charge_rate > 0 and mode == MODE_DISCHARGE_ALLOWED:
+                self.current_dc_charge_demand = charge_rate * 1000
+                logger.info(
+                    "[BASE_CTRL] OVERRIDE set DC charge demand to %s",
+                    self.current_dc_charge_demand,
+                )
         else:
             logger.error("[BASE_CTRL] OVERRIDE invalid mode %s", mode)
 
@@ -354,6 +380,7 @@ class BaseControl:
         self.override_active = False
         self.override_end_time = 0
         self.current_ac_charge_demand = self.current_ac_charge_demand_no_override
+        self.current_dc_charge_demand = self.current_dc_charge_demand_no_override
         self.__set_current_overall_state()
         # reset the override end time to 0
         logger.info("[BASE_CTRL] cleared mode override")

@@ -30,10 +30,7 @@ class MqttInterface:
     and publishes messages.
     """
 
-    def __init__(
-        self,
-        config_mqtt: Dict[str, Any],
-    ):
+    def __init__(self, config_mqtt: Dict[str, Any], on_mqtt_command=None):
         """
         Initialize the MQTT client.
 
@@ -70,11 +67,6 @@ class MqttInterface:
         if self.tls:
             self.client.tls_set()
 
-        self.topcis_subscribed = {
-            "control/overall_state/set": False,
-            "control/override_remain_time/set": False,
-        }
-
         self.topics_publish = {
             "status": {
                 "value": "offline",
@@ -85,6 +77,7 @@ class MqttInterface:
                 "type": "sensor",
                 "device_class": None,
                 "icon": "mdi:state-machine",
+                "entity_category": "diagnostic",
             },
             "control/overall_state": {
                 "value": None,
@@ -98,7 +91,9 @@ class MqttInterface:
                 "device_class": None,
                 "icon": "mdi:state-machine",
                 "value_template": (
-                    "{% if value == '0' %}Charge from Grid"
+                    "{% if value == '-2' %}Auto"
+                    "{% elif value == '-1' %}StartUp"
+                    "{% elif value == '0' %}Charge from Grid"
                     "{% elif value == '1' %}Avoid Discharge"
                     "{% elif value == '2' %}Discharge Allowed"
                     "{% elif value == '3' %}Avoid Discharge EVCC FAST"
@@ -107,21 +102,24 @@ class MqttInterface:
                     "{% else %}Unknown{% endif %}"
                 ),
                 "command_template": (
-                    "{% if value == 'Charge from Grid' %}0"
+                    "{% if value == 'Auto' %}-2"
+                    "{% elif value == 'Charge from Grid' %}0"
                     "{% elif value == 'Avoid Discharge' %}1"
                     "{% elif value == 'Discharge Allowed' %}2"
-                    "{% elif value == 'Avoid Discharge EVCC FAST' %}3"
-                    "{% elif value == 'Avoid Discharge EVCC PV' %}4"
-                    "{% elif value == 'Avoid Discharge EVCC MIN+PV' %}5"
+                    # "{% elif value == 'Avoid Discharge EVCC FAST' %}3"
+                    # "{% elif value == 'Avoid Discharge EVCC PV' %}4"
+                    # "{% elif value == 'Avoid Discharge EVCC MIN+PV' %}5"
                     "{% else %}2{% endif %}"
                 ),
                 "options": [
                     "Charge from Grid",
                     "Avoid Discharge",
                     "Discharge Allowed",
-                    "Avoid Discharge EVCC FAST",
-                    "Avoid Discharge EVCC PV",
-                    "Avoid Discharge EVCC MIN+PV",
+                    # "Avoid Discharge EVCC FAST",
+                    # "Avoid Discharge EVCC PV",
+                    # "Avoid Discharge EVCC MIN+PV",
+                    "Auto",
+                    # "StartUp"
                 ],
             },
             "control/eos_ac_charge_demand": {
@@ -173,7 +171,6 @@ class MqttInterface:
                     "00:30",
                     "01:00",
                     "01:30",
-                    "01:30",
                     "02:00",
                     "02:30",
                     "03:00",
@@ -196,6 +193,42 @@ class MqttInterface:
                     "11:30",
                     "12:00",
                 ],
+            },
+            "control/override_charge_power": {
+                "value": None,
+                "set_value": None,
+                "command_topic": "control/override_charge_power/set",
+                "name": "Override Charge Power",
+                "qos": 0,
+                "retain": True,
+                "unit": None,
+                "type": "number",
+                "min": 0,
+                "max": 10000,
+                "step": 100,
+                "device_class": "power",
+                "icon": "mdi:state-machine",
+            },
+            "control/override_active": {
+                "value": None,
+                "name": "Override Active",
+                "qos": 0,
+                "retain": True,
+                "unit": None,
+                "type": "binary_sensor",
+                "device_class": None,
+                "value_template": "{{ 'OFF' if 'False' in value else 'ON'}}",
+                "icon": "mdi:state-machine",
+            },
+            "control/override_end_time": {
+                "value": None,
+                "name": "Override End Time",
+                "qos": 0,
+                "retain": True,
+                "unit": None,
+                "type": "sensor",
+                "device_class": "timestamp",
+                "icon": "mdi:clock",
             },
             "optimization/last_run": {
                 "value": None,
@@ -269,6 +302,7 @@ class MqttInterface:
         self.client.will_set(self.base_topic + "/status", "offline", qos=1, retain=True)
 
         # Attach event callbacks
+        self.on_mqtt_command = on_mqtt_command  # Store the callback
         self.client.on_connect = self.__on_connect
         self.client.on_message = self.__on_message
         self.client.on_disconnect = self.__on_disconnect
@@ -283,8 +317,9 @@ class MqttInterface:
         Subscribe to the necessary topics for the MQTT client.
         """
         if self.base_topic:
-            for topic, subscribe in self.topcis_subscribed.items():
-                self.__subscribe(self.base_topic + "/" + topic)
+            for topic, value in self.topics_publish.items():
+                if "command_topic" in value and value["command_topic"]:
+                    self.__subscribe(self.base_topic + "/" + value["command_topic"])
 
     def __on_connect(self, client, userdata, flags, rc):
         """
@@ -342,8 +377,61 @@ class MqttInterface:
         """
         Callback for when a message is received on a subscribed topic.
         """
-        logger.info(
+        logger.debug(
             "[MQTT] Received message on topic '%s': %s", msg.topic, msg.payload.decode()
+        )
+        topic = msg.topic.replace(self.base_topic + "/", "", 1).removesuffix("/set")
+        if topic in self.topics_publish:
+            try:
+                self.topics_publish[topic]["set_value"] = msg.payload.decode()
+                logger.info(
+                    "[MQTT] message received - set value for topic '%s': %s",
+                    topic,
+                    self.topics_publish[topic]["set_value"],
+                )
+            except KeyError as e:
+                logger.error(
+                    "[MQTT] KeyError while updating publish topic => %s: %s",
+                    topic,
+                    e,
+                )
+            except (TypeError, ValueError) as e:
+                logger.error("[MQTT] Error while updating publish topics: %s", e)
+            # call the callback if it is set and current topic is "control/overall_state"
+            if self.on_mqtt_command and topic == "control/overall_state":
+                self.__set_change_mode_callback(topic)
+
+    def __set_change_mode_callback(self, topic):
+        """
+        Private method to handle the change mode callback for MQTT commands.
+
+        This method logs the received MQTT topic and associated values, then
+        invokes the `on_mqtt_command` callback with a dictionary containing
+        mode, duration, and grid charge power information.
+
+        Args:
+            topic (str): The MQTT topic triggering the callback.
+
+        Logs:
+            Logs the topic, remaining time, and charge power values for debugging.
+        """
+        logger.debug(
+            "[MQTT] Calling on_mqtt_command callback with topic '%s' and "
+            + "remain time '%s' and charge power '%s'",
+            topic,
+            self.topics_publish["control/override_remain_time"]["set_value"],
+            self.topics_publish["control/override_charge_power"]["set_value"],
+        )
+        self.on_mqtt_command(
+            {
+                "mode": self.topics_publish["control/overall_state"]["set_value"],
+                "duration": self.topics_publish["control/override_remain_time"][
+                    "set_value"
+                ],
+                "charge_power": self.topics_publish[
+                    "control/override_charge_power"
+                ]["set_value"],
+            }
         )
 
     def __connect(self):
@@ -449,6 +537,9 @@ class MqttInterface:
                 and self.base_topic + "/" + value["command_topic"],
                 entity_category=value.get("entity_category")
                 and value["entity_category"],
+                min_value=value.get("min") and value["min"],
+                max_value=value.get("max") and value["max"],
+                step_value=value.get("step") and value["step"],
                 value_template=value.get("value_template") and value["value_template"],
                 command_template=value.get("command_template")
                 and value["command_template"],

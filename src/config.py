@@ -147,7 +147,7 @@ class ConfigManager:
             "item / entity for load power data in watts", "load_sensor"
         )
         config["load"].yaml_add_eol_comment(
-            "item / entity for wallbox power data in watts or kilowatts",
+            "item / entity for wallbox power data in watts",
             "car_charge_load_sensor",
         )
         config["load"].yaml_add_eol_comment(

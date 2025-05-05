@@ -336,22 +336,24 @@ class LoadInterface:
             self.car_charge_load_sensor, start_time, end_time
         )
         # check for max value in car_load_data
-        max_car_load = 0
-        car_load_unit_factor = 1
-        for data_entry in car_load_data:
-            try:
-                float(data_entry["state"])
-            except ValueError:
-                continue
-            max_car_load = max(max_car_load, float(data_entry["state"]))
-        if 0 < max_car_load < 23:
-            max_car_load = max_car_load * 1000
-            car_load_unit_factor = 1000
+        # max_car_load = 0
+        # car_load_unit_factor = 1
+        # for data_entry in car_load_data:
+        #     try:
+        #         float(data_entry["state"])
+        #     except ValueError:
+        #         continue
+        #     max_car_load = max(max_car_load, float(data_entry["state"]))
+        # if 0 < max_car_load < 23:
+        #     max_car_load = max_car_load * 1000
+        #     car_load_unit_factor = 1000
         # logger.debug("[LOAD-IF] Max car load: %s W", round(max_car_load,0))
         # multiply every value with car_load_unit_factor before returning
         for data_entry in car_load_data:
             try:
-                data_entry["state"] = float(data_entry["state"]) * car_load_unit_factor
+                data_entry["state"] = float(
+                    data_entry["state"]
+                )  # * car_load_unit_factor
             except ValueError:
                 continue
             except KeyError:
@@ -393,7 +395,8 @@ class LoadInterface:
                 energy = energy - car_load_energy
             else:
                 logger.error(
-                    "[LOAD-IF] DATA ERROR load smaller than car load - Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    "[LOAD-IF] DATA ERROR load smaller than car load "+
+                    "- Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
                     current_hour,
                     round(energy, 1),
                     round(car_load_energy, 1),

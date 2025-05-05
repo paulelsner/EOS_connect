@@ -19,7 +19,7 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
   - [Configuration](#configuration)
   - [Useful Information](#useful-information)
     - [Getting historical values](#getting-historical-values)
-      - [Homeassistant](#homeassistant)
+      - [Home Assistant Persistance](#home-assistant-persistance)
       - [Openhab](#openhab-1)
   - [Usage](#usage)
   - [Requirements](#requirements)
@@ -126,13 +126,14 @@ Data collection for load forecasting is based on your existing load data provide
 Load data is retrieved from:
 - Today one week ago, averaged with today two weeks ago.
 - Tomorrow one week ago, averaged with tomorrow two weeks ago.
+- **Car Load Adjustment**: If an electric vehicle (EV) is/ was connected, its load is subtracted from the household load to ensure accurate forecasting of non-EV energy consumption.
 
-(See [Home Assistant](#home-assistant) for more details.)
+(See [Home Assistant Persistance](#home-assistant-persistance) for more details.)
 
 #### OpenHAB
 Load data is retrieved from the last two days:
 - From two days ago (00:00) to yesterday midnight.
-(hint: )
+- **Car Load Adjustment**: Similar to Home Assistant, the EV load is subtracted from the household load to isolate non-EV energy consumption.
 
 #### PV Forecast
 PV forecasts are retrieved directly from the [AKKUDOKTOR API](https://api.akkudoktor.net/forecast).
@@ -158,7 +159,7 @@ With the first start of **EOS connect** a default `config.yaml` will be generate
 
 ### Getting historical values
 
-#### Homeassistant
+#### Home Assistant Persistance
 
 The tool will use historical data from Home Assistant's local database. By default, this database is configured with a retention period of **10 days**.
 

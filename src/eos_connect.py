@@ -120,6 +120,14 @@ def charging_state_callback(new_state):
     change_control_state()
 
 
+# callback function for battery interface
+def battery_state_callback():
+    """
+    Callback function that gets triggered when the battery state changes.
+    """
+    # update the base control with the new battery state of charge
+    change_control_state()
+
 # callback function for mqtt interface
 def mqtt_control_callback(command):
     """
@@ -187,6 +195,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
     config_manager.config.get("battery", {}),
+    on_bat_max_changed=battery_state_callback
 )
 
 price_interface = PriceInterface(
@@ -711,7 +720,7 @@ def change_control_state():
                 "value": battery_interface.get_current_usable_capacity()
             },
             "battery/dyn_max_charge_power": {
-                "value": battery_interface.get_max_charge_power_dyn()
+                "value": battery_interface.get_max_charge_power()
             },
             "status": {"value": "online"},
         }
@@ -721,12 +730,14 @@ def change_control_state():
     # to the max dynamic charge power of the battery based on SOC
     tgt_ac_charge_power = min(
         base_control.get_current_ac_charge_demand(),
-        round(battery_interface.get_max_charge_power_dyn()),
+        round(battery_interface.get_max_charge_power()),
     )
     tgt_dc_charge_power = min(
         base_control.get_current_dc_charge_demand(),
-        round(battery_interface.get_max_charge_power_dyn()),
+        round(battery_interface.get_max_charge_power()),
     )
+
+    base_control.set_current_bat_charge_max(max(tgt_ac_charge_power, tgt_dc_charge_power))
 
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
@@ -786,8 +797,8 @@ def change_control_state():
         elif current_overall_state < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
-    # Log the current state if no recent changes were made
 
+    # Log the current state if no recent changes were made
     logger.info(
         "[Main] Overall state not changed recently"
         + " - remaining in current state: %s  (_____OOOOO_____)",
@@ -877,7 +888,7 @@ def get_controls():
         "battery": {
             "soc": current_battery_soc,
             "usable_capacity": battery_interface.get_current_usable_capacity(),
-            "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
+            "max_charge_power_dyn": battery_interface.get_max_charge_power(),
             "max_grid_charge_rate": config_manager.config["inverter"][
                 "max_grid_charge_rate"
             ],

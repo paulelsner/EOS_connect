@@ -63,15 +63,18 @@ class BatteryInterface:
             Fetches the current SOC of the battery based on the configured source.
     """
 
-    def __init__(self, src, url, soc_sensor, access_token, battery_data):
+    def __init__(self, src, url, soc_sensor, access_token, battery_data, on_bat_max_changed=None):
         self.src = src
         self.url = url
         self.soc_sensor = soc_sensor
         self.access_token = access_token
         self.max_charge_power_fix = battery_data.get("max_charge_power_w", 0)
+        self.max_charge_power_dyn = 0
+        self.last_max_charge_power_dyn = 0
         self.battery_data = battery_data
         self.current_soc = 0
         self.current_usable_capacity = 0
+        self.on_bat_max_changed = on_bat_max_changed
         self.update_interval = 30
         self._update_thread = None
         self._stop_event = threading.Event()
@@ -192,13 +195,19 @@ class BatteryInterface:
         """
         return self.current_soc
 
+    def get_max_charge_power(self):
+        """
+        Returns the maximum charge power of the battery.
+        """
+        return round(self.max_charge_power_dyn, 0)
+
     def get_current_usable_capacity(self):
         """
         Returns the current usable capacity of the battery.
         """
         return round(self.current_usable_capacity, 2)
 
-    def get_max_charge_power_dyn(self, soc=None, min_charge_power=500):
+    def __get_max_charge_power_dyn(self, soc=None, min_charge_power=500):
         """
         Calculates the maximum charge power of the battery dynamically based on SOC
         using a decay function that incorporates the C-rate.
@@ -257,34 +266,14 @@ class BatteryInterface:
         # Round the charge power to the nearest 50 watts
         max_charge_power = round(max_charge_power / 50) * 50
 
-        # Ensure the charge power is not less than the minimum charge power
-        return max(max_charge_power, min_charge_power)
-
-    def get_max_charge_power_dyn_stat(self, soc=None):
-        """
-        Calculates the maximum charge power of the battery depending on the SOC.
-
-        - If SOC < 60%, the fixed maximum charge power is used.
-        - If SOC >= 60% and < 95%, the maximum charge power decreases linearly.
-        - If SOC >= 95%, the maximum charge power is fixed at 500W.
-
-        Args:
-            soc (float, optional): The state of charge to use for calculation.
-                       If None, the current SOC is used.
-
-        Returns:
-            float: The dynamically calculated maximum charge power in watts.
-        """
-        if soc is None:
-            soc = self.current_soc
-
-        if soc < 70:
-            return self.max_charge_power_fix
-        elif soc >= 70 and soc < 95:
-            return max(500, self.max_charge_power_fix * ((95 - soc) / 35))
-            # return max(500, self.max_charge_power_fix * (1 - (soc / 100)**2))
-        else:  # SOC >= 95
-            return 500
+        self.max_charge_power_dyn = max(max_charge_power, min_charge_power)
+        if self.max_charge_power_dyn != self.last_max_charge_power_dyn:
+            self.last_max_charge_power_dyn = self.max_charge_power_dyn
+            logger.info(
+                "[BATTERY-IF] Max dynamic charge power changed to %s W", self.max_charge_power_dyn
+            )
+            if self.on_bat_max_changed:
+                self.on_bat_max_changed()
 
     def start_update_service(self):
         """
@@ -323,6 +312,8 @@ class BatteryInterface:
                     )
                     / 100
                 )
+                self.__get_max_charge_power_dyn()
+                
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 logger.error("[BATTERY-IF] Error while updating state: %s", e)
                 # Break the sleep interval into smaller chunks to allow immediate shutdown

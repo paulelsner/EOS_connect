@@ -46,6 +46,8 @@ class BaseControl:
         self.current_dc_charge_demand = 0
         self.last_dc_charge_demand = 0
         self.current_dc_charge_demand_no_override = 0
+        self.current_bat_charge_max = 0
+        self.last_bat_charge_max = 0
         self.current_discharge_allowed = -1
         self.current_evcc_charging_state = False
         self.current_evcc_charging_mode = False
@@ -92,6 +94,15 @@ class BaseControl:
         Returns the current DC charge demand.
         """
         return self.current_dc_charge_demand
+
+    def get_current_bat_charge_max(self):
+        """
+        Returns the current maximum battery charge power.
+        """
+        logger.debug(
+            "[BASE_CTRL] get current battery charge max %s", self.current_bat_charge_max
+        )
+        return self.current_bat_charge_max
 
     def get_current_discharge_allowed(self):
         """
@@ -192,7 +203,17 @@ class BaseControl:
                 self.current_dc_charge_demand,
                 self.config["battery"]["max_charge_power_w"],
             )
-        
+        self.__set_current_overall_state()
+
+    def set_current_bat_charge_max(self, value_max):
+        """
+        Sets the current maximum battery charge power.
+        """
+        # store the current charge demand without override
+        self.current_bat_charge_max = value_max
+        logger.debug(
+            "[BASE_CTRL] set current battery charge max to %s", self.current_bat_charge_max
+        )
         self.__set_current_overall_state()
 
     def set_current_discharge_allowed(self, value):
@@ -250,6 +271,9 @@ class BaseControl:
         dc_charge_value_changed = (
             self.current_dc_charge_demand != self.last_dc_charge_demand
         )
+        bat_charge_max_value_changed = (
+            self.current_bat_charge_max != self.last_bat_charge_max
+        )
 
         # override overall state if EVCC charging state is active and
         # in mode fast charge and discharge is allowed
@@ -294,6 +318,7 @@ class BaseControl:
             new_state != self.current_overall_state
             or grid_charge_value_changed
             or dc_charge_value_changed
+            or bat_charge_max_value_changed
         ):
             self._state_change_timestamps.append(time.time())
             # Limit the size of the state change timestamps to avoid memory overrun
@@ -302,13 +327,18 @@ class BaseControl:
                 self._state_change_timestamps.pop(0)
             if grid_charge_value_changed:
                 logger.info(
-                    "[BASE_CTRL] AC charge demand changed to %s",
+                    "[BASE_CTRL] AC charge demand changed to %s W",
                     self.current_ac_charge_demand,
                 )
             elif dc_charge_value_changed:
                 logger.info(
-                    "[BASE_CTRL] DC charge demand changed to %s",
+                    "[BASE_CTRL] DC charge demand changed to %s W",
                     self.current_dc_charge_demand,
+                )
+            elif bat_charge_max_value_changed:
+                logger.info(
+                    "[BASE_CTRL] Battery charge max changed to %s W",
+                    self.current_bat_charge_max,
                 )
             else:
                 logger.debug(
@@ -319,6 +349,8 @@ class BaseControl:
         self.last_ac_charge_demand = self.current_ac_charge_demand
         # store the last DC charge demand for comparison
         self.last_dc_charge_demand = self.current_dc_charge_demand
+        # store the last battery charge max for comparison
+        self.last_bat_charge_max = self.current_bat_charge_max
 
         self.current_overall_state = new_state
 

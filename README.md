@@ -3,7 +3,10 @@
 EOS Connect is a tool designed to optimize energy usage by interacting with the [EOS (Energy Optimization System)](https://github.com/Akkudoktor-EOS/EOS). It fetches energy data, processes it, controls a FRONIUS inverter and connected battery and displays the results dynamically on a webpage.
 
 - [EOS Connect](#eos-connect)
-  - [Features](#features)
+  - [Key Features](#key-features)
+    - [**Energy Optimization**](#energy-optimization)
+    - [**Interactive Web Interface**](#interactive-web-interface)
+    - [**Integration with External Systems**](#integration-with-external-systems)
   - [Current Status](#current-status)
   - [How it Works](#how-it-works)
     - [Base](#base)
@@ -16,7 +19,7 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
   - [Configuration](#configuration)
   - [Useful Information](#useful-information)
     - [Getting historical values](#getting-historical-values)
-      - [Homeassistant](#homeassistant)
+      - [Home Assistant Persistance](#home-assistant-persistance)
       - [Openhab](#openhab-1)
   - [Usage](#usage)
   - [Requirements](#requirements)
@@ -31,16 +34,54 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
   - [License](#license)
 
 
+## Key Features
 
+### **Energy Optimization**
+- **Dynamic Energy Flow Control**:
+  - Automatically optimizes energy usage based on system states and external data.
+  - Supports manual override modes for precise control.
+- **Battery Management**:
+  - Monitors battery state of charge (SOC) and remaining energy.
+  - Configures charging and discharging modes, including:
+    - Charge from grid.
+    - Avoid discharge.
+    - Discharge allowed.
+    - EVCC-specific modes (e.g., fast charge, PV mode).
+  - **Dynamic Charging Curve**:
+    - Dynamically adjusts the maximum AC charging power based on system conditions.
+    - Ensures efficient and safe battery charging by adapting to real-time energy availability and battery state.
+- **Cost and Solar Optimization**:
+  - Aligns energy usage with real-time electricity prices (e.g., from Tibber) to minimize costs.
+  - Incorporates PV forecasts to prioritize charging during periods of high solar output.
+  - Reduces grid dependency and maximizes self-consumption by combining cost and solar production data.
+- **Energy Optimization Scheduling**:
+  - Displays timestamps for the last and next optimization runs.
+  - Tracks system performance and optimization results.
 
-## Features
-* Fetches energy or battery data from OpenHAB or HomeAssistant.
-* Processes data to create a load profile.
-* Interacts with the Tibber API and PV forecast API.
-* Manages configurations via a user-friendly config.yaml file.
-* Displays results dynamically on a webpage.
-* Controlling FRONIUS inverters and battery charging systems interactively.
-* Battery charging is dynamicaly limited depending on the SOC (charging curve)
+### **Interactive Web Interface**
+- **Real-Time Monitoring**:
+  - View current system states, including battery SOC, grid charge power, and EVCC modes.
+  - Dynamic icons and color-coded indicators for easy visualization.
+- **User Controls**:
+  - Set grid charge power and override system modes directly from the interface.
+  - Configure EVCC charging behavior with intuitive controls.
+
+### **Integration with External Systems**
+- **Home Assistant**:
+  - Full MQTT integration with Home Assistant Auto Discovery.
+  - Automatically detects and configures energy system entities.
+- **OpenHAB**:
+  - Integrates with OpenHAB for monitoring and controlling energy systems.
+  - Publishes system states and subscribes to commands via MQTT.
+- **EVCC (Electric Vehicle Charging Controller)**:
+  - Monitors and controls EVCC charging modes and states.
+  - Supports fast charge, PV charging, and combined modes.
+- **Inverter Interfaces**:
+  - Communicates directly with inverters (currently Fronius GEN24) to monitor and control energy flows.
+  - Retrieves real-time data such as grid charge power, discharge power, and battery SOC.
+- **MQTT Broker**:
+  - Acts as the central hub for real-time data exchange.
+  - Publishes system states and subscribes to control commands.
 
 ## Current Status
 
@@ -85,13 +126,14 @@ Data collection for load forecasting is based on your existing load data provide
 Load data is retrieved from:
 - Today one week ago, averaged with today two weeks ago.
 - Tomorrow one week ago, averaged with tomorrow two weeks ago.
+- **Car Load Adjustment**: If an electric vehicle (EV) is/ was connected, its load is subtracted from the household load to ensure accurate forecasting of non-EV energy consumption.
 
-(See [Home Assistant](#home-assistant) for more details.)
+(See [Home Assistant Persistance](#home-assistant-persistance) for more details.)
 
 #### OpenHAB
 Load data is retrieved from the last two days:
 - From two days ago (00:00) to yesterday midnight.
-(hint: )
+- **Car Load Adjustment**: Similar to Home Assistant, the EV load is subtracted from the household load to isolate non-EV energy consumption.
 
 #### PV Forecast
 PV forecasts are retrieved directly from the [AKKUDOKTOR API](https://api.akkudoktor.net/forecast).
@@ -117,7 +159,7 @@ With the first start of **EOS connect** a default `config.yaml` will be generate
 
 ### Getting historical values
 
-#### Homeassistant
+#### Home Assistant Persistance
 
 The tool will use historical data from Home Assistant's local database. By default, this database is configured with a retention period of **10 days**.
 

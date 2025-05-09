@@ -120,7 +120,58 @@ def charging_state_callback(new_state):
     change_control_state()
 
 
-mqtt_interface = MqttInterface(config_manager.config["mqtt"])
+# callback function for battery interface
+def battery_state_callback():
+    """
+    Callback function that gets triggered when the battery state changes.
+    """
+    # update the base control with the new battery state of charge
+    change_control_state()
+
+# callback function for mqtt interface
+def mqtt_control_callback(command):
+    """
+    Handles MQTT control commands by parsing the command dictionary and updating the system's state.
+
+    Args:
+        command (dict): Contains "duration" (str, "HH:MM"), "mode" (str/int),
+        and "grid_charge_power" (str/int).
+
+    Side Effects:
+        - Updates base control mode override.
+        - Publishes updated control topics to MQTT.
+        - Logs the event and triggers a control state change.
+    """
+    # Default to "02:00" if empty or None
+    duration_string = command.get("duration", "02:00") or "02:00"
+    duration_hh = duration_string.split(":")[0]
+    duration_mm = duration_string.split(":")[1]
+    duration = int(duration_hh) * 60 + int(duration_mm)
+    # Default to 0 if empty or None
+    charge_power = command.get("charge_power", 0) or 0
+    charge_power = int(charge_power) / 1000  # convert to kW
+    # update the base control with the new charging state
+    base_control.set_mode_override(int(command["mode"]), duration, charge_power)
+    mqtt_interface.update_publish_topics(
+        {
+            "control/override_charge_power": {"value": charge_power * 1000},
+            "control/override_active": {
+                "value": base_control.get_override_active_and_endtime()[0]
+            },
+            "control/override_end_time": {
+                "value": (datetime.fromtimestamp(
+                    base_control.get_override_active_and_endtime()[1], time_zone
+                )).isoformat()
+            },
+        }
+    )
+    logger.info("[MAIN] MQTT Event - control command to: %s", command["mode"])
+    change_control_state()
+
+
+mqtt_interface = MqttInterface(
+    config_mqtt=config_manager.config["mqtt"], on_mqtt_command=mqtt_control_callback
+)
 
 evcc_interface = EvccInterface(
     url=config_manager.config["evcc"]["url"],
@@ -144,6 +195,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
     config_manager.config.get("battery", {}),
+    on_bat_max_changed=battery_state_callback
 )
 
 price_interface = PriceInterface(
@@ -651,32 +703,53 @@ def change_control_state():
             "optimization/state": {
                 "value": optimization_scheduler.get_current_state()["request_state"]
             },
-            "control/override_remain_time": {"value": "01:00"},
+            # "control/override_remain_time": {"value": "01:00"},
+            # "control/override_charge_power": {
+            #     "value": base_control.get_current_ac_charge_demand()
+            # },
+            "control/override_active": {
+                "value": base_control.get_override_active_and_endtime()[0]
+            },
+            "control/override_end_time": {
+                "value": (datetime.fromtimestamp(
+                    base_control.get_override_active_and_endtime()[1], time_zone
+                )).isoformat()
+            },
             "battery/soc": {"value": battery_interface.get_current_soc()},
             "battery/remaining_energy": {
                 "value": battery_interface.get_current_usable_capacity()
             },
+            "battery/dyn_max_charge_power": {
+                "value": battery_interface.get_max_charge_power()
+            },
             "status": {"value": "online"},
         }
     )
+
+    # get the current ac/dc charge demand and for setting to inverter according
+    # to the max dynamic charge power of the battery based on SOC
+    tgt_ac_charge_power = min(
+        base_control.get_current_ac_charge_demand(),
+        round(battery_interface.get_max_charge_power()),
+    )
+    tgt_dc_charge_power = min(
+        base_control.get_current_dc_charge_demand(),
+        round(battery_interface.get_max_charge_power()),
+    )
+
+    base_control.set_current_bat_charge_max(max(tgt_ac_charge_power, tgt_dc_charge_power))
 
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
         logger.debug("[Main] Overall state changed recently")
         # MODE_CHARGE_FROM_GRID
         if current_overall_state == 0:
-            # get the current ac charge demand and set it to the inverter according
-            # to the max dynamic charge power of the battery based on SOC
-            tgt_charge_power = min(
-                base_control.get_current_ac_charge_demand(),
-                round(battery_interface.get_max_charge_power_dyn()),
-            )
             if inverter_en:
-                inverter_interface.set_mode_force_charge(tgt_charge_power)
+                inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
             logger.info(
                 "[Main] Inverter mode set to %s with %s W (_____|||||_____)",
                 current_overall_state_text,
-                tgt_charge_power,
+                tgt_ac_charge_power,
             )
         # MODE_AVOID_DISCHARGE
         elif current_overall_state == 1:
@@ -689,6 +762,7 @@ def change_control_state():
         # MODE_DISCHARGE_ALLOWED
         elif current_overall_state == 2:
             if inverter_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+++++_____)",
@@ -705,6 +779,7 @@ def change_control_state():
         # MODE_DISCHARGE_ALLOWED_EVCC_PV
         elif current_overall_state == 4:
             if inverter_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-+++-_____)",
@@ -713,6 +788,7 @@ def change_control_state():
         # MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
         elif current_overall_state == 5:
             if inverter_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+-+-+_____)",
@@ -721,8 +797,8 @@ def change_control_state():
         elif current_overall_state < 0:
             logger.warning("[Main] Inverter mode not initialized yet")
         return True
-    # Log the current state if no recent changes were made
 
+    # Log the current state if no recent changes were made
     logger.info(
         "[Main] Overall state not changed recently"
         + " - remaining in current state: %s  (_____OOOOO_____)",
@@ -812,7 +888,7 @@ def get_controls():
         "battery": {
             "soc": current_battery_soc,
             "usable_capacity": battery_interface.get_current_usable_capacity(),
-            "max_charge_power_dyn": battery_interface.get_max_charge_power_dyn(),
+            "max_charge_power_dyn": battery_interface.get_max_charge_power(),
             "max_grid_charge_rate": config_manager.config["inverter"][
                 "max_grid_charge_rate"
             ],
@@ -863,7 +939,7 @@ def handle_mode_override():
         grid_charge_power = float(data["grid_charge_power"])
 
         # Validate mode and duration
-        if mode < -1 or mode > 2:
+        if mode < -2 or mode > 2:
             return Response(
                 json.dumps({"error": "Invalid mode value"}),
                 status=400,

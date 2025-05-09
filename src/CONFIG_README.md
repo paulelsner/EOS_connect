@@ -17,12 +17,11 @@ A default config file will be created with the first start, if there is no `conf
 
 - **`load.load_sensor`**:  
   Item/entity name for load power data (OpenHAB item/Home Assistant sensor).  
-  Must be in watts.  
-  **Hint**: For Home Assistant, negative values are expected for persisted data.
+  Must be in watts.
 
 - **`load.car_charge_load_sensor`**:  
   Item/entity name for wallbox power data.  
-  Must be in watts or kilowatts (automatically checked).
+  Must be in watts.
 
 - **`load.access_token`**:  
   Access token for Home Assistant (optional).
@@ -242,7 +241,7 @@ load:
   source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
   url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:7070 or http://homeassistant:8123)
   load_sensor: Load_Power # item / entity for load power data in watts
-  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts or kilowatts
+  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts
   access_token: abc123 # access token for homeassistant (optional)
 # EOS server configuration
 eos:

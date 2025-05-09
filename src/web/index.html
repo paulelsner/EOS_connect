@@ -117,7 +117,7 @@
                             <td colspan="2" style="text-align: right;" id="next_charge_avg_price">... kWh</td>
                         </tr>
                         <tr>
-                            <td><i>Dynamic Max AC Charge Power</i></td>
+                            <td><i>Dynamic Max AC+DC Charge Power</i></td>
                             <td colspan="2" style="text-align: right;" id="current_max_charge_dyn">--</td>
                         </tr>
                     </table>
@@ -564,7 +564,8 @@
             const buttons =
                 icons.map((icon, index) => {
                     if (index > 2) return; // without special evcc modes
-                    const isDisabled = index === inverter_mode_num;
+                    //const isDisabled = index === inverter_mode_num;
+                    const isDisabled = false;
                     return '<button id="mode_' + index + '" class="button" style="' +
                         'cursor: ' + (isDisabled ? 'not-allowed' : 'pointer') + '; ' +
                         'font-size: 0.8em; padding: 0.15em 0.3em; margin: 10px; color: ' + (isDisabled ? 'gray' : icon.color) + '; ' +
@@ -580,7 +581,7 @@
                     'font-size: 0.8em; padding: 0.15em 0.3em; margin: 10px; color: green; transition: color 0.3s; background-color: rgb(58, 58, 58); ' +
                     'border-radius: 10px; border: 1px solid grey;cursor: pointer;' +
                     ' onmouseover="this.style.color=\'white\'" onmouseout="this.style.color=\'green\'" onmousedown="this.style.color=\'#000000\'" ' +
-                    'onmouseup="this.style.color=\'green\'" onclick="handleModeChange(\'-1\')"' +
+                    'onmouseup="this.style.color=\'green\'" onclick="handleModeChange(\'-2\')"' +
                     '>' +
                     '<i class="fa-solid fa-clock-rotate-left"></i></i></button>' : ''
                 );
@@ -596,18 +597,18 @@
                 '</select>';
             const ac_charge_power =
                 '<div style="display: flex; justify-content: center; align-items: center; margin-top: 10px; padding-bottom: 10px;">' +
-                '<button onclick="adjustGridChargePower(-0.1)" style="padding: 10px; font-size: 1em; margin-right: 10px; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;'+
+                '<button onclick="adjustGridChargePower(-0.1)" style="padding: 10px; font-size: 1em; margin-right: 10px; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;' +
                 'transition: color 0.3s;" ' +
-                'onmouseover="this.style.color=\'gray\'" onmouseout="this.style.color=\'white\'" onmousedown="this.style.backgroundColor=\'lightblue\'" onmouseup="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+ 
-                'ontouchstart="this.style.backgroundColor=\'lightblue\'" ontouchend="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+
+                'onmouseover="this.style.color=\'gray\'" onmouseout="this.style.color=\'white\'" onmousedown="this.style.backgroundColor=\'lightblue\'" onmouseup="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"' +
+                'ontouchstart="this.style.backgroundColor=\'lightblue\'" ontouchend="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"' +
                 '">-</button>' +
                 '<input id="grid_charge_power" type="number" step="0.25" min="0.5" max="' + ac_charge_max.toFixed(1) + '" value="' + ac_charge_max.toFixed(1) + '" style="padding: 10px; font-size: 1em; text-align: center; width: 1.4em; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;">' +
-                '<button onclick="adjustGridChargePower(0.1)" style="padding: 10px; font-size: 1em; margin-left: 10px; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;"'+
+                '<button onclick="adjustGridChargePower(0.1)" style="padding: 10px; font-size: 1em; margin-left: 10px; border-radius: 5px; border: 1px solid #ccc; background-color: #444; color: white;"' +
                 'transition: color 0.3s;" ' +
-                'onmouseover="this.style.color=\'gray\'" onmouseout="this.style.color=\'white\'" onmousedown="this.style.backgroundColor=\'lightblue\'" onmouseup="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+ 
-                'ontouchstart="this.style.backgroundColor=\'lightblue\'" ontouchend="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"'+
+                'onmouseover="this.style.color=\'gray\'" onmouseout="this.style.color=\'white\'" onmousedown="this.style.backgroundColor=\'lightblue\'" onmouseup="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"' +
+                'ontouchstart="this.style.backgroundColor=\'lightblue\'" ontouchend="this.style.color=\'white\';this.style.backgroundColor=\'#444\'"' +
                 '>+</button>' +
-//                '<span style="font-size: 1.5em; padding-left: 5px;"> kW</span>' +
+                //                '<span style="font-size: 1.5em; padding-left: 5px;"> kW</span>' +
                 '</div>';
             const content =
                 '<div style="font-size: 2em;">' +
@@ -644,6 +645,9 @@
                 if (inverter_mode_num === 0) {
                     document.getElementById('control_dc_charge_desc').innerText = "AC Charge Power";
                     document.getElementById('control_dc_charge').innerText = (data_controls["current_states"]["current_ac_charge_demand"] / 1000).toFixed(1) + " kW";
+                } else if (inverter_mode_num === 2) {
+                    document.getElementById('control_dc_charge_desc').innerText = "DC Charge Power";
+                    document.getElementById('control_dc_charge').innerText = (data_controls["current_states"]["current_dc_charge_demand"] / 1000).toFixed(1) + " kW";
                 } else {
                     document.getElementById('control_dc_charge_desc').innerText = "";
                     document.getElementById('control_dc_charge').innerText = "";
@@ -668,7 +672,7 @@
             document.getElementById('battery_soc').innerText = data_controls["battery"]["soc"] + " %";
             // set battery icon
             document.getElementById('battery_icon_main').innerHTML = getBatteryIcon(data_controls["battery"]["soc"]);
-            document.getElementById('current_max_charge_dyn').innerHTML = "<i>" + (data_controls["battery"]["max_charge_power_dyn"] / 1000).toFixed(1) + " kW</i>";
+            document.getElementById('current_max_charge_dyn').innerHTML = "<i>" + (data_controls["battery"]["max_charge_power_dyn"] / 1000).toFixed(2) + " kW</i>";
             // set battery usable energy
             document.getElementById('battery_usable_capacity').innerHTML = '<i class="fa-solid fa-database"></i> ' + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + ' <span style="font-size: 0.6em;">kWh</span>';
             document.getElementById('battery_usable_capacity').title = "usable capacity: " + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + " kWh";
@@ -953,7 +957,7 @@
 
         async function setOverrideControl(data_controls) {
             try {
-                const response = await fetch('/controls/mode_override', {
+                const response = await fetch('controls/mode_override', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

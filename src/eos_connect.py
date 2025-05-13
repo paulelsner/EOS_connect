@@ -125,8 +125,13 @@ def battery_state_callback():
     """
     Callback function that gets triggered when the battery state changes.
     """
+    logger.debug(
+        "[MAIN] Battery Event - State of charge changed to: %s",
+        battery_interface.get_current_soc(),
+    )
     # update the base control with the new battery state of charge
     change_control_state()
+
 
 # callback function for mqtt interface
 def mqtt_control_callback(command):
@@ -159,9 +164,11 @@ def mqtt_control_callback(command):
                 "value": base_control.get_override_active_and_endtime()[0]
             },
             "control/override_end_time": {
-                "value": (datetime.fromtimestamp(
-                    base_control.get_override_active_and_endtime()[1], time_zone
-                )).isoformat()
+                "value": (
+                    datetime.fromtimestamp(
+                        base_control.get_override_active_and_endtime()[1], time_zone
+                    )
+                ).isoformat()
             },
         }
     )
@@ -195,7 +202,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
     config_manager.config.get("battery", {}),
-    on_bat_max_changed=battery_state_callback
+    on_bat_max_changed=battery_state_callback,
 )
 
 price_interface = PriceInterface(
@@ -339,7 +346,9 @@ def create_optimize_request():
             "pv_prognose_wh": get_summarized_pv_forecast(EOS_TGT_DURATION),
             "strompreis_euro_pro_wh": price_interface.get_current_prices(),
             "einspeiseverguetung_euro_pro_wh": price_interface.get_current_feedin_prices(),
-            "preis_euro_pro_wh_akku": config_manager.config["battery"]["price_euro_per_wh_accu"],
+            "preis_euro_pro_wh_akku": config_manager.config["battery"][
+                "price_euro_per_wh_accu"
+            ],
             "gesamtlast": load_interface.get_load_profile(EOS_TGT_DURATION),
         }
 
@@ -464,6 +473,9 @@ class OptimizationScheduler:
         self._update_thread = None
         self._stop_event = threading.Event()
         self.start_update_service()
+        self._update_thread_inner_loop = None
+        self._stop_event_inner_loop = threading.Event()
+        self.__start_update_service_inner_loop()
 
     def get_last_request_response(self):
         """
@@ -513,15 +525,6 @@ class OptimizationScheduler:
             self._update_thread.start()
             logger.info("[OPTIMIZATION] Update service started.")
 
-    def shutdown(self):
-        """
-        Stops the background thread and shuts down the update service.
-        """
-        if self._update_thread and self._update_thread.is_alive():
-            self._stop_event.set()
-            self._update_thread.join()
-            logger.info("[OPTIMIZATION] Update service stopped.")
-
     def _update_state_loop(self):
         """
         The loop that runs in the background thread to update the state.
@@ -530,7 +533,7 @@ class OptimizationScheduler:
             try:
                 self.run_optimization()
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
-                logger.error("[BATTERY-IF] Error while updating state: %s", e)
+                logger.error("[OPTIMIZATION] Error while updating state: %s", e)
                 # Break the sleep interval into smaller chunks to allow immediate shutdown
             sleep_interval = self.update_interval
             while sleep_interval > 0:
@@ -633,6 +636,93 @@ class OptimizationScheduler:
             seconds,
         )
 
+    def __start_update_service_inner_loop(self):
+        """
+        Starts the background thread to periodically update the state.
+        """
+        if self._update_thread_inner_loop is None or not self._update_thread_inner_loop.is_alive():
+            self._stop_event_inner_loop.clear()
+            self._update_thread_inner_loop = threading.Thread(
+                target=self.__update_state_loop_inner_loop, daemon=True
+            )
+            self._update_thread_inner_loop.start()
+            logger.info("[OPTIMIZATION] Update service 2 started.")
+
+    def __update_state_loop_inner_loop(self):
+        """
+        The loop that runs in the background thread to update the state.
+        """
+        while not self._stop_event_inner_loop.is_set():
+            try:
+                self.__run_inner_loop()
+            except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+                logger.error(
+                    "[OPTIMIZATION] Error while updating inverter data state: %s", e
+                )
+                # Break the sleep interval into smaller chunks to allow immediate shutdown
+            sleep_interval = 15
+            while sleep_interval > 0:
+                if self._stop_event_inner_loop.is_set():
+                    return  # Exit immediately if stop event is set
+                time.sleep(min(1, sleep_interval))  # Sleep in 1-second chunks
+                sleep_interval -= 1
+        self.__start_update_service_inner_loop()
+
+    def __run_inner_loop(self):
+        if config_manager.config["inverter"]["type"] == "fronius_gen24":
+            inverter_interface.fetch_inverter_data()
+            mqtt_interface.update_publish_topics(
+                {
+                    "inverter/special/temperature_inverter": {
+                        "value": inverter_interface.get_inverter_current_data()[
+                            "DEVICE_TEMPERATURE_AMBIENTEMEAN_F32"
+                        ]
+                    },
+                    "inverter/special/temperature_ac_module": {
+                        "value": inverter_interface.get_inverter_current_data()[
+                            "MODULE_TEMPERATURE_MEAN_01_F32"
+                        ]
+                    },
+                    "inverter/special/temperature_dc_module": {
+                        "value": inverter_interface.get_inverter_current_data()[
+                            "MODULE_TEMPERATURE_MEAN_03_F32"
+                        ]
+                    },
+                    "inverter/special/temperature_battery_module": {
+                        "value": inverter_interface.get_inverter_current_data()[
+                            "MODULE_TEMPERATURE_MEAN_04_F32"
+                        ]
+                    },
+                    "inverter/special/fan_control_01": {
+                        "value": inverter_interface.get_inverter_current_data()[
+                            "FANCONTROL_PERCENT_01_F32"
+                        ]
+                    },
+                    "inverter/special/fan_control_02": {
+                        "value": inverter_interface.get_inverter_current_data()[
+                            "FANCONTROL_PERCENT_02_F32"
+                        ]
+                    },
+                }
+            )
+            # logger.debug(
+            #     "[Main] Inverter data fetched - %s",
+            #     inverter_interface.get_inverter_current_data(),
+            # )
+
+    def shutdown(self):
+        """
+        Stops the background thread and shuts down the update service.
+        """
+        if self._update_thread and self._update_thread.is_alive():
+            self._stop_event.set()
+            self._update_thread.join()
+            logger.info("[OPTIMIZATION] Update service stopped.")
+        if self._update_thread_inner_loop and self._update_thread_inner_loop.is_alive():
+            self._stop_event_inner_loop.set()
+            self._update_thread_inner_loop.join()
+            logger.info("[OPTIMIZATION] Update service Inner Loop stopped.")
+
 
 optimization_scheduler = OptimizationScheduler(
     config_manager.config["refresh_time"] * 60  # convert to seconds
@@ -711,9 +801,11 @@ def change_control_state():
                 "value": base_control.get_override_active_and_endtime()[0]
             },
             "control/override_end_time": {
-                "value": (datetime.fromtimestamp(
-                    base_control.get_override_active_and_endtime()[1], time_zone
-                )).isoformat()
+                "value": (
+                    datetime.fromtimestamp(
+                        base_control.get_override_active_and_endtime()[1], time_zone
+                    )
+                ).isoformat()
             },
             "battery/soc": {"value": battery_interface.get_current_soc()},
             "battery/remaining_energy": {
@@ -737,7 +829,9 @@ def change_control_state():
         round(battery_interface.get_max_charge_power()),
     )
 
-    base_control.set_current_bat_charge_max(max(tgt_ac_charge_power, tgt_dc_charge_power))
+    base_control.set_current_bat_charge_max(
+        max(tgt_ac_charge_power, tgt_dc_charge_power)
+    )
 
     # Check if the overall state of the inverter was changed recently
     if base_control.was_overall_state_changed_recently(180):
@@ -893,6 +987,14 @@ def get_controls():
                 "max_grid_charge_rate"
             ],
         },
+        "inverter": {
+            "inverter_special_data": (
+                inverter_interface.get_inverter_current_data()
+                if config_manager.config["inverter"]["type"] == "fronius_gen24"
+                and inverter_interface is not None
+                else None
+            )
+        },
         "state": optimization_scheduler.get_current_state(),
         "eos_connect_version": __version__,
         "timestamp": datetime.now(time_zone).isoformat(),
@@ -1008,6 +1110,7 @@ def handle_mode_override():
             status=400,
             content_type="application/json",
         )
+
 
 if __name__ == "__main__":
     http_server = WSGIServer(

@@ -339,7 +339,7 @@ def create_optimize_request():
             "pv_prognose_wh": get_summarized_pv_forecast(EOS_TGT_DURATION),
             "strompreis_euro_pro_wh": price_interface.get_current_prices(),
             "einspeiseverguetung_euro_pro_wh": price_interface.get_current_feedin_prices(),
-            "preis_euro_pro_wh_akku": 0,
+            "preis_euro_pro_wh_akku": config_manager.config["battery"]["price_euro_per_wh_accu"],
             "gesamtlast": load_interface.get_load_profile(EOS_TGT_DURATION),
         }
 

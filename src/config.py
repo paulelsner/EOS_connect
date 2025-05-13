@@ -75,6 +75,7 @@ class ConfigManager:
                         "max_charge_power_w": 5000,
                         "min_soc_percentage": 5,
                         "max_soc_percentage": 100,
+                        "price_euro_per_wh_accu": 0.0,  # price for battery in euro/kWh
                     }
                 ),
                 "pv_forecast": [
@@ -213,6 +214,9 @@ class ConfigManager:
         )
         config["battery"].yaml_add_eol_comment(
             "URL for battery soc in %", "max_soc_percentage"
+        )
+        config["battery"].yaml_add_eol_comment(
+            "price for battery in euro/kWh - default: 0.0", "price_euro_per_wh_accu"
         )
         # pv forecast configuration
         config.yaml_set_comment_before_after_key(

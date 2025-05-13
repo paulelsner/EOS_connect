@@ -391,7 +391,7 @@ class LoadInterface:
             car_load_energy = abs(self.process_energy_data({"data": car_load_data}))
             # print(f'HA Car load data: {car_load_data} --- {energy}')
             car_load_energy = max(car_load_energy, 0)  # prevent negative values
-            if car_load_energy < energy:
+            if car_load_energy <= energy:
                 energy = energy - car_load_energy
             else:
                 logger.error(

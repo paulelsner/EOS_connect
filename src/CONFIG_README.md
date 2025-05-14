@@ -242,7 +242,7 @@ The `mqtt` section allows you to configure the MQTT broker and Home Assistant MQ
 # Load configuration
 load:
   source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
-  url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:7070 or http://homeassistant:8123)
+  url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:8080 or http://homeassistant:8123)
   load_sensor: Load_Power # item / entity for load power data in watts
   car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts
   access_token: abc123 # access token for homeassistant (optional)

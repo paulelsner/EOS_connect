@@ -36,18 +36,37 @@ class LoadInterface:
         self.time_zone = timezone
 
     # get load data from url persistance source
-    def fetch_energy_data_from_openhab(self, openhab_item_url, start_time, end_time):
+    def __fetch_historical_energy_data_from_openhab(
+        self, openhab_item, start_time, end_time
+    ):
         """
         Fetch energy data from the specified OpenHAB item URL within the given time range.
         """
-        if openhab_item_url == "":
+        if openhab_item == "":
             return {"data": []}
-        openhab_item_url = self.url + "/rest/persistence/items/" + self.load_sensor
+        openhab_item_url = self.url + "/rest/persistence/items/" + openhab_item
         params = {"starttime": start_time.isoformat(), "endtime": end_time.isoformat()}
         try:
             response = requests.get(openhab_item_url, params=params, timeout=10)
             response.raise_for_status()
-            return response.json()
+            # logger.debug(
+            #     "[LOAD-IF] OPENHAB - Fetched data from %s to %s",
+            #     start_time.isoformat(),
+            #     end_time.isoformat()
+            # )
+
+            historical_data = (response.json())["data"]
+            # Extract only 'state' and 'last_updated' from the historical data
+            filtered_data = [
+                {
+                    "state": entry["state"],
+                    "last_updated": datetime.utcfromtimestamp(
+                        entry["time"] / 1000
+                    ).isoformat(),
+                }
+                for entry in historical_data
+            ]
+            return filtered_data
         except requests.exceptions.Timeout:
             logger.error(
                 "[LOAD-IF] OPENHAB - Request timed out while fetching energy data."
@@ -59,7 +78,7 @@ class LoadInterface:
             )
             return {"data": []}
 
-    def fetch_historical_energy_data_from_homeassistant(
+    def __fetch_historical_energy_data_from_homeassistant(
         self, entity_id, start_time, end_time
     ):
         """
@@ -117,7 +136,7 @@ class LoadInterface:
             )
             return []
 
-    def process_energy_data(self, data):
+    def __process_energy_data(self, data):
         """
         Processes energy data to calculate the average energy consumption based on timestamps.
         """
@@ -135,6 +154,9 @@ class LoadInterface:
                 current_time = datetime.fromisoformat(data["data"][i]["last_updated"])
                 next_time = datetime.fromisoformat(data["data"][i + 1]["last_updated"])
             except (ValueError, KeyError):
+                logger.error(
+                    "[LOAD-IF] Error processing energy data: %s", data["data"][i]
+                )
                 continue
 
             duration = (next_time - current_time).total_seconds()
@@ -154,167 +176,167 @@ class LoadInterface:
             return round(total_energy / total_duration, 4)
         return 0
 
-    def create_load_profile_openhab_from_last_days(self, tgt_duration, start_time=None):
-        """
-        Creates a load profile for energy consumption over the last `tgt_duration` hours.
+    # def create_load_profile_openhab_from_last_days(self, tgt_duration, start_time=None):
+    #     """
+    #     Creates a load profile for energy consumption over the last `tgt_duration` hours.
 
-        The function calculates the energy consumption for each hour from the current hour
-        going back `tgt_duration` hours. It fetches energy data for base load and additional loads,
-        processes the data, and sums the energy values. If the total energy for an hour is zero,
-        it skips that hour. The resulting load profile is a list of energy consumption values
-        for each hour.
+    #     The function calculates the energy consumption for each hour from the current hour
+    #     going back `tgt_duration` hours. It fetches energy data for base load and additional loads,
+    #     processes the data, and sums the energy values. If the total energy for an hour is zero,
+    #     it skips that hour. The resulting load profile is a list of energy consumption values
+    #     for each hour.
 
-        """
-        logger.info("[LOAD-IF] Creating load profile from openhab ...")
-        current_time = datetime.now(self.time_zone).replace(
-            minute=0, second=0, microsecond=0
-        )
-        if start_time is None:
-            start_time = current_time.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ) - timedelta(hours=tgt_duration)
-            end_time = start_time + timedelta(hours=tgt_duration)
-        else:
-            start_time = current_time - timedelta(hours=tgt_duration)
-            end_time = current_time
+    #     """
+    #     logger.info("[LOAD-IF] Creating load profile from openhab ...")
+    #     current_time = datetime.now(self.time_zone).replace(
+    #         minute=0, second=0, microsecond=0
+    #     )
+    #     if start_time is None:
+    #         start_time = current_time.replace(
+    #             hour=0, minute=0, second=0, microsecond=0
+    #         ) - timedelta(hours=tgt_duration)
+    #         end_time = start_time + timedelta(hours=tgt_duration)
+    #     else:
+    #         start_time = current_time - timedelta(hours=tgt_duration)
+    #         end_time = current_time
 
-        load_profile = []
-        current_hour = start_time
+    #     load_profile = []
+    #     current_hour = start_time
 
-        while current_hour < end_time:
-            next_hour = current_hour + timedelta(hours=1)
-            # logger.debug("[LOAD-IF] Fetching data for %s to %s",current_hour, next_hour)
+    #     while current_hour < end_time:
+    #         next_hour = current_hour + timedelta(hours=1)
+    #         # logger.debug("[LOAD-IF] Fetching data for %s to %s",current_hour, next_hour)
 
-            energy_data = self.fetch_energy_data_from_openhab(
-                self.url, current_hour, next_hour
-            )
-            energy = self.process_energy_data(energy_data)
-            # if energy == 0:
-            #     current_hour += timedelta(hours=1)
-            #     continue
+    #         energy_data = self.__fetch_historical_energy_data_from_openhab(
+    #             self.load_sensor, current_hour, next_hour
+    #         )
+    #         energy = self.__process_energy_data(energy_data)
+    #         if energy == 0:
+    #             logger.warning(
+    #                 "[LOAD-IF] load = 0 ... Energy for %s: %5.1f Wh",
+    #                 current_hour,
+    #                 round(energy, 1),
+    #             )
+    #             # current_hour += timedelta(hours=1)
+    #             # continue
 
-            energy_sum = energy
-            # easy workaround to prevent car charging energy data in the standard load profile
-            if energy_sum > 10800:
-                energy_sum = energy_sum - 10800
-            elif energy_sum > 9200:
-                energy_sum = energy_sum - 9200
+    #         energy_sum = abs(energy)
 
-            load_profile.append(energy_sum)
-            logger.debug("[LOAD-IF] Energy for %s: %s", current_hour, energy_sum)
+    #         load_profile.append(energy_sum)
+    #         logger.debug("[LOAD-IF] Energy for %s: %s", current_hour, energy_sum)
 
-            current_hour += timedelta(hours=1)
-        logger.info("[LOAD-IF] Load profile created successfully.")
-        return load_profile
+    #         current_hour += timedelta(hours=1)
+    #     logger.info("[LOAD-IF] Load profile created successfully.")
+    #     return load_profile
 
-    def create_load_profile_homeassistant_from_last_days(
-        self, tgt_duration, start_time=None
-    ):
-        """
-        Creates a load profile for energy consumption over the last `tgt_duration` hours.
+    # def create_load_profile_homeassistant_from_last_days(
+    #     self, tgt_duration, start_time=None
+    # ):
+    #     """
+    #     Creates a load profile for energy consumption over the last `tgt_duration` hours.
 
-        This function calculates the energy consumption for each hour from the current hour
-        going back `tgt_duration` hours. It fetches energy data from Home Assistant,
-        processes the data, and sums the energy values. If the total energy for an hour is zero,
-        it skips that hour. The resulting load profile is a list of energy consumption values
-        for each hour.
+    #     This function calculates the energy consumption for each hour from the current hour
+    #     going back `tgt_duration` hours. It fetches energy data from Home Assistant,
+    #     processes the data, and sums the energy values. If the total energy for an hour is zero,
+    #     it skips that hour. The resulting load profile is a list of energy consumption values
+    #     for each hour.
 
-        Args:
-            tgt_duration (int): The target duration in hours for which the load profile is needed.
-            start_time (datetime, optional): The start time for fetching the load profile.
-            Defaults to None.
+    #     Args:
+    #         tgt_duration (int): The target duration in hours for which the load profile is needed.
+    #         start_time (datetime, optional): The start time for fetching the load profile.
+    #         Defaults to None.
 
-        Returns:
-            list: A list of energy consumption values for the specified duration.
-        """
-        logger.info("[LOAD-IF] Creating load profile from Home Assistant ...")
-        current_time = datetime.now(self.time_zone).replace(
-            minute=0, second=0, microsecond=0
-        )
-        if start_time is None:
-            start_time = current_time.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ) - timedelta(hours=tgt_duration)
-            end_time = start_time + timedelta(hours=tgt_duration)
-        else:
-            start_time = current_time - timedelta(hours=tgt_duration)
-            end_time = current_time
+    #     Returns:
+    #         list: A list of energy consumption values for the specified duration.
+    #     """
+    #     logger.info("[LOAD-IF] Creating load profile from Home Assistant ...")
+    #     current_time = datetime.now(self.time_zone).replace(
+    #         minute=0, second=0, microsecond=0
+    #     )
+    #     if start_time is None:
+    #         start_time = current_time.replace(
+    #             hour=0, minute=0, second=0, microsecond=0
+    #         ) - timedelta(hours=tgt_duration)
+    #         end_time = start_time + timedelta(hours=tgt_duration)
+    #     else:
+    #         start_time = current_time - timedelta(hours=tgt_duration)
+    #         end_time = current_time
 
-        load_profile = []
-        current_hour = start_time
+    #     load_profile = []
+    #     current_hour = start_time
 
-        # current_hour = datetime.strptime("18.03.2025 11:00", "%d.%m.%Y %H:%M")
-        # end_time = current_hour + timedelta(hours=tgt_duration)
+    #     # current_hour = datetime.strptime("18.03.2025 11:00", "%d.%m.%Y %H:%M")
+    #     # end_time = current_hour + timedelta(hours=tgt_duration)
 
-        # check car load data for W or kW
-        car_load_data = self.fetch_historical_energy_data_from_homeassistant(
-            self.car_charge_load_sensor, current_hour, end_time
-        )
-        # check for max value in car_load_data
-        max_car_load = 0
-        car_load_unit_factor = 1
-        for data_entry in car_load_data:
-            try:
-                float(data_entry["state"])
-            except ValueError:
-                continue
-            max_car_load = max(max_car_load, float(data_entry["state"]))
-        if 0 < max_car_load < 23:
-            max_car_load = max_car_load * 1000
-            car_load_unit_factor = 1000
-        logger.debug("[LOAD-IF] Max car load: %s W", round(max_car_load, 0))
+    #     # check car load data for W or kW
+    #     car_load_data = self.__fetch_historical_energy_data_from_homeassistant(
+    #         self.car_charge_load_sensor, current_hour, end_time
+    #     )
+    #     # check for max value in car_load_data
+    #     max_car_load = 0
+    #     car_load_unit_factor = 1
+    #     for data_entry in car_load_data:
+    #         try:
+    #             float(data_entry["state"])
+    #         except ValueError:
+    #             continue
+    #         max_car_load = max(max_car_load, float(data_entry["state"]))
+    #     if 0 < max_car_load < 23:
+    #         max_car_load = max_car_load * 1000
+    #         car_load_unit_factor = 1000
+    #     logger.debug("[LOAD-IF] Max car load: %s W", round(max_car_load, 0))
 
-        while current_hour < end_time:
-            next_hour = current_hour + timedelta(hours=1)
-            # logger.debug("[LOAD-IF] Fetching data for %s to %s", current_hour, next_hour)
-            energy_data = self.fetch_historical_energy_data_from_homeassistant(
-                self.load_sensor, current_hour, next_hour
-            )
-            car_load_data = self.fetch_historical_energy_data_from_homeassistant(
-                self.car_charge_load_sensor, current_hour, next_hour
-            )
+    #     while current_hour < end_time:
+    #         next_hour = current_hour + timedelta(hours=1)
+    #         # logger.debug("[LOAD-IF] Fetching data for %s to %s", current_hour, next_hour)
+    #         energy_data = self.__fetch_historical_energy_data_from_homeassistant(
+    #             self.load_sensor, current_hour, next_hour
+    #         )
+    #         car_load_data = self.__fetch_historical_energy_data_from_homeassistant(
+    #             self.car_charge_load_sensor, current_hour, next_hour
+    #         )
 
-            # print(f'HA Energy data: {car_load_data}')
-            energy = abs(self.process_energy_data({"data": energy_data}))
-            car_load_energy = abs(
-                self.process_energy_data({"data": car_load_data}) * car_load_unit_factor
-            )
-            car_load_energy = max(car_load_energy, 0)  # prevent negative values
-            # print(f'HA Energy Orig: {energy}')
-            # print(f'HA Car load energy: {car_load_energy}')
-            energy = energy - car_load_energy
-            if energy < 0:
-                logger.error(
-                    "[LOAD-IF] DATA ERROR Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
-                    current_hour,
-                    round(energy, 1),
-                    round(car_load_energy, 1),
-                )
-            # print(f'HA Energy Final: {energy}')
-            if energy == 0:
-                logger.warning(
-                    "[LOAD-IF] Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
-                    current_hour,
-                    round(energy, 1),
-                    round(car_load_energy, 1),
-                )
-            #     current_hour += timedelta(hours=1)
-            #     continue
+    #         # print(f'HA Energy data: {car_load_data}')
+    #         energy = abs(self.__process_energy_data({"data": energy_data}))
+    #         car_load_energy = abs(
+    #             self.__process_energy_data({"data": car_load_data}) * car_load_unit_factor
+    #         )
+    #         car_load_energy = max(car_load_energy, 0)  # prevent negative values
+    #         # print(f'HA Energy Orig: {energy}')
+    #         # print(f'HA Car load energy: {car_load_energy}')
+    #         energy = energy - car_load_energy
+    #         if energy < 0:
+    #             logger.error(
+    #                 "[LOAD-IF] DATA ERROR Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+    #                 current_hour,
+    #                 round(energy, 1),
+    #                 round(car_load_energy, 1),
+    #             )
+    #         # print(f'HA Energy Final: {energy}')
+    #         if energy == 0:
+    #             logger.warning(
+    #                 "[LOAD-IF] load = 0 ... Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+    #                 current_hour,
+    #                 round(energy, 1),
+    #                 round(car_load_energy, 1),
+    #             )
+    #             # current_hour += timedelta(hours=1)
+    #             # continue
 
-            energy_sum = energy
+    #         energy_sum = energy
 
-            load_profile.append(energy_sum)
-            logger.debug(
-                "[LOAD-IF] Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
-                current_hour,
-                round(energy, 1),
-                round(car_load_energy, 1),
-            )
-            # logger.debug("[LOAD-IF] Energy for %s: %s", current_hour, round(energy_sum,1))
+    #         load_profile.append(energy_sum)
+    #         logger.debug(
+    #             "[LOAD-IF] Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+    #             current_hour,
+    #             round(energy, 1),
+    #             round(car_load_energy, 1),
+    #         )
+    #         # logger.debug("[LOAD-IF] Energy for %s: %s", current_hour, round(energy_sum,1))
 
-            current_hour += timedelta(hours=1)
-        logger.info("[LOAD-IF] Load profile created successfully.")
-        return load_profile
+    #         current_hour += timedelta(hours=1)
+    #     logger.info("[LOAD-IF] Load profile created successfully.")
+    #     return load_profile
 
     def __get_car_load_list_from_to(self, start_time, end_time):
         """
@@ -337,23 +359,21 @@ class LoadInterface:
             - All load values are multiplied by the determined unit factor before being returned.
         """
 
-        # check car load data for W or kW
-        car_load_data = self.fetch_historical_energy_data_from_homeassistant(
-            self.car_charge_load_sensor, start_time, end_time
-        )
-        # check for max value in car_load_data
-        # max_car_load = 0
-        # car_load_unit_factor = 1
-        # for data_entry in car_load_data:
-        #     try:
-        #         float(data_entry["state"])
-        #     except ValueError:
-        #         continue
-        #     max_car_load = max(max_car_load, float(data_entry["state"]))
-        # if 0 < max_car_load < 23:
-        #     max_car_load = max_car_load * 1000
-        #     car_load_unit_factor = 1000
-        # logger.debug("[LOAD-IF] Max car load: %s W", round(max_car_load,0))
+        if self.src == "openhab":
+            car_load_data = self.__fetch_historical_energy_data_from_openhab(
+                self.car_charge_load_sensor, start_time, end_time
+            )
+        elif self.src == "homeassistant":
+            car_load_data = self.__fetch_historical_energy_data_from_homeassistant(
+                self.car_charge_load_sensor, start_time, end_time
+            )
+        else:
+            logger.error(
+                "[LOAD-IF] Car Load source '%s' currently not supported. Using default.",
+                self.src,
+            )
+            return []
+
         # multiply every value with car_load_unit_factor before returning
         for data_entry in car_load_data:
             try:
@@ -388,21 +408,31 @@ class LoadInterface:
         while current_hour < end_time:
             next_hour = current_hour + timedelta(hours=1)
             # logger.debug("[LOAD-IF] Fetching data for %s to %s", current_hour, next_hour)
-            energy_data = self.fetch_historical_energy_data_from_homeassistant(
-                self.load_sensor, current_hour, next_hour
-            )
-            car_load_data = self.__get_car_load_list_from_to(current_hour, next_hour)
+            if self.src == "openhab":
+                energy_data = self.__fetch_historical_energy_data_from_openhab(
+                    self.load_sensor, current_hour, next_hour
+                )
+            elif self.src == "homeassistant":
+                energy_data = self.__fetch_historical_energy_data_from_homeassistant(
+                    self.load_sensor, current_hour, next_hour
+                )
+            else:
+                logger.error(
+                    "[LOAD-IF] Load source '%s' currently not supported. Using default.",
+                    self.src,
+                )
+                return []
 
-            energy = abs(self.process_energy_data({"data": energy_data}))
-            car_load_energy = abs(self.process_energy_data({"data": car_load_data}))
-            # print(f'HA Car load data: {car_load_data} --- {energy}')
+            car_load_data = self.__get_car_load_list_from_to(current_hour, next_hour)
+            energy = abs(self.__process_energy_data({"data": energy_data}))
+            car_load_energy = abs(self.__process_energy_data({"data": car_load_data}))
             car_load_energy = max(car_load_energy, 0)  # prevent negative values
             if car_load_energy <= energy:
                 energy = energy - car_load_energy
             else:
                 logger.error(
-                    "[LOAD-IF] DATA ERROR load smaller than car load "+
-                    "- Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    "[LOAD-IF] DATA ERROR load smaller than car load "
+                    + "- Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
                     current_hour,
                     round(energy, 1),
                     round(car_load_energy, 1),
@@ -435,7 +465,7 @@ class LoadInterface:
             )
         return load_profile
 
-    def create_load_profile_homeassistant_weekdays(self):
+    def __create_load_profile_weekdays(self):
         """
         Creates a load profile for weekdays based on historical data from Home Assistant.
         This method calculates the average load profile for the same day of the week
@@ -577,15 +607,9 @@ class LoadInterface:
                 200.0,  # 23:00 - 0:00
             ]
             return default_profile[:tgt_duration]
-        if self.src == "openhab":
-            # logger.info("[LOAD-IF] Using load source openhab")
-            return self.create_load_profile_openhab_from_last_days(
-                tgt_duration, start_time
-            )
-        if self.src == "homeassistant":
-            # logger.info("[LOAD-IF] Using load source homeassistant")
-            # return self.create_load_profile_homeassistant_from_last_days(tgt_duration, start_time)
-            return self.create_load_profile_homeassistant_weekdays()
+        if self.src == "openhab" or self.src == "homeassistant":
+            return self.__create_load_profile_weekdays()
+
         logger.error(
             "[LOAD-IF] Load source '%s' currently not supported. Using default.",
             self.src,

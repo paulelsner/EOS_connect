@@ -189,9 +189,9 @@ class LoadInterface:
                 self.url, current_hour, next_hour
             )
             energy = self.process_energy_data(energy_data)
-            if energy == 0:
-                current_hour += timedelta(hours=1)
-                continue
+            # if energy == 0:
+            #     current_hour += timedelta(hours=1)
+            #     # continue
 
             energy_sum = energy
             # easy workaround to prevent car charging energy data in the standard load profile

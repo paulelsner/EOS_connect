@@ -141,7 +141,7 @@ class ConfigManager:
         )
         config["load"].yaml_add_eol_comment(
             "URL for openhab or homeassistant"+
-            " (e.g. http://openhab:7070 or http://homeassistant:8123)",
+            " (e.g. http://openhab:8080 or http://homeassistant:8123)",
             "url",
         )
         config["load"].yaml_add_eol_comment(
@@ -190,7 +190,7 @@ class ConfigManager:
         )
         config["battery"].yaml_add_eol_comment(
             "URL for openhab or homeassistant"+
-            " (e.g. http://openhab:7070 or http://homeassistant:8123)",
+            " (e.g. http://openhab:8080 or http://homeassistant:8123)",
             "url",
         )
         config["battery"].yaml_add_eol_comment(

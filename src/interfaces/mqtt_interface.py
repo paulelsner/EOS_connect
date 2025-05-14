@@ -677,7 +677,7 @@ class MqttInterface:
             }
             payload["device"] = device
             logger.debug(
-                "Sending HA AD config message for %s",
+                "[MQTT] Sending HA AD config message for %s",
                 self.auto_discover_topic
                 + "/"
                 + item_type

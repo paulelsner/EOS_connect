@@ -598,7 +598,6 @@ def change_control_state():
     )
     return False
 
-
 class OptimizationScheduler:
     """
     A scheduler class that manages the periodic execution of an optimization process

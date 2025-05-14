@@ -291,9 +291,9 @@ class LoadInterface:
                     round(car_load_energy, 1),
                 )
             # print(f'HA Energy Final: {energy}')
-            if energy == 0:
-                current_hour += timedelta(hours=1)
-                continue
+            # if energy == 0:
+            #     current_hour += timedelta(hours=1)
+            #     continue
 
             energy_sum = energy
 

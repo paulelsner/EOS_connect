@@ -291,7 +291,13 @@ class LoadInterface:
                     round(car_load_energy, 1),
                 )
             # print(f'HA Energy Final: {energy}')
-            # if energy == 0:
+            if energy == 0:
+                logger.warning(
+                    "[LOAD-IF] Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    current_hour,
+                    round(energy, 1),
+                    round(car_load_energy, 1),
+                )
             #     current_hour += timedelta(hours=1)
             #     continue
 
@@ -402,8 +408,14 @@ class LoadInterface:
                     round(car_load_energy, 1),
                 )
             if energy == 0:
-                current_hour += timedelta(hours=1)
-                continue
+                logger.warning(
+                    "[LOAD-IF] load = 0 ... Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    current_hour,
+                    round(energy, 1),
+                    round(car_load_energy, 1),
+                )
+                # current_hour += timedelta(hours=1)
+                # continue
 
             energy_sum = energy
 

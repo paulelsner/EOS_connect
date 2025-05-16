@@ -319,26 +319,6 @@ class EosInterface:
                 df.loc[date, "Household"] = energy
         return df
 
-    # def __retrieve_eos_version(self):
-    #     """
-    #     Get the EOS api version from the server.
-
-    #     Returns:
-    #         str: The EOS version.
-    #     """
-    #     try:
-    #         response = requests.get(self.base_url + "/openapi.json", timeout=10)
-    #         response.raise_for_status()
-    #         eos_version = response.json().get("info").get("version")
-    #         logger.info("[EOS] EOS version: %s", eos_version)
-    #         return eos_version
-    #     except requests.exceptions.RequestException as e:
-    #         logger.error("[EOS] Failed to get EOS version: %s", e)
-    #         return None
-    #     except json.JSONDecodeError as e:
-    #         logger.error("[EOS] Failed to decode EOS version response: %s", e)
-    #         return None
-
     def __retrieve_eos_version(self):
         """
         Get the EOS version from the server. Dirty hack to get something to distinguish between

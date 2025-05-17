@@ -91,6 +91,9 @@ A default config file will be created with the first start, if there is no `conf
 - **`battery.max_soc_percentage`**:  
   Maximum state of charge for the battery, as a percentage.
 
+- **`price_euro_per_wh_accu`**:
+  Price for battery in €/Wh - can be used to shifting the result over the day according to the available energy (more details follow)
+
 ---
 
 ### **PV Forecast Configuration**
@@ -239,7 +242,7 @@ The `mqtt` section allows you to configure the MQTT broker and Home Assistant MQ
 # Load configuration
 load:
   source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
-  url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:7070 or http://homeassistant:8123)
+  url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:8080 or http://homeassistant:8123)
   load_sensor: Load_Power # item / entity for load power data in watts
   car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts
   access_token: abc123 # access token for homeassistant (optional)
@@ -266,6 +269,7 @@ battery:
   max_charge_power_w: 5000 # max charging power in W
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
+  price_euro_per_wh_accu: 0 # price for battery in €/Wh
 # List of PV forecast configurations. Add multiple entries as needed.
 # See Akkudoktor API (https://api.akkudoktor.net/#/pv%20generation%20calculation/getForecast) for more details.
 pv_forecast:

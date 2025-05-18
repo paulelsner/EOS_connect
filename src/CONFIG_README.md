@@ -147,26 +147,24 @@ pv_forecast:
 
 - **`inverter.type`**:  
   Specifies the type of inverter. Possible values:  
-  - `fronius_gen24`: Use the Fronius Gen24 inverter.  
+  - `fronius_gen24`: Use the Fronius Gen24 inverter.
+  - `evcc`: Use the universal interface via evcc external battery control (evcc config below has to be valid).
   - `default`: Disable inverter control (only display the target state).
 
 - **`inverter.address`**:  
-  The IP address of the inverter.
+  The IP address of the inverter. (only needed for fronius_gen24)
 
 - **`inverter.user`**:  
-  The username for the inverter's local portal.
+  The username for the inverter's local portal. (only needed for fronius_gen24)
 
 - **`inverter.password`**:  
-  The password for the inverter's local portal.
+  The password for the inverter's local portal. (only needed for fronius_gen24)
 
 - **`inverter.max_grid_charge_rate`**:  
-  The maximum grid charge rate, in watts (W).
+  The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
 
 - **`inverter.max_pv_charge_rate`**:  
-  The maximum PV charge rate, in watts (W).
-
-- **`inverter.max_bat_discharge_rate`**:  
-  The maximum battery discharge rate, in watts (W).
+  The maximum PV charge rate, in watts (W). Limitation for calculating the target pv charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
 
 ---
 
@@ -284,13 +282,12 @@ pv_forecast:
     horizont: 10,20,10,15 # Horizont to calculate shading up to 360 values to describe shading situation for your PV.
 # Inverter configuration
 inverter:
-  type: default  # Type of inverter - fronius_gen24, default (default will disable inverter control - only displaying the target state) - preset: default
-  address: 192.168.1.12 # Address of the inverter
-  user: customer # Username for the inverter
-  password: abc123 # Password for the inverter
-  max_grid_charge_rate: 5000 # Max grid charge rate in W - default: 5000
-  max_pv_charge_rate: 5000 # Max PV charge rate in W - default: 5000
-  max_bat_discharge_rate: 5000 # Max battery discharge rate in W (currently not used) - default: 5000
+  type: default  # Type of inverter - fronius_gen24, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
+  address: 192.168.1.12 # Address of the inverter (fronius_gen24 only)
+  user: customer # Username for the inverter (fronius_gen24 only)
+  password: abc123 # Password for the inverter (fronius_gen24 only)
+  max_grid_charge_rate: 5000 # Max inverter grid charge rate in W - default: 5000
+  max_pv_charge_rate: 5000 # Max imverter PV charge rate in W - default: 5000
 # EVCC configuration
 evcc:
   url: http://yourEVCCserver:7070  # URL for EVCC server - default: http://yourEVCCserver:7070

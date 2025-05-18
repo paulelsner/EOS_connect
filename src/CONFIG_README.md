@@ -148,7 +148,7 @@ pv_forecast:
 - **`inverter.type`**:  
   Specifies the type of inverter. Possible values:  
   - `fronius_gen24`: Use the Fronius Gen24 inverter.
-  - `evcc`: Use the universal interface via evcc external battery control.
+  - `evcc`: Use the universal interface via evcc external battery control (evcc config below has to be valid).
   - `default`: Disable inverter control (only display the target state).
 
 - **`inverter.address`**:  
@@ -161,10 +161,10 @@ pv_forecast:
   The password for the inverter's local portal. (only needed for fronius_gen24)
 
 - **`inverter.max_grid_charge_rate`**:  
-  The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model.
+  The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
 
 - **`inverter.max_pv_charge_rate`**:  
-  The maximum PV charge rate, in watts (W). Limitation for calculating the target pv charge power and for EOS inverter model.
+  The maximum PV charge rate, in watts (W). Limitation for calculating the target pv charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
 
 ---
 

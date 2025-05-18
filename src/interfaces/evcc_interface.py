@@ -58,12 +58,13 @@ class EvccInterface:
         fetch_evcc_state_via_api():
     """
 
-    def __init__(self, url, update_interval=15, on_charging_state_change=None):
+    def __init__(self, url, ext_bat_mode=False, update_interval=15, on_charging_state_change=None):
         """
         Initializes the EVCC interface and starts the update service.
 
         Args:
             url (str): The base URL for the EVCC API.
+            ext_bat_mode (bool, optional): Enables external battery mode. Defaults to False.
             update_interval (int, optional): The interval (in seconds) for updating
             the charging state. Defaults to 15.
             on_charging_state_change (callable, optional): A callback function to be called
@@ -86,6 +87,8 @@ class EvccInterface:
             "vehicleName": "",
             "smartCostActive": False,
         }
+        self.external_battery_mode_en = ext_bat_mode
+        self.external_battery_mode = "off"  # Default mode
         self.update_interval = update_interval
         self.on_charging_state_change = on_charging_state_change  # Store the callback
         self._update_thread = None
@@ -129,6 +132,8 @@ class EvccInterface:
         """
         Stops the background thread and shuts down the update service.
         """
+        if self.external_battery_mode_en:
+            self.__disable_external_battery_mode()
         if self._update_thread and self._update_thread.is_alive():
             self._stop_event.set()
             self._update_thread.join()
@@ -141,6 +146,9 @@ class EvccInterface:
         while not self._stop_event.is_set():
             try:
                 self.__request_charging_state()
+                if self.external_battery_mode_en and self.external_battery_mode != "off":
+                    # Set the external battery mode if it is set
+                    self.__set_external_battery_mode_loop()
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 logger.error("[EVCC] Error while updating charging state: %s", e)
                 # Break the sleep interval into smaller chunks to allow immediate shutdown
@@ -206,7 +214,10 @@ class EvccInterface:
             "smartCostActive": loadpoint.get("smartCostActive", False),
         }
         # override charging mode if pv and smartcost is active
-        if charging_mode in ('pv', 'minpv') and self.current_detail_data["smartCostActive"]:
+        if (
+            charging_mode in ("pv", "minpv")
+            and self.current_detail_data["smartCostActive"]
+        ):
             charging_mode = charging_mode + "+now"
         logger.debug(
             "[EVCC] Charging state: %s - Charging mode: %s",
@@ -252,3 +263,119 @@ class EvccInterface:
                 "[EVCC] Request failed while fetching EVCC state. Error: %s.", e
             )
             return None  # Default SOC value in case of request failure
+
+    def set_external_battery_mode(self, mode):
+        """
+        Sets the external battery mode in the EVCC.
+
+        Args:
+            mode (str): The external battery mode to set. Can be one of:
+                        "avoid_discharge", "discharge_allowed", "force_charge".
+        """
+        if mode not in ["avoid_discharge", "discharge_allowed", "force_charge", "off"]:
+            logger.error(
+                "[EVCC] Invalid external battery mode: %s. "
+                + "Expected one of ['avoid_discharge', 'discharge_allowed',"
+                + " 'force_charge', 'off'].",
+                mode,
+            )
+        elif mode == "off":
+            self.__disable_external_battery_mode()
+            logger.info("[EVCC] External battery mode disabled.")
+        else:
+            self.external_battery_mode = mode
+
+    def get_current_external_battery_mode(self):
+        """
+        Retrieves the current external battery mode from the EVCC.
+        """
+        return self.external_battery_mode
+
+    def __disable_external_battery_mode(self):
+        """
+        Disables the external battery mode in the EVCC.
+        """
+        evcc_url = self.url + "/api/batterymode"
+        try:
+            response = requests.delete(evcc_url, timeout=6)
+            response.raise_for_status()
+            logger.info("[EVCC] External battery mode disabled. response: %s", response)
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "[EVCC] Request failed while disabling external battery mode. Error: %s.",
+                e,
+            )
+
+    def __set_external_battery_mode_loop(self):
+        """
+        Sets the external battery mode in a loop until the mode is set successfully.
+
+        Args:
+            mode (str): The external battery mode to set. Can be one of:
+                        "avoid_discharge", "discharge_allowed", "force_charge".
+        """
+        if self.external_battery_mode == "avoid_discharge":
+            self.__set_external_battery_mode_avoid_discharge()
+        elif self.external_battery_mode == "discharge_allowed":
+            self.__set_external_battery_mode_discharge_allowed()
+        elif self.external_battery_mode == "force_charge":
+            self.__set_external_battery_mode_force_charge()
+        else:
+            logger.error(
+                "[EVCC] Invalid external battery mode: %s. "
+                + "Expected one of ['avoid_discharge', 'discharge_allowed', 'force_charge'].",
+                self.external_battery_mode,
+            )
+
+    def __set_external_battery_mode_avoid_discharge(self):
+        """
+        Enables the external battery mode with AVOID DISCHARGE in the EVCC.
+        """
+        evcc_url = self.url + "/api/batterymode/hold"
+        try:
+            response = requests.post(evcc_url, timeout=6)
+            response.raise_for_status()
+            logger.debug(
+                "[EVCC] External battery mode set AVOID DISCHARGE. response: %s",
+                response,
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "[EVCC] Request failed while enabling external battery mode. Error: %s.",
+                e,
+            )
+
+    def __set_external_battery_mode_discharge_allowed(self):
+        """
+        Enables the external battery mode with DISCHARGE ALLOWED in the EVCC.
+        """
+        evcc_url = self.url + "/api/batterymode/normal"
+        try:
+            response = requests.post(evcc_url, timeout=6)
+            response.raise_for_status()
+            logger.debug(
+                "[EVCC] External battery mode set DISCHARGE ALLOWED. response: %s",
+                response,
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "[EVCC] Request failed while enabling external battery mode. Error: %s.",
+                e,
+            )
+
+    def __set_external_battery_mode_force_charge(self):
+        """
+        Enables the external battery mode with FORCE CHARGE in the EVCC.
+        """
+        evcc_url = self.url + "/api/batterymode/charge"
+        try:
+            response = requests.post(evcc_url, timeout=6)
+            response.raise_for_status()
+            logger.debug(
+                "[EVCC] External battery mode set FORCE CHARGE. response: %s", response
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "[EVCC] Request failed while enabling external battery mode. Error: %s.",
+                e,
+            )

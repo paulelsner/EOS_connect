@@ -182,14 +182,14 @@ def mqtt_control_callback(command):
 
 
 mqtt_interface = MqttInterface(
-    config_mqtt=config_manager.config["mqtt"], on_mqtt_command=mqtt_control_callback
+    config_mqtt=config_manager.config["mqtt"], on_mqtt_command=None
 )
 
 evcc_interface = EvccInterface(
     url=config_manager.config["evcc"]["url"],
     ext_bat_mode=config_manager.config["inverter"]["type"] == "evcc",
     update_interval=10,
-    on_charging_state_change=charging_state_callback,
+    on_charging_state_change=None,
 )
 
 # intialize the load interface
@@ -208,7 +208,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
     config_manager.config.get("battery", {}),
-    on_bat_max_changed=battery_state_callback,
+    on_bat_max_changed=None,
 )
 
 price_interface = PriceInterface(
@@ -920,6 +920,10 @@ def change_control_state():
     )
     return False
 
+# setting the callbacks for the interfaces
+battery_interface.on_bat_max_changed = battery_state_callback
+evcc_interface.on_charging_state_change = charging_state_callback
+mqtt_interface.on_mqtt_command = mqtt_control_callback
 
 # web server
 app = Flask(__name__)

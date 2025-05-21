@@ -51,7 +51,7 @@ EOS Connect is a tool designed to optimize energy usage by interacting with the 
     - Dynamically adjusts the maximum AC charging power based on system conditions.
     - Ensures efficient and safe battery charging by adapting to real-time energy availability and battery state.
 - **Cost and Solar Optimization**:
-  - Aligns energy usage with real-time electricity prices (e.g., from Tibber) to minimize costs.
+  - Aligns energy usage with real-time electricity prices (e.g., from Tibber or [smartenergy.at](https://www.smartenergy.at/)) to minimize costs.
   - Incorporates PV forecasts to prioritize charging during periods of high solar output.
   - Reduces grid dependency and maximizes self-consumption by combining cost and solar production data.
 - **Energy Optimization Scheduling**:

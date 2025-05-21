@@ -30,6 +30,7 @@ Example:
     current_feedin_prices = price_interface.get_current_feedin_prices()
 '''
 from datetime import datetime, timedelta
+from collections import defaultdict
 import json
 import logging
 import requests
@@ -39,6 +40,7 @@ logger.info("[PRICE-IF] loading module ")
 
 AKKUDOKTOR_API_PRICES = "https://api.akkudoktor.net/prices"
 TIBBER_API = "https://api.tibber.com/v1-beta/gql"
+SMARTENERGY_API = "https://apis.smartenergy.at/market/v1/price"
 
 
 class PriceInterface:
@@ -180,7 +182,9 @@ class PriceInterface:
         """
         if self.src == "tibber":
             return self.__retrieve_prices_from_tibber(tgt_duration, start_time)
-        if self.src == "default":
+        elif self.src == "smartenergy_at":
+            return self.__retrieve_prices_from_smartenergy_at(tgt_duration, start_time)
+        elif self.src == "default":
             return self.__retrieve_prices_from_akkudoktor(tgt_duration, start_time)
         logger.error("[PRICE-IF] Price source currently not supported.")
         return []
@@ -382,4 +386,56 @@ class PriceInterface:
             extended_prices_direct.extend(prices_direct[:remaining_hours])
         self.current_prices_direct = extended_prices_direct.copy()
         logger.info("[PRICE-IF] Prices from TIBBER fetched successfully.")
+        return extended_prices
+
+    def __retrieve_prices_from_smartenergy_at(self, tgt_duration, start_time=None):
+
+        logger.debug("[PRICE-IF] Prices fetching from SMARTENERGY_AT started")
+        if self.src != "smartenergy_at":
+            logger.error("[PRICE-IF] Price source currently not supported.")
+            return []
+        if start_time is None:
+            start_time = datetime.now(self.time_zone).replace(
+                minute=0, second=0, microsecond=0
+            )
+        request_url = (
+            SMARTENERGY_API
+        )
+        logger.debug("[PRICE-IF] Requesting prices from SMARTENERGY_AT: %s", request_url)
+        try:
+            response = requests.get(request_url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.Timeout:
+            logger.error(
+                "[PRICE-IF] Request timed out while fetching prices from SMARTENERGY_AT."
+            )
+            return []
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "[PRICE-IF] Request failed while fetching prices from SMARTENERGY_AT: %s", e
+            )
+            return []
+
+        # Summarize to hourly averages
+        hourly = defaultdict(list)
+        for entry in data["data"]:
+            # Parse the hour from the ISO date string
+            hour = datetime.fromisoformat(entry["date"]).hour
+            hourly[hour].append(entry["value"] / 100000) # Convert to euro/wh
+        # Compute the average for each hour (0-23)
+        hourly_prices = []
+        for hour in range(24):
+            values = hourly.get(hour, [])
+            avg = sum(values) / len(values) if values else 0
+            hourly_prices.append(round(avg, 6))
+
+        # Optionally extend to tgt_duration if needed
+        extended_prices = hourly_prices
+        if len(extended_prices) < tgt_duration:
+            remaining_hours = tgt_duration - len(extended_prices)
+            extended_prices.extend(hourly_prices[:remaining_hours])
+
+        logger.info("[PRICE-IF] Prices from SMARTENERGY_AT fetched successfully.")
+        self.current_prices_direct = extended_prices.copy()
         return extended_prices

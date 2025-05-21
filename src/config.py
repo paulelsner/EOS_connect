@@ -169,7 +169,7 @@ class ConfigManager:
             "price", before="Electricity price configuration"
         )
         config["price"].yaml_add_eol_comment(
-            "data source for electricity price tibber, default (default uses akkudoktor)",
+            "data source for electricity price tibber, smartenergy_at, default (default uses akkudoktor)",
             "source",
         )
         config["price"].yaml_add_eol_comment("Token for electricity price", "token")

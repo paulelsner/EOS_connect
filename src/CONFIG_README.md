@@ -44,7 +44,7 @@ A default config file will be created with the first start, if there is no `conf
 ### **Electricity Price Configuration**
 
 - **`price.source`**:  
-  Data source for electricity prices. Possible values: `tibber`, `default` (default uses akkudoktor API).
+  Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`default` (default uses akkudoktor API).
 
 - **`price.token`**:  
   Token for accessing electricity price data.
@@ -251,7 +251,7 @@ eos:
   timeout: 180 # timeout for EOS optimize request in seconds - default: 180
 # Electricity price configuration
 price:
-  source: default  # data source for electricity price tibber, default (default uses akkudoktor)
+  source: default  # data source for electricity price tibber, smartenergy_at, default (default uses akkudoktor)
   token: tibberBearerToken # Token for electricity price
   feed_in_price: 0.0 # feed in price for the grid in €/kWh
   negative_price_switch: false # switch for no payment if negative stock price is given

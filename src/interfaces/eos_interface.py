@@ -190,7 +190,7 @@ class EosInterface:
             logger.debug(
                 "[EOS] RESPONSE AC charge demand for current hour %s:00 -> %s %%",
                 current_hour,
-                ac_charge_demand_relative,
+                ac_charge_demand_relative * 100,
             )
         if "dc_charge" in optimized_response_in:
             dc_charge_demand_relative = optimized_response_in["dc_charge"]
@@ -199,7 +199,7 @@ class EosInterface:
             logger.debug(
                 "[EOS] RESPONSE DC charge demand for current hour %s:00 -> %s %%",
                 current_hour,
-                dc_charge_demand_relative,
+                dc_charge_demand_relative * 100,
             )
         if "discharge_allowed" in optimized_response_in:
             discharge_allowed = optimized_response_in["discharge_allowed"]

@@ -100,6 +100,11 @@ if config_manager.config["inverter"]["type"] == "fronius_gen24":
         "password": config_manager.config["inverter"]["password"],
     }
     inverter_interface = FroniusWR(inverter_config)
+elif config_manager.config["inverter"]["type"] == "evcc":
+    logger.info(
+        "[Inverter] Inverter type %s - using the universal evcc external battery control.",
+        config_manager.config["inverter"]["type"],
+    )
 else:
     logger.info(
         "[Inverter] Inverter type %s - no external connection."
@@ -177,13 +182,14 @@ def mqtt_control_callback(command):
 
 
 mqtt_interface = MqttInterface(
-    config_mqtt=config_manager.config["mqtt"], on_mqtt_command=mqtt_control_callback
+    config_mqtt=config_manager.config["mqtt"], on_mqtt_command=None
 )
 
 evcc_interface = EvccInterface(
     url=config_manager.config["evcc"]["url"],
+    ext_bat_mode=config_manager.config["inverter"]["type"] == "evcc",
     update_interval=10,
-    on_charging_state_change=charging_state_callback,
+    on_charging_state_change=None,
 )
 
 # intialize the load interface
@@ -202,7 +208,7 @@ battery_interface = BatteryInterface(
     config_manager.config.get("battery", {}).get("soc_sensor", ""),
     config_manager.config.get("battery", {}).get("access_token", ""),
     config_manager.config.get("battery", {}),
-    on_bat_max_changed=battery_state_callback,
+    on_bat_max_changed=None,
 )
 
 price_interface = PriceInterface(
@@ -777,9 +783,12 @@ def change_control_state():
         bool: True if the state was changed recently and an action was performed,
               False otherwise.
     """
-    inverter_en = False
+    inverter_fronius_en = False
+    inverter_evcc_en = False
     if config_manager.config["inverter"]["type"] == "fronius_gen24":
-        inverter_en = True
+        inverter_fronius_en = True
+    elif config_manager.config["inverter"]["type"] == "evcc":
+        inverter_evcc_en = True
 
     current_overall_state = base_control.get_current_overall_state_number()
     current_overall_state_text = base_control.get_current_overall_state()
@@ -837,8 +846,10 @@ def change_control_state():
         logger.debug("[Main] Overall state changed recently")
         # MODE_CHARGE_FROM_GRID
         if current_overall_state == 0:
-            if inverter_en:
+            if inverter_fronius_en:
                 inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
+            elif inverter_evcc_en:
+                evcc_interface.set_external_battery_mode("force_charge")
             logger.info(
                 "[Main] Inverter mode set to %s with %s W (_____|||||_____)",
                 current_overall_state_text,
@@ -846,43 +857,53 @@ def change_control_state():
             )
         # MODE_AVOID_DISCHARGE
         elif current_overall_state == 1:
-            if inverter_en:
+            if inverter_fronius_en:
                 inverter_interface.set_mode_avoid_discharge()
+            elif inverter_evcc_en:
+                evcc_interface.set_external_battery_mode("avoid_discharge")
             logger.info(
                 "[Main] Inverter mode set to %s (_____-----_____)",
                 current_overall_state_text,
             )
         # MODE_DISCHARGE_ALLOWED
         elif current_overall_state == 2:
-            if inverter_en:
+            if inverter_fronius_en:
                 inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
+            elif inverter_evcc_en:
+                evcc_interface.set_external_battery_mode("discharge_allowed")
             logger.info(
                 "[Main] Inverter mode set to %s (_____+++++_____)",
                 current_overall_state_text,
             )
         # MODE_AVOID_DISCHARGE_EVCC_FAST
         elif current_overall_state == 3:
-            if inverter_en:
+            if inverter_fronius_en:
                 inverter_interface.set_mode_avoid_discharge()
+            elif inverter_evcc_en:
+                evcc_interface.set_external_battery_mode("avoid_discharge")
             logger.info(
                 "[Main] Inverter mode set to %s (_____+---+_____)",
                 current_overall_state_text,
             )
         # MODE_DISCHARGE_ALLOWED_EVCC_PV
         elif current_overall_state == 4:
-            if inverter_en:
+            if inverter_fronius_en:
                 inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
+            elif inverter_evcc_en:
+                evcc_interface.set_external_battery_mode("discharge_allowed")
             logger.info(
                 "[Main] Inverter mode set to %s (_____-+++-_____)",
                 current_overall_state_text,
             )
         # MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV
         elif current_overall_state == 5:
-            if inverter_en:
+            if inverter_fronius_en:
                 inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
+            elif inverter_evcc_en:
+                evcc_interface.set_external_battery_mode("discharge_allowed")
             logger.info(
                 "[Main] Inverter mode set to %s (_____+-+-+_____)",
                 current_overall_state_text,
@@ -899,6 +920,10 @@ def change_control_state():
     )
     return False
 
+# setting the callbacks for the interfaces
+battery_interface.on_bat_max_changed = battery_state_callback
+evcc_interface.on_charging_state_change = charging_state_callback
+mqtt_interface.on_mqtt_command = mqtt_control_callback
 
 # web server
 app = Flask(__name__)
@@ -982,9 +1007,7 @@ def get_controls():
             "soc": current_battery_soc,
             "usable_capacity": battery_interface.get_current_usable_capacity(),
             "max_charge_power_dyn": battery_interface.get_max_charge_power(),
-            "max_grid_charge_rate": config_manager.config["inverter"][
-                "max_grid_charge_rate"
-            ],
+            "max_grid_charge_rate": config_manager.config["inverter"]["max_grid_charge_rate"],
         },
         "inverter": {
             "inverter_special_data": (

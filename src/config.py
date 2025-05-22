@@ -103,7 +103,6 @@ class ConfigManager:
                         "password": "abc123",
                         "max_grid_charge_rate": 5000,
                         "max_pv_charge_rate": 5000,
-                        "max_bat_discharge_rate": 5000,
                     }
                 ),
                 "evcc": CommentedMap(
@@ -113,13 +112,13 @@ class ConfigManager:
                 ),
                 "mqtt": CommentedMap(
                     {
-                        "enabled": False, # Enable MQTT - default: false
+                        "enabled": False,  # Enable MQTT - default: false
                         # URL for MQTT server - default: mqtt://yourMQTTserver
                         "broker": "homeassistant",
-                        "port": 1883, # Port for MQTT server - default: 1883
-                        "user": "username", # Username for MQTT server - default: mqtt
-                        "password": "password", # Password for MQTT server - default: mqtt
-                        "tls": False, # Use TLS for MQTT server - default: false
+                        "port": 1883,  # Port for MQTT server - default: 1883
+                        "user": "username",  # Username for MQTT server - default: mqtt
+                        "password": "password",  # Password for MQTT server - default: mqtt
+                        "tls": False,  # Use TLS for MQTT server - default: false
                         # Enable Home Assistant MQTT auto discovery - default: true
                         "ha_mqtt_auto_discovery": True,
                         # Prefix for Home Assistant MQTT auto discovery - default: homeassistant
@@ -135,13 +134,13 @@ class ConfigManager:
         # load configuration
         config.yaml_set_comment_before_after_key("load", before="Load configuration")
         config["load"].yaml_add_eol_comment(
-            "Data source for load power - openhab, homeassistant,"+
-            " default (using a static load profile)",
+            "Data source for load power - openhab, homeassistant,"
+            + " default (using a static load profile)",
             "source",
         )
         config["load"].yaml_add_eol_comment(
-            "URL for openhab or homeassistant"+
-            " (e.g. http://openhab:8080 or http://homeassistant:8123)",
+            "URL for openhab or homeassistant"
+            + " (e.g. http://openhab:8080 or http://homeassistant:8123)",
             "url",
         )
         config["load"].yaml_add_eol_comment(
@@ -170,7 +169,7 @@ class ConfigManager:
             "price", before="Electricity price configuration"
         )
         config["price"].yaml_add_eol_comment(
-            "data source for electricity price tibber, default (default uses akkudoktor)",
+            "data source for electricity price tibber, smartenergy_at, default (default uses akkudoktor)",
             "source",
         )
         config["price"].yaml_add_eol_comment("Token for electricity price", "token")
@@ -189,8 +188,8 @@ class ConfigManager:
             "Data source for battery soc - openhab, homeassistant, default", "source"
         )
         config["battery"].yaml_add_eol_comment(
-            "URL for openhab or homeassistant"+
-            " (e.g. http://openhab:8080 or http://homeassistant:8123)",
+            "URL for openhab or homeassistant"
+            + " (e.g. http://openhab:8080 or http://homeassistant:8123)",
             "url",
         )
         config["battery"].yaml_add_eol_comment(
@@ -255,8 +254,8 @@ class ConfigManager:
                 "inverterEfficiency",
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Horizont to calculate shading up to 360 values"+
-                " to describe shading situation for your PV.",
+                "Horizont to calculate shading up to 360 values"
+                + " to describe shading situation for your PV.",
                 "horizont",
             )
         # inverter configuration
@@ -264,22 +263,25 @@ class ConfigManager:
             "inverter", before="Inverter configuration"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Type of inverter - fronius_gen24, default (default will disable inverter control -"+
-            " only displaying the target state) - preset: default",
+            "Type of inverter - fronius_gen24, evcc, default"
+            + " (default will disable inverter control -"
+            + " only displaying the target state) - preset: default",
             "type",
         )
-        config["inverter"].yaml_add_eol_comment("Address of the inverter", "address")
-        config["inverter"].yaml_add_eol_comment("Username for the inverter", "user")
-        config["inverter"].yaml_add_eol_comment("Password for the inverter", "password")
         config["inverter"].yaml_add_eol_comment(
-            "Max grid charge rate in W - default: 5000", "max_grid_charge_rate"
+            "Address of the inverter (fronius_gen24 only)", "address"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Max PV charge rate in W - default: 5000", "max_pv_charge_rate"
+            "Username for the inverter (fronius_gen24 only)", "user"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Max battery discharge rate in W (currently not used) - default: 5000",
-            "max_bat_discharge_rate",
+            "Password for the inverter (fronius_gen24 only)", "password"
+        )
+        config["inverter"].yaml_add_eol_comment(
+            "Max inverter grid charge rate in W - default: 5000", "max_grid_charge_rate"
+        )
+        config["inverter"].yaml_add_eol_comment(
+            "Max inverter PV charge rate in W - default: 5000", "max_pv_charge_rate"
         )
         # evcc configuration
         config.yaml_set_comment_before_after_key("evcc", before="EVCC configuration")
@@ -288,12 +290,8 @@ class ConfigManager:
             "url",
         )
         # mqtt configuration
-        config.yaml_set_comment_before_after_key(
-            "mqtt", before="MQTT configuration"
-        )
-        config["mqtt"].yaml_add_eol_comment(
-            "Enable MQTT - default: false", "enabled"
-        )
+        config.yaml_set_comment_before_after_key("mqtt", before="MQTT configuration")
+        config["mqtt"].yaml_add_eol_comment("Enable MQTT - default: false", "enabled")
         config["mqtt"].yaml_add_eol_comment(
             "URL for MQTT server - default: mqtt://yourMQTTserver", "broker"
         )

@@ -194,11 +194,7 @@ evcc_interface = EvccInterface(
 
 # intialize the load interface
 load_interface = LoadInterface(
-    config_manager.config.get("load", {}).get("source", ""),
-    config_manager.config.get("load", {}).get("url", ""),
-    config_manager.config.get("load", {}).get("load_sensor", ""),
-    config_manager.config.get("load", {}).get("car_charge_load_sensor", ""),
-    config_manager.config.get("load", {}).get("access_token", ""),
+    config_manager.config.get("load", {}),
     time_zone,
 )
 
@@ -409,10 +405,19 @@ def create_optimize_request():
         return eauto_object
 
     def get_dishwasher_data():
-        dishwaser_object = {"consumption_wh": 1, "duration_h": 1}
+        consumption_wh = config_manager.config["load"]["additional_load_1_consumption"]
+        if not consumption_wh or consumption_wh == 0:
+            consumption_wh = 1
+        duration_h = config_manager.config["load"]["additional_load_1_runtime"]
+        if not duration_h or duration_h == 0:
+            duration_h = 1
+        dishwasher_object = {
+            "consumption_wh": consumption_wh,
+            "duration_h": duration_h,
+        }
         if eos_interface.get_eos_version() == ">=2025-04-09":
-            dishwaser_object = {"device_id": "dishwasher1", **dishwaser_object}
-        return dishwaser_object
+            dishwasher_object = {"device_id": "additional_load_1", **dishwasher_object}
+        return dishwasher_object
 
     payload = {
         "ems": get_ems_data(),
@@ -678,7 +683,10 @@ class OptimizationScheduler:
         """
         Starts the background thread to periodically update the state.
         """
-        if self._update_thread_inner_loop is None or not self._update_thread_inner_loop.is_alive():
+        if (
+            self._update_thread_inner_loop is None
+            or not self._update_thread_inner_loop.is_alive()
+        ):
             self._stop_event_inner_loop.clear()
             self._update_thread_inner_loop = threading.Thread(
                 target=self.__update_state_loop_inner_loop, daemon=True
@@ -766,6 +774,7 @@ optimization_scheduler = OptimizationScheduler(
     config_manager.config["refresh_time"] * 60  # convert to seconds
 )
 
+
 def change_control_state():
     """
     Adjusts the control state of the inverter based on the current overall state.
@@ -814,6 +823,12 @@ def change_control_state():
                         base_control.get_override_active_and_endtime()[1], time_zone
                     )
                 ).isoformat()
+            },
+            "control/eos_homeappliance_released": {
+                "value": eos_interface.get_home_appliance_released()
+            },
+            "control/eos_homeappliance_start_hour": {
+                "value": eos_interface.get_home_appliance_start_hour()
             },
             "battery/soc": {"value": battery_interface.get_current_soc()},
             "battery/remaining_energy": {
@@ -920,6 +935,7 @@ def change_control_state():
     )
     return False
 
+
 # setting the callbacks for the interfaces
 battery_interface.on_bat_max_changed = battery_state_callback
 evcc_interface.on_charging_state_change = charging_state_callback
@@ -1007,7 +1023,9 @@ def get_controls():
             "soc": current_battery_soc,
             "usable_capacity": battery_interface.get_current_usable_capacity(),
             "max_charge_power_dyn": battery_interface.get_max_charge_power(),
-            "max_grid_charge_rate": config_manager.config["inverter"]["max_grid_charge_rate"],
+            "max_grid_charge_rate": config_manager.config["inverter"][
+                "max_grid_charge_rate"
+            ],
         },
         "inverter": {
             "inverter_special_data": (

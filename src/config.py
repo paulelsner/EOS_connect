@@ -43,9 +43,13 @@ class ConfigManager:
                     {
                         "source": "default",  # data source for load power
                         "url": "http://homeassistant:8123",  # URL for openhab or homeassistant
+                        "access_token": "abc123",  # access token for homeassistant
                         "load_sensor": "Load_Power",  # item / entity for load power data
                         "car_charge_load_sensor": "Wallbox_Power",  # item / entity wallbox power
-                        "access_token": "abc123",  # access token for homeassistant
+                        # item / entity for additional load power data
+                        "additional_load_1_sensor": "additional_load_1_sensor", 
+                        "additional_load_1_runtime": 0,  # runtime for additional load 1 in minutes
+                        "additional_load_1_consumption": 0,  # consumption for additional load 1 in Wh
                     }
                 ),
                 "eos": CommentedMap(
@@ -139,6 +143,9 @@ class ConfigManager:
             "source",
         )
         config["load"].yaml_add_eol_comment(
+            "access token for homeassistant (optional)", "access_token"
+        )
+        config["load"].yaml_add_eol_comment(
             "URL for openhab or homeassistant"
             + " (e.g. http://openhab:8080 or http://homeassistant:8123)",
             "url",
@@ -147,12 +154,22 @@ class ConfigManager:
             "item / entity for load power data in watts", "load_sensor"
         )
         config["load"].yaml_add_eol_comment(
-            "item / entity for wallbox power data in watts",
+            "item / entity for wallbox power data in watts. Leave empty if not used.",
             "car_charge_load_sensor",
         )
         config["load"].yaml_add_eol_comment(
-            "access token for homeassistant (optional)", "access_token"
+            "item / entity for additional load power data in watts. Leave empty if not used.",
+            "additional_load_1_sensor",
         )
+        config["load"].yaml_add_eol_comment(
+            "runtime for additional load 1 in minutes - default: 0 (or empty) = not used",
+            "additional_load_1_runtime",
+        )
+        config["load"].yaml_add_eol_comment(
+            "consumption for additional load 1 in Wh - default: 0 (or empty) = not used",
+            "additional_load_1_consumption",
+        )
+
         # eos configuration
         config.yaml_set_comment_before_after_key(
             "eos", before="EOS server configuration"
@@ -169,7 +186,8 @@ class ConfigManager:
             "price", before="Electricity price configuration"
         )
         config["price"].yaml_add_eol_comment(
-            "data source for electricity price tibber, smartenergy_at, default (default uses akkudoktor)",
+            "data source for electricity price tibber, smartenergy_at," +
+            " default (default uses akkudoktor)",
             "source",
         )
         config["price"].yaml_add_eol_comment("Token for electricity price", "token")

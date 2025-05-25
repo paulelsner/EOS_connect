@@ -69,6 +69,8 @@ class EosInterface:
         self.base_url = f"http://{eos_server}:{eos_port}"
         self.time_zone = timezone
         self.last_start_solution = None
+        self.home_appliance_released = False
+        self.home_appliance_start_hour = None
         self.eos_version = None
         self.eos_version = self.__retrieve_eos_version()
 
@@ -226,6 +228,20 @@ class EosInterface:
         else:
             logger.error("[EOS] RESPONSE No control data in optimized response")
             response_error = True
+
+        if "washingstart" in optimized_response_in:
+            self.home_appliance_start_hour = optimized_response_in["washingstart"]
+            if self.home_appliance_start_hour == current_hour:
+                self.home_appliance_released = True
+            else:
+                self.home_appliance_released = False
+            logger.debug(
+                "[EOS] RESPONSE Home appliance - current hour %s:00 - start hour %s - is Released: %s",
+                current_hour,
+                self.home_appliance_start_hour,
+                self.home_appliance_released,
+            )
+
         return (
             ac_charge_demand_relative,
             dc_charge_demand_relative,
@@ -278,6 +294,24 @@ class EosInterface:
         """
         '''
         return self.last_start_solution
+
+    def get_home_appliance_released(self):
+        """
+        Get the home appliance released status.
+
+        Returns:
+            bool: True if the home appliance is released, False otherwise.
+        """
+        return self.home_appliance_released
+    
+    def get_home_appliance_start_hour(self):
+        """
+        Get the home appliance start hour.
+
+        Returns:
+            int: The hour when the home appliance starts.
+        """
+        return self.home_appliance_start_hour
 
     # function that creates a pandas dataframe with a DateTimeIndex with the given average profile
     def create_dataframe(self, profile):

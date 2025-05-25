@@ -7,6 +7,7 @@ load profiles based on historical energy consumption data.
 from datetime import datetime, timedelta
 import logging
 import requests
+from urllib.parse import quote
 
 logger = logging.getLogger("__main__")
 logger.info("[LOAD-IF] loading module ")
@@ -21,18 +22,15 @@ class LoadInterface:
 
     def __init__(
         self,
-        src,
-        url,
-        load_sensor,
-        car_charge_load_sensor,
-        access_token,
+        config,
         timezone="UTC",
     ):
-        self.src = src
-        self.url = url
-        self.load_sensor = load_sensor
-        self.car_charge_load_sensor = car_charge_load_sensor
-        self.access_token = access_token
+        self.src = config.get("source", "")
+        self.url = config.get("url", "")
+        self.load_sensor = config.get("load_sensor", "")
+        self.car_charge_load_sensor = config.get("car_charge_load_sensor", "")
+        self.additional_load_1_sensor = config.get("additional_load_1_sensor", "")
+        self.access_token = config.get("access_token", "")
         self.time_zone = timezone
 
     # get load data from url persistance source
@@ -92,6 +90,9 @@ class LoadInterface:
         Returns:
             list: A list of historical state changes for the entity.
         """
+        if entity_id == "" or entity_id is None:
+            #logger.debug("[LOAD-IF] HOMEASSISTANT get historical values - No entity_id configured.")
+            return []
         # Headers for the API request
         headers = {
             "Authorization": f"Bearer {self.access_token}",
@@ -136,7 +137,7 @@ class LoadInterface:
             )
             return []
 
-    def __process_energy_data(self, data):
+    def __process_energy_data(self, data, debug_sensor=None):
         """
         Processes energy data to calculate the average energy consumption based on timestamps.
         """
@@ -148,14 +149,49 @@ class LoadInterface:
         duration = 0.0
 
         for i in range(len(data["data"]) - 1):
+            # check if data are available
+            if (
+                data["data"][i + 1]["state"] == "unavailable"
+                or data["data"][i]["state"] == "unavailable"
+            ):
+                # if debug_name != "add_load_1":
+                #     logger.error(
+                #         "[LOAD-IF] state 'unavailable' in data '%s' at index %d: %s",
+                #         debug_name if debug_name is not None else '',
+                #         i,
+                #         data["data"][i],
+                #     )
+                continue
             try:
                 current_state = float(data["data"][i]["state"])
                 last_state = float(data["data"][i + 1]["state"])
                 current_time = datetime.fromisoformat(data["data"][i]["last_updated"])
                 next_time = datetime.fromisoformat(data["data"][i + 1]["last_updated"])
-            except (ValueError, KeyError):
+            except (ValueError, KeyError) as e:
+                debug_url = None
+                if self.src == "homeassistant":
+                    current_time = datetime.fromisoformat(
+                        data["data"][i]["last_updated"]
+                    )
+                    debug_url = (
+                        "(check: "
+                        + self.url
+                        + "/history?entity_id="
+                        + quote(debug_sensor)
+                        + "&start_date="
+                        + quote((current_time - timedelta(hours=2)).isoformat())
+                        + "&end_date="
+                        + quote((current_time + timedelta(hours=2)).isoformat())
+                        + ")"
+                    )
                 logger.error(
-                    "[LOAD-IF] Error processing energy data: %s", data["data"][i]
+                    "[LOAD-IF] Error processing energy ('%s') data at index %d: %s (next: %s) - %s %s",
+                    debug_sensor if debug_sensor is not None else "",
+                    i,
+                    data["data"][i],
+                    data["data"][i + 1],
+                    str(e),
+                    debug_url if debug_url is not None else "",
                 )
                 continue
 
@@ -338,6 +374,57 @@ class LoadInterface:
     #     logger.info("[LOAD-IF] Load profile created successfully.")
     #     return load_profile
 
+    def __get_additional_load_list_from_to(self, item, start_time, end_time):
+        """
+        Retrieves and processes additional load data within a specified time range.
+        This method fetches historical energy data for additional loads from Home Assistant,
+        determines the maximum additional load, and adjusts the unit of measurement if necessary.
+        The processed data is then returned with all values converted to the appropriate unit.
+        Args:
+            start_time (datetime): The start time of the data retrieval period.
+            end_time (datetime): The end time of the data retrieval period.
+        Returns:
+            list[dict]: A list of dictionaries containing the processed additional load data.
+                        Each dictionary includes a "state" key with the adjusted load value.
+        Raises:
+            ValueError: If a data entry's "state" value cannot be converted to a float.
+            KeyError: If a data entry does not contain the "state" key.
+        Notes:
+            - If the maximum additional load is between 0 and 23 (assumed to be in kW), it is
+              converted to W.
+            - All load values are multiplied by the determined unit factor before being returned.
+        """
+
+        if self.src == "openhab":
+            additional_load_data = self.__fetch_historical_energy_data_from_openhab(
+                item, start_time, end_time
+            )
+        elif self.src == "homeassistant":
+            additional_load_data = (
+                self.__fetch_historical_energy_data_from_homeassistant(
+                    item, start_time, end_time
+                )
+            )
+        else:
+            logger.error(
+                "[LOAD-IF] Car Load source '%s' currently not supported. Using default.",
+                self.src,
+            )
+            return []
+
+        # multiply every value with car_load_unit_factor before returning
+        for data_entry in additional_load_data:
+            try:
+                data_entry["state"] = float(
+                    data_entry["state"]
+                )  # * car_load_unit_factor
+            except ValueError:
+                continue
+            except KeyError:
+                continue
+        # print(f'HA Car load data: {car_load_data}')
+        return additional_load_data
+
     def __get_car_load_list_from_to(self, start_time, end_time):
         """
         Retrieves and processes car load data within a specified time range.
@@ -423,25 +510,67 @@ class LoadInterface:
                 )
                 return []
 
-            car_load_data = self.__get_car_load_list_from_to(current_hour, next_hour)
-            energy = abs(self.__process_energy_data({"data": energy_data}))
-            car_load_energy = abs(self.__process_energy_data({"data": car_load_data}))
+            # car_load_data = self.__get_car_load_list_from_to(current_hour, next_hour)
+            car_load_data = self.__get_additional_load_list_from_to(
+                self.car_charge_load_sensor, current_hour, next_hour
+            )
+            car_load_energy = abs(
+                self.__process_energy_data(
+                    {"data": car_load_data}, self.car_charge_load_sensor
+                )
+            )
             car_load_energy = max(car_load_energy, 0)  # prevent negative values
-            if car_load_energy <= energy:
-                energy = energy - car_load_energy
+
+            add_load_data_1 = self.__get_additional_load_list_from_to(
+                self.additional_load_1_sensor, current_hour, next_hour
+            )
+            add_load_data_1_energy = abs(
+                self.__process_energy_data(
+                    {"data": add_load_data_1}, self.additional_load_1_sensor
+                )
+            )
+            add_load_data_1_energy = max(
+                add_load_data_1_energy, 0
+            )  # prevent negative values
+
+            sum_controlable_energy_load = car_load_energy + add_load_data_1_energy
+            energy = abs(
+                self.__process_energy_data({"data": energy_data}, self.load_sensor)
+            )
+
+            if sum_controlable_energy_load <= energy:
+                energy = energy - sum_controlable_energy_load
             else:
+                debug_url = None
+                if self.src == "homeassistant":
+                    current_time = datetime.fromisoformat(current_hour.isoformat())
+                    debug_url = (
+                        "(check: "
+                        + self.url
+                        + "/history?entity_id="
+                        + quote(self.load_sensor)
+                        + "&start_date="
+                        + quote((current_time - timedelta(hours=2)).isoformat())
+                        + "&end_date="
+                        + quote((current_time + timedelta(hours=2)).isoformat())
+                        + ")"
+                    )
                 logger.error(
                     "[LOAD-IF] DATA ERROR load smaller than car load "
-                    + "- Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    + "- Energy for %s: %5.1f Wh (sum add energy %5.1f Wh - car load: %5.1f Wh) %s",
                     current_hour,
                     round(energy, 1),
+                    round(sum_controlable_energy_load, 1),
                     round(car_load_energy, 1),
+                    debug_url,
                 )
             if energy == 0:
                 logger.warning(
-                    "[LOAD-IF] load = 0 ... Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                    "[LOAD-IF] load = 0 ... Energy for %s: %5.1f Wh" +
+                    " (sum add energy %5.1f Wh - car load: %5.1f Wh)",
                     current_hour,
                     round(energy, 1),
+                    round(sum_controlable_energy_load, 1),
                     round(car_load_energy, 1),
                 )
                 # current_hour += timedelta(hours=1)
@@ -451,9 +580,10 @@ class LoadInterface:
 
             load_profile.append(energy_sum)
             logger.debug(
-                "[LOAD-IF] Energy for %s: %5.1f Wh (car load: %5.1f Wh)",
+                "[LOAD-IF] Energy for %s: %5.1f Wh (sum add energy %5.1f Wh - car load: %5.1f Wh)",
                 current_hour,
                 round(energy, 1),
+                round(sum_controlable_energy_load, 1),
                 round(car_load_energy, 1),
             )
             current_hour += timedelta(hours=1)
@@ -554,9 +684,7 @@ class LoadInterface:
         Returns:
             list: A list of energy consumption values for the specified duration.
         """
-        if self.src == "default":
-            logger.info("[LOAD-IF] Using load source default")
-            default_profile = [
+        default_profile = [
                 200.0,  # 0:00 - 1:00 -- day 1
                 200.0,  # 1:00 - 2:00
                 200.0,  # 2:00 - 3:00
@@ -606,12 +734,20 @@ class LoadInterface:
                 300.0,  # 22:00 - 23:00
                 200.0,  # 23:00 - 0:00
             ]
+        if self.src == "default":
+            logger.info("[LOAD-IF] Using load source default")
             return default_profile[:tgt_duration]
-        if self.src == "openhab" or self.src == "homeassistant":
+        if self.src in ('openhab', 'homeassistant'):
+            if self.load_sensor == "" or self.load_sensor is None:
+                logger.error(
+                    "[LOAD-IF] Load sensor not configured for source '%s'. Using default.",
+                    self.src,
+                )
+                return default_profile[:tgt_duration]
             return self.__create_load_profile_weekdays()
 
         logger.error(
             "[LOAD-IF] Load source '%s' currently not supported. Using default.",
             self.src,
         )
-        return []
+        return default_profile[:tgt_duration]

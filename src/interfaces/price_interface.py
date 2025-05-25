@@ -1,34 +1,32 @@
-'''
-This module provides the `PriceInterface` class, which is designed to handle electricity price 
-data retrieval, processing, and management from various sources. It includes methods for fetching
-current prices, generating feed-in prices, and updating price data for a specified duration and
-start time. The module supports integration with the Akkudoktor API and Tibber API for retrieving
-electricity prices.
-Classes:
-    PriceInterface: A class for managing electricity price data, including fetching, processing, 
-    and generating feed-in prices.
-Constants:
-    AKKUDOKTOR_API_PRICES (str): The URL for the Akkudoktor API to fetch electricity prices.
-    TIBBER_API (str): The URL for the Tibber API to fetch electricity prices.
-Dependencies:
-    - datetime: For handling date and time operations.
-    - json: For parsing JSON responses from APIs.
-    - logging: For logging messages and errors.
-    - requests: For making HTTP requests to APIs.
+"""
+This module provides the `PriceInterface` class for retrieving and processing electricity price data from various sources.
+
+Supported sources:
+    - Akkudoktor API (default)
+    - Tibber API
+    - SmartEnergy AT API
+    - Fixed 24-hour price array
+
+Features:
+    - Fetches and updates current prices for a specified duration and start time.
+    - Generates feed-in prices based on configuration.
+    - Handles negative price switching and feed-in tariff logic.
+    - Provides default fallback prices if external data is unavailable.
+
 Usage:
-    Create an instance of the `PriceInterface` class with the desired configuration, and use its
-    methods to fetch and process electricity price data.
-Example:
-    price_interface = PriceInterface(
-        src="tibber",
-        access_token="your_access_token",
-        feed_in_tariff_price=5.0,
-        negative_price_switch=True,
-        timezone="Europe/Berlin"
+    config = {
+        "source": "tibber",
+        "token": "your_access_token",
+        "feed_in_tariff_price": 5.0,
+        "negative_price_switch": True,
+        "fixed_24h_array": [10.0] * 24
+    }
+    price_interface = PriceInterface(config, timezone="Europe/Berlin")
     price_interface.update_prices(tgt_duration=24, start_time=datetime.now())
     current_prices = price_interface.get_current_prices()
     current_feedin_prices = price_interface.get_current_feedin_prices()
-'''
+"""
+
 from datetime import datetime, timedelta
 from collections import defaultdict
 import json
@@ -44,60 +42,61 @@ SMARTENERGY_API = "https://apis.smartenergy.at/market/v1/price"
 
 
 class PriceInterface:
-    '''
-    PriceInterface is a class designed to handle electricity price data retrieval, processing, 
-    and management from various sources. It provides methods to fetch current prices, 
-    generate feed-in prices, and update price data for a specified duration and start time.
+    """
+    The PriceInterface class manages electricity price data retrieval and processing from various sources.
+
     Attributes:
-        src (str): The source of the price data (e.g., 'tibber', 'default').
-        access_token (str): The access token for authenticating with the price source.
-        feed_in_tariff_price (float): The feed-in tariff price in cents per kWh.
-        negative_price_switch (bool): A flag to determine whether to set feed-in prices to 0
-        for negative prices.
-        timezone (str): The timezone used for date and time operations.
-        current_prices (list): A list of current prices fetched from the price source.
-        current_prices_direct (list): A list of current prices without tax.
-        current_feedin (list): A list of current feed-in prices.
+        src (str): Source of the price data (e.g., 'tibber', 'default', 'smartenergy_at', 'fixed_24h').
+        access_token (str): Access token for authenticating with the price source.
+        fixed_24h_array (list): Optional fixed 24-hour price array.
+        feed_in_tariff_price (float): Feed-in tariff price in cents per kWh.
+        negative_price_switch (bool): If True, sets feed-in prices to 0 for negative prices.
+        time_zone (str): Timezone for date and time operations.
+        current_prices (list): Current prices including taxes.
+        current_prices_direct (list): Current prices without tax.
+        current_feedin (list): Current feed-in prices.
+        default_prices (list): Default price list if external data is unavailable.
+
     Methods:
         update_prices(tgt_duration, start_time):
-            Updates the current prices and feed-in prices based on the target duration and
-            start time.
+            Updates current_prices and current_feedin for the given duration and start time.
         get_current_prices():
-            Returns the current prices fetched from the price source.
+            Returns the current prices.
         get_current_feedin_prices():
-            Returns the current feed-in prices fetched from the price source.
+            Returns the current feed-in prices.
         __create_feedin_prices():
-            Creates feed-in prices based on the current prices and the configured feed-in
-            tariff price.
+            Generates feed-in prices based on current_prices_direct and configuration.
         __retrieve_prices(tgt_duration, start_time=None):
-            Retrieves prices based on the target duration and optional start time from the
-            configured source.
+            Dispatches price retrieval to the configured source.
         __retrieve_prices_from_akkudoktor(tgt_duration, start_time=None):
-            Fetches and processes electricity prices for today and tomorrow from the
-            Akkudoktor API.
+            Fetches prices from the Akkudoktor API.
         __retrieve_prices_from_tibber(tgt_duration, start_time=None):
-            Fetches and processes electricity prices for today and tomorrow from the Tibber API.
-    '''
+            Fetches prices from the Tibber API.
+        __retrieve_prices_from_smartenergy_at(tgt_duration, start_time=None):
+            Fetches prices from the SmartEnergy AT API.
+        __retrieve_prices_from_fixed24h_array(tgt_duration, start_time=None):
+            Returns prices from a fixed 24-hour array.
+    """
+
     def __init__(
         self,
-        src,
-        access_token,
-        feed_in_tariff_price=0.0,
-        negative_price_switch=False,
+        config,
         timezone="UTC",
     ):
-        self.src = src
-        self.access_token = access_token
-        self.feed_in_tariff_price = feed_in_tariff_price
-        self.negative_price_switch = negative_price_switch
+        self.src = config["source"]
+        self.access_token = config.get("token", "")
+        self.fixed_24h_array = config.get("fixed_24h_array", False)
+        self.feed_in_tariff_price = config.get("feed_in_tariff_price", 0.0)
+        self.negative_price_switch = config.get("negative_price_switch", False)
         self.time_zone = timezone
         self.current_prices = []
         self.current_prices_direct = []  # without tax
         self.current_feedin = []
+        self.default_prices = [0.0001] * 24  # if external data are not available
 
     def update_prices(self, tgt_duration, start_time):
         """
-        Updates the current prices and feed-in prices based on the target duration 
+        Updates the current prices and feed-in prices based on the target duration
         and start time provided.
 
         Args:
@@ -184,6 +183,8 @@ class PriceInterface:
             return self.__retrieve_prices_from_tibber(tgt_duration, start_time)
         elif self.src == "smartenergy_at":
             return self.__retrieve_prices_from_smartenergy_at(tgt_duration, start_time)
+        elif self.src == "fixed_24h":
+            return self.__retrieve_prices_from_fixed24h_array(tgt_duration, start_time)
         elif self.src == "default":
             return self.__retrieve_prices_from_akkudoktor(tgt_duration, start_time)
         logger.error("[PRICE-IF] Price source currently not supported.")
@@ -208,10 +209,10 @@ class PriceInterface:
         """
         if self.src != "default":
             logger.error(
-                "[PRICE-IF] Price source %s currently not supported.",
+                "[PRICE-IF] Price source %s currently not supported. Default prices will be used.", 
                 self.src,
             )
-            return []
+            return self.default_prices
         logger.debug("[PRICE-IF] Fetching prices from akkudoktor ...")
         if start_time is None:
             start_time = datetime.now(self.time_zone).replace(
@@ -232,14 +233,17 @@ class PriceInterface:
             data = response.json()
         except requests.exceptions.Timeout:
             logger.error(
-                "[PRICE-IF] Request timed out while fetching prices from akkudoktor."
+                "[PRICE-IF] Request timed out while fetching prices from akkudoktor." +
+                " Default prices will be used."
             )
-            return []
+            return self.default_prices
         except requests.exceptions.RequestException as e:
             logger.error(
-                "[PRICE-IF] Request failed while fetching prices from akkudoktor: %s", e
+                "[PRICE-IF] Request failed while fetching prices from akkudoktor: %s" +
+                " Default prices will be used.",
+                e
             )
-            return []
+            return self.default_prices
 
         prices = []
         for price in data["values"]:
@@ -282,8 +286,8 @@ class PriceInterface:
         """
         logger.debug("[PRICE-IF] Prices fetching from TIBBER started")
         if self.src != "tibber":
-            logger.error("[PRICE-IF] Price source currently not supported.")
-            return []
+            logger.error("[PRICE-IF] Price source '%s' currently not supported.", self.src)
+            return self.default_prices
         headers = {
             "Authorization": self.access_token,
             "Content-Type": "application/json",
@@ -318,13 +322,16 @@ class PriceInterface:
         except requests.exceptions.Timeout:
             logger.error(
                 "[PRICE-IF] Request timed out while fetching prices from Tibber."
+                + " Default prices will be used."
             )
-            return []
+            return self.default_prices
         except requests.exceptions.RequestException as e:
             logger.error(
-                "[PRICE-IF] Request failed while fetching prices from Tibber: %s", e
+                "[PRICE-IF] Request failed while fetching prices from Tibber: %s"
+                + " Default prices will be used.",
+                e,
             )
-            return []
+            return self.default_prices
 
         response.raise_for_status()
         data = response.json()
@@ -389,19 +396,21 @@ class PriceInterface:
         return extended_prices
 
     def __retrieve_prices_from_smartenergy_at(self, tgt_duration, start_time=None):
-
         logger.debug("[PRICE-IF] Prices fetching from SMARTENERGY_AT started")
         if self.src != "smartenergy_at":
-            logger.error("[PRICE-IF] Price source currently not supported.")
-            return []
+            logger.error(
+                "[PRICE-IF] Price source '%s' currently not supported. Default prices will be used.",
+                self.src
+            )
+            return self.default_prices
         if start_time is None:
             start_time = datetime.now(self.time_zone).replace(
                 minute=0, second=0, microsecond=0
             )
-        request_url = (
-            SMARTENERGY_API
+        request_url = SMARTENERGY_API
+        logger.debug(
+            "[PRICE-IF] Requesting prices from SMARTENERGY_AT: %s", request_url
         )
-        logger.debug("[PRICE-IF] Requesting prices from SMARTENERGY_AT: %s", request_url)
         try:
             response = requests.get(request_url, timeout=10)
             response.raise_for_status()
@@ -409,20 +418,23 @@ class PriceInterface:
         except requests.exceptions.Timeout:
             logger.error(
                 "[PRICE-IF] Request timed out while fetching prices from SMARTENERGY_AT."
+                + " Default prices will be used."
             )
-            return []
+            return self.default_prices
         except requests.exceptions.RequestException as e:
             logger.error(
-                "[PRICE-IF] Request failed while fetching prices from SMARTENERGY_AT: %s", e
+                "[PRICE-IF] Request failed while fetching prices from SMARTENERGY_AT: %s"
+                + " Default prices will be used.",
+                e,
             )
-            return []
+            return self.default_prices
 
         # Summarize to hourly averages
         hourly = defaultdict(list)
         for entry in data["data"]:
             # Parse the hour from the ISO date string
             hour = datetime.fromisoformat(entry["date"]).hour
-            hourly[hour].append(entry["value"] / 100000) # Convert to euro/wh
+            hourly[hour].append(entry["value"] / 100000)  # Convert to euro/wh
         # Compute the average for each hour (0-23)
         hourly_prices = []
         for hour in range(24):
@@ -437,5 +449,46 @@ class PriceInterface:
             extended_prices.extend(hourly_prices[:remaining_hours])
 
         logger.info("[PRICE-IF] Prices from SMARTENERGY_AT fetched successfully.")
+        self.current_prices_direct = extended_prices.copy()
+        return extended_prices
+
+    def __retrieve_prices_from_fixed24h_array(self, tgt_duration, start_time=None):
+        """
+        Returns a fixed 24-hour array of prices.
+
+        This function returns a fixed 24-hour array of prices based on the configured
+        feed-in tariff price. It is used when the `fixed_24h_array` configuration is set to True.
+
+        Args:
+            tgt_duration (int): The target duration for which prices are needed.
+            start_time (datetime, optional): The start time for fetching prices. Defaults to None.
+
+        Returns:
+            list: A list of fixed prices for the specified duration.
+        """
+        # if start_time is None:
+        #     start_time = datetime.now(self.time_zone).replace(
+        #         minute=0, second=0, microsecond=0
+        #     )
+        # current_hour = start_time.hour
+        if not self.fixed_24h_array:
+            logger.error(
+                "[PRICE-IF] fixed_24h is configured,"
+                + " but no 'fixed_24h_array' is provided."
+                + " Default prices will be used."
+            )
+            return self.default_prices
+        if len(self.fixed_24h_array) != 24:
+            logger.error(
+                "[PRICE-IF] fixed_24h_array must contain exactly 24 entries."
+                + " Default prices will be used."
+            )
+            return self.default_prices
+        # Convert each entry in fixed_24h_array from ct/kWh to €/Wh (divide by 100000)
+        extended_prices = [round(price / 100000, 9) for price in self.fixed_24h_array]
+        # Extend to tgt_duration if needed
+        if len(extended_prices) < tgt_duration:
+            remaining_hours = tgt_duration - len(extended_prices)
+            extended_prices.extend(extended_prices[:remaining_hours])
         self.current_prices_direct = extended_prices.copy()
         return extended_prices

@@ -47,7 +47,7 @@ class ConfigManager:
                         "load_sensor": "Load_Power",  # item / entity for load power data
                         "car_charge_load_sensor": "Wallbox_Power",  # item / entity wallbox power
                         # item / entity for additional load power data
-                        "additional_load_1_sensor": "additional_load_1_sensor", 
+                        "additional_load_1_sensor": "additional_load_1_sensor",
                         "additional_load_1_runtime": 0,  # runtime for additional load 1 in minutes
                         "additional_load_1_consumption": 0,  # consumption for additional load 1 in Wh
                     }
@@ -63,6 +63,32 @@ class ConfigManager:
                     {
                         "source": "default",
                         "token": "tibberBearerToken",  # token for electricity price
+                        "fixed_24h_array": [
+                            10.1,
+                            10.1,
+                            10.1,
+                            10.1,
+                            10.1,
+                            23,
+                            28.23,
+                            28.23,
+                            28.23,
+                            28.23,
+                            28.23,
+                            23.52,
+                            23.52,
+                            23.52,
+                            23.52,
+                            28.17,
+                            28.17,
+                            34.28,
+                            34.28,
+                            34.28,
+                            34.28,
+                            34.28,
+                            28,
+                            23,
+                        ],  # 24 hours array with fixed end customer prices in ct/kWh over the day
                         "feed_in_price": 0.0,  # feed in price for the grid
                         "negative_price_switch": False,  # switch for negative price
                     }
@@ -186,11 +212,15 @@ class ConfigManager:
             "price", before="Electricity price configuration"
         )
         config["price"].yaml_add_eol_comment(
-            "data source for electricity price tibber, smartenergy_at," +
-            " default (default uses akkudoktor)",
+            "data source for electricity price tibber, smartenergy_at,"
+            + " default (default uses akkudoktor)",
             "source",
         )
         config["price"].yaml_add_eol_comment("Token for electricity price", "token")
+        config["price"].yaml_add_eol_comment(
+            "24 hours array with fixed end customer prices in ct/kWh over the day", 
+            "fixed_24h_array"
+        )
         config["price"].yaml_add_eol_comment(
             "feed in price for the grid in €/kWh", "feed_in_price"
         )

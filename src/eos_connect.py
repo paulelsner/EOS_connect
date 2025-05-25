@@ -207,12 +207,7 @@ battery_interface = BatteryInterface(
     on_bat_max_changed=None,
 )
 
-price_interface = PriceInterface(
-    config_manager.config["price"]["source"],
-    config_manager.config["price"]["token"],
-    config_manager.config["price"]["feed_in_price"],
-    config_manager.config["price"]["negative_price_switch"],
-)
+price_interface = PriceInterface(config_manager.config["price"])
 
 
 def create_forecast_request(pv_config_entry):

@@ -54,10 +54,15 @@ A default config file will be created with the first start, if there is no `conf
 ### **Electricity Price Configuration**
 
 - **`price.source`**:  
-  Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`default` (default uses akkudoktor API).
+  Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`fixed_24h`,`default` (default uses akkudoktor API).
 
 - **`price.token`**:  
   Token for accessing electricity price data.
+
+- **`price.fixed_24h_array`**:
+  24 hours array with fixed end customer prices in ct/kWh over the day.
+  - Leave empty if not set source to `fixed_24h`.
+  - e.g. [10.42, 10.42, 10.42, 10.42, 10.42, 23.52, 28.17, 28.17, 28.17, 28.17, 28.17, 23.52, 23.52, 23.52, 23.52, 28.17, 28.17, 34.28, 34.28, 34.28, 34.28, 34.28, 28.17, 23.52] means 10.42 ct/kWh from 00 - 01 hour
 
 - **`price.feed_in_price`**:  
   Feed-in price for the grid, in €/kWh.
@@ -264,8 +269,9 @@ eos:
   timeout: 180 # timeout for EOS optimize request in seconds - default: 180
 # Electricity price configuration
 price:
-  source: default  # data source for electricity price tibber, smartenergy_at, default (default uses akkudoktor)
+  source: default  # data source for electricity price tibber, smartenergy_at, fixed_24h, default (default uses akkudoktor)
   token: tibberBearerToken # Token for electricity price
+  fixed_24h_array: [10.41, 10.42, 10.42, 10.42, 10.42, 23.52, 28.17, 28.17, 28.17, 28.17, 28.17, 23.52, 23.52, 23.52, 23.52, 28.17, 28.17, 34.28, 34.28, 34.28, 34.28, 34.28, 28.17, 23.52] # 24 hours array with fixed prices over the day
   feed_in_price: 0.0 # feed in price for the grid in €/kWh
   negative_price_switch: false # switch for no payment if negative stock price is given
 # battery configuration

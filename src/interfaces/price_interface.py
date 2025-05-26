@@ -86,13 +86,20 @@ class PriceInterface:
         self.src = config["source"]
         self.access_token = config.get("token", "")
         self.fixed_24h_array = config.get("fixed_24h_array", False)
+        # for HA addon config - if string, convert to list of floats
+        if isinstance(self.fixed_24h_array, str):
+            self.fixed_24h_array = [
+                float(price) for price in self.fixed_24h_array.split(",")
+            ]
+        elif not isinstance(self.fixed_24h_array, list):
+            self.fixed_24h_array = False
         self.feed_in_tariff_price = config.get("feed_in_tariff_price", 0.0)
         self.negative_price_switch = config.get("negative_price_switch", False)
         self.time_zone = timezone
         self.current_prices = []
         self.current_prices_direct = []  # without tax
         self.current_feedin = []
-        self.default_prices = [0.0001] * 24  # if external data are not available
+        self.default_prices = [0.0001] * 48  # if external data are not available
 
     def update_prices(self, tgt_duration, start_time):
         """

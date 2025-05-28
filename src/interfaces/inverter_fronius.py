@@ -29,7 +29,7 @@ import requests
 # from .baseclass import InverterBaseclass
 
 # logger = logging.getLogger('__main__')
-logger = logging.getLogger('__main__').getChild('Fronius')
+logger = logging.getLogger("__main__").getChild("Fronius")
 logger.setLevel(logging.INFO)
 logger.info("[Inverter] loading module ")
 
@@ -365,20 +365,24 @@ class FroniusWR:
         result = json.loads(response.text)["Body"]["Data"]["0"]["channels"]
 
         self.inverter_current_data = {
-            "DEVICE_TEMPERATURE_AMBIENTEMEAN_F32": result.get(
-                "DEVICE_TEMPERATURE_AMBIENTEMEAN_F32", 0
+            "DEVICE_TEMPERATURE_AMBIENTEMEAN_F32": round(
+                result.get("DEVICE_TEMPERATURE_AMBIENTEMEAN_F32", 0), 2
             ),
-            "MODULE_TEMPERATURE_MEAN_01_F32": result.get(
-                "MODULE_TEMPERATURE_MEAN_01_F32", 0
+            "MODULE_TEMPERATURE_MEAN_01_F32": round(
+                result.get("MODULE_TEMPERATURE_MEAN_01_F32", 0), 2
             ),
-            "MODULE_TEMPERATURE_MEAN_03_F32": result.get(
-                "MODULE_TEMPERATURE_MEAN_03_F32", 0
+            "MODULE_TEMPERATURE_MEAN_03_F32": round(
+                result.get("MODULE_TEMPERATURE_MEAN_03_F32", 0), 2
             ),
-            "MODULE_TEMPERATURE_MEAN_04_F32": result.get(
-                "MODULE_TEMPERATURE_MEAN_04_F32", 0
+            "MODULE_TEMPERATURE_MEAN_04_F32": round(
+                result.get("MODULE_TEMPERATURE_MEAN_04_F32", 0), 2
             ),
-            "FANCONTROL_PERCENT_01_F32": result.get("FANCONTROL_PERCENT_01_F32", 0),
-            "FANCONTROL_PERCENT_02_F32": result.get("FANCONTROL_PERCENT_02_F32", 0),
+            "FANCONTROL_PERCENT_01_F32": round(
+                result.get("FANCONTROL_PERCENT_01_F32", 0), 2
+            ),
+            "FANCONTROL_PERCENT_02_F32": round(
+                result.get("FANCONTROL_PERCENT_02_F32", 0), 2
+            ),
         }
 
         logger.debug("[Inverter] Inverter data: %s", self.inverter_current_data)

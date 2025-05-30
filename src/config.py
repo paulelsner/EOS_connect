@@ -63,32 +63,7 @@ class ConfigManager:
                     {
                         "source": "default",
                         "token": "tibberBearerToken",  # token for electricity price
-                        "fixed_24h_array": [
-                            10.1,
-                            10.1,
-                            10.1,
-                            10.1,
-                            10.1,
-                            23,
-                            28.23,
-                            28.23,
-                            28.23,
-                            28.23,
-                            28.23,
-                            23.52,
-                            23.52,
-                            23.52,
-                            23.52,
-                            28.17,
-                            28.17,
-                            34.28,
-                            34.28,
-                            34.28,
-                            34.28,
-                            34.28,
-                            28,
-                            23,
-                        ],  # 24 hours array with fixed end customer prices in ct/kWh over the day
+                        "fixed_24h_array": "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23,28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,34.28,34.28,34.28,34.28,28,23",  # 24 hours array with fixed end customer prices in ct/kWh over the day
                         "feed_in_price": 0.0,  # feed in price for the grid
                         "negative_price_switch": False,  # switch for negative price
                     }
@@ -213,7 +188,7 @@ class ConfigManager:
         )
         config["price"].yaml_add_eol_comment(
             "data source for electricity price tibber, smartenergy_at,"
-            + " default (default uses akkudoktor)",
+            + " fixed_24h, default (default uses akkudoktor)",
             "source",
         )
         config["price"].yaml_add_eol_comment("Token for electricity price", "token")

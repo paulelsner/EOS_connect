@@ -400,10 +400,10 @@ def create_optimize_request():
         return eauto_object
 
     def get_dishwasher_data():
-        consumption_wh = config_manager.config["load"]["additional_load_1_consumption"]
+        consumption_wh = config_manager.config["load"].get("additional_load_1_consumption", 1)
         if not consumption_wh or consumption_wh == 0:
             consumption_wh = 1
-        duration_h = config_manager.config["load"]["additional_load_1_runtime"]
+        duration_h = config_manager.config["load"].get("additional_load_1_runtime", 1)
         if not duration_h or duration_h == 0:
             duration_h = 1
         dishwasher_object = {

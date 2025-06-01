@@ -93,7 +93,7 @@ class PriceInterface:
             ]
         elif not isinstance(self.fixed_24h_array, list):
             self.fixed_24h_array = False
-        self.feed_in_tariff_price = config.get("feed_in_tariff_price", 0.0)
+        self.feed_in_tariff_price = config.get("feed_in_price", 0.0)
         self.negative_price_switch = config.get("negative_price_switch", False)
         self.time_zone = timezone
         self.current_prices = []

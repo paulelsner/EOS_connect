@@ -15,16 +15,26 @@ A default config file will be created with the first start, if there is no `conf
 - **`load.url`**:  
   URL for OpenHAB (e.g., `http://<ip>:8080`) or Home Assistant (e.g., `http://<ip>:8123`).
 
+- **`load.access_token`**:  
+  Access token for Home Assistant (optional).
+
 - **`load.load_sensor`**:  
   Item/entity name for load power data (OpenHAB item/Home Assistant sensor).  
   Must be in watts.
 
 - **`load.car_charge_load_sensor`**:  
   Item/entity name for wallbox power data.  
-  Must be in watts.
+  Must be in watts. (leave empty if not used)
 
-- **`load.access_token`**:  
-  Access token for Home Assistant (optional).
+- **`additional_load_1_sensor`**:
+  Item / entity for additional load power data. e.g. heatpump or dishwasher - this energy will also removed from optimization load prediction.
+  Must be in watts. (leave empty if not used)
+
+- **`additional_load_1_runtime`**:
+  Runtime of additional load 1 in hours. Set to 0 if not needed. (leave empty if not used)
+
+- **`additional_load_1_consumption`**:
+  Overall consumption of additional load 1 in Wh for the given hours. Set to 0 if not needed. (leave empty if not used)
 
 ---
 
@@ -44,10 +54,15 @@ A default config file will be created with the first start, if there is no `conf
 ### **Electricity Price Configuration**
 
 - **`price.source`**:  
-  Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`default` (default uses akkudoktor API).
+  Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`fixed_24h`,`default` (default uses akkudoktor API).
 
 - **`price.token`**:  
   Token for accessing electricity price data.
+
+- **`price.fixed_24h_array`**:
+  24 hours array with fixed end customer prices in ct/kWh over the day.
+  - Leave empty if not set source to `fixed_24h`.
+  - e.g. 10.42, 10.42, 10.42, 10.42, 10.42, 23.52, 28.17, 28.17, 28.17, 28.17, 28.17, 23.52, 23.52, 23.52, 23.52, 28.17, 28.17, 34.28, 34.28, 34.28, 34.28, 34.28, 28.17, 23.52 means 10.42 ct/kWh from 00 - 01 hour (config entry have to be without any brackets)
 
 - **`price.feed_in_price`**:  
   Feed-in price for the grid, in €/kWh.
@@ -241,9 +256,12 @@ The `mqtt` section allows you to configure the MQTT broker and Home Assistant MQ
 load:
   source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
   url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:8080 or http://homeassistant:8123)
-  load_sensor: Load_Power # item / entity for load power data in watts
-  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts
   access_token: abc123 # access token for homeassistant (optional)
+  load_sensor: Load_Power # item / entity for load power data in watts
+  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. Leave empty if not used.
+  additional_load_1_sensor: "additional_load_1_sensor", # item / entity for wallbox power data in watts. Leave empty if not used.
+  additional_load_1_runtime: 2 # runtime for additional load 1 in minutes - default: 0 (or empty) = not used
+  additional_load_1_consumption: 1500 # consumption for additional load 1 in Wh - default: 0 (or empty) = not used
 # EOS server configuration
 eos:
   server: 192.168.1.94  # EOS server address
@@ -251,8 +269,9 @@ eos:
   timeout: 180 # timeout for EOS optimize request in seconds - default: 180
 # Electricity price configuration
 price:
-  source: default  # data source for electricity price tibber, smartenergy_at, default (default uses akkudoktor)
+  source: default  # data source for electricity price tibber, smartenergy_at, fixed_24h, default (default uses akkudoktor)
   token: tibberBearerToken # Token for electricity price
+  fixed_24h_array: 10.41, 10.42, 10.42, 10.42, 10.42, 23.52, 28.17, 28.17, 28.17, 28.17, 28.17, 23.52, 23.52, 23.52, 23.52, 28.17, 28.17, 34.28, 34.28, 34.28, 34.28, 34.28, 28.17, 23.52 # 24 hours array with fixed prices over the day
   feed_in_price: 0.0 # feed in price for the grid in €/kWh
   negative_price_switch: false # switch for no payment if negative stock price is given
 # battery configuration

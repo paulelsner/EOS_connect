@@ -166,7 +166,7 @@ class PriceInterface:
         Returns:
             list: A list of current prices.
         """
-        logger.debug("[PRICE-IF] Returning current prices: %s", self.current_prices)
+        # logger.debug("[PRICE-IF] Returning current prices: %s", self.current_prices)
         return self.current_prices
 
     def get_current_feedin_prices(self):
@@ -179,9 +179,9 @@ class PriceInterface:
         Returns:
             list: A list of current feed-in prices.
         """
-        logger.debug(
-            "[PRICE-IF] Returning current feed-in prices: %s", self.current_feedin
-        )
+        # logger.debug(
+        #     "[PRICE-IF] Returning current feed-in prices: %s", self.current_feedin
+        # )
         return self.current_feedin
 
     def __create_feedin_prices(self):

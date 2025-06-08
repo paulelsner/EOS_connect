@@ -3,6 +3,8 @@
 This document provides an overview of the configuration settings for the application. The configuration settings are stored in a `config.yaml` file.  
 A default config file will be created with the first start, if there is no `config.yaml` in the `src` folder.
 
+*Hint: There are different combinations of parameters possible. If there is a problem with missing or incorrect configuration, it will be shown in the log as an error.*
+
 ---
 
 ## Configuration Sections

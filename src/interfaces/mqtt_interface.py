@@ -396,8 +396,12 @@ class MqttInterface:
         self.client.on_subscribe = self.__on_subscribe
 
         # start the client loop
-        self.__connect()
+        if not self.__connect():
+            logger.error("[MQTT] Failed to connect to MQTT broker, disabling MQTT.")
+            self.enable_mqtt = False
+            return
         self.client.loop_start()
+        logger.info("[MQTT] Successfully connected to MQTT broker.")
 
     def __subscribe_needed_topics(self):
         """
@@ -515,9 +519,9 @@ class MqttInterface:
                 "duration": self.topics_publish["control/override_remain_time"][
                     "set_value"
                 ],
-                "charge_power": self.topics_publish[
-                    "control/override_charge_power"
-                ]["set_value"],
+                "charge_power": self.topics_publish["control/override_charge_power"][
+                    "set_value"
+                ],
             }
         )
 
@@ -525,7 +529,34 @@ class MqttInterface:
         """
         Connect to the MQTT broker.
         """
-        self.client.connect(self.broker, self.port)
+        try:
+            self.client.connect(self.broker, self.port)
+            return True
+        except mqtt.socket.error as e:
+            logger.error(
+                "[MQTT] Network error while" + " connecting to MQTT broker %s:%d - %s",
+                self.broker,
+                self.port,
+                e,
+            )
+            self.enable_mqtt = False
+        except mqtt.ssl.SSLError as e:
+            logger.error(
+                "[MQTT] SSL error while" + " connecting to MQTT broker %s:%d - %s",
+                self.broker,
+                self.port,
+                e,
+            )
+            self.enable_mqtt = False
+        except Exception as e:
+            logger.error(
+                "[MQTT] Failed to connect" + " to MQTT broker %s:%d - %s",
+                self.broker,
+                self.port,
+                e,
+            )
+            self.enable_mqtt = False
+        return False
 
     def __publish(self, topic, payload, qos=0, retain=False):
         """

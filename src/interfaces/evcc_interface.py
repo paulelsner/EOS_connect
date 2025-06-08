@@ -93,7 +93,49 @@ class EvccInterface:
         self.on_charging_state_change = on_charging_state_change  # Store the callback
         self._update_thread = None
         self._stop_event = threading.Event()
+        if not self.__check_config():
+            logger.error("[EVCC] Invalid configuration. Update service not started.")
+            return
         self.start_update_service()
+
+    def __check_config(self):
+        """
+        Checks if the configuration is valid.
+        """
+        if not self.url or self.url == "http://yourEVCCserver:7070":
+            logger.error("[EVCC] URL is not set. Please provide a valid URL.")
+            return False
+        # check reachability of the EVCC server
+        try:
+            response = requests.get(self.url, timeout=5)
+            if response.status_code != 200:
+                logger.error(
+                    "[EVCC] Unable to reach EVCC server at %s. Status code: %s",
+                    self.url,
+                    response.status_code,
+                )
+                return False
+            return True
+        except requests.exceptions.ConnectionError as e:
+            logger.error(
+                "[EVCC] Connection error while checking EVCC server reachability: %s", e
+            )
+            return False
+        except requests.exceptions.Timeout as e:
+            logger.error(
+                "[EVCC] Timeout while checking EVCC server reachability: %s", e
+            )
+            return False
+        except requests.exceptions.HTTPError as e:
+            logger.error(
+                "[EVCC] HTTP error while checking EVCC server reachability: %s", e
+            )
+            return False
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "[EVCC] Unexpected error while checking EVCC server reachability: %s", e
+            )
+            return False
 
     def get_charging_state(self):
         """
@@ -117,9 +159,6 @@ class EvccInterface:
         """
         Starts the background thread to periodically update the charging state.
         """
-        if self.url == "http://yourEVCCserver:7070":
-            logger.warning("[EVCC] Update service not started. URL is not set.")
-            return
         if self._update_thread is None or not self._update_thread.is_alive():
             self._stop_event.clear()
             self._update_thread = threading.Thread(

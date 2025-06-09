@@ -6,8 +6,8 @@ load profiles based on historical energy consumption data.
 
 from datetime import datetime, timedelta
 import logging
-import requests
 from urllib.parse import quote
+import requests
 
 logger = logging.getLogger("__main__")
 logger.info("[LOAD-IF] loading module ")
@@ -32,6 +32,45 @@ class LoadInterface:
         self.additional_load_1_sensor = config.get("additional_load_1_sensor", "")
         self.access_token = config.get("access_token", "")
         self.time_zone = timezone
+
+        self.__check_config()
+
+    def __check_config(self):
+        """
+        Checks if the configuration is valid.
+        Returns:
+            bool: True if the configuration is valid, False otherwise.
+        """
+        if self.src not in ["openhab", "homeassistant", "default"]:
+            logger.error(
+                "[LOAD-IF] Invalid source '%s' configured. Using default.", self.src
+            )
+            self.src = "default"
+            return False
+        if self.src != "default":
+            if self.url == "":
+                logger.error(
+                    "[LOAD-IF] Source '%s' selected, but URL not configured. Using default.",
+                    self.src,
+                )
+                self.src = "default"
+                return False
+            if self.access_token == "" and self.src == "homeassistant":
+                logger.error(
+                    "[LOAD-IF] Source '%s' selected, but access_token not configured."
+                    + " Using default.",
+                    self.src,
+                )
+                self.src = "default"
+                return False
+            if self.load_sensor == "":
+                logger.error("[LOAD-IF] Load sensor not configured. Using default.")
+                self.src = "default"
+                return False
+            logger.debug("[LOAD-IF] Config check successful using '%s'", self.src)
+        else:
+            logger.debug("[LOAD-IF] Using default load profile.")
+        return True
 
     # get load data from url persistance source
     def __fetch_historical_energy_data_from_openhab(
@@ -91,7 +130,8 @@ class LoadInterface:
             list: A list of historical state changes for the entity.
         """
         if entity_id == "" or entity_id is None:
-            #logger.debug("[LOAD-IF] HOMEASSISTANT get historical values - No entity_id configured.")
+            # logger.debug("[LOAD-IF] HOMEASSISTANT get historical values"+
+            # " - No entity_id configured.")
             return []
         # Headers for the API request
         headers = {
@@ -119,20 +159,25 @@ class LoadInterface:
                 ]
                 return filtered_data
             logger.error(
-                "[LOAD-IF] HOMEASSISTANT - Failed to retrieve historical data: %s",
+                "[LOAD-IF] HOMEASSISTANT - Failed to retrieve"
+                + " historical data for '%s' - error: %s",
+                entity_id,
                 response.status_code,
             )
             logger.error(response.text)
             return []
         except requests.exceptions.Timeout:
             logger.error(
-                "[LOAD-IF] HOMEASSISTANT - Request timed out while fetching historical energy data."
+                "[LOAD-IF] HOMEASSISTANT - Request timed out"
+                + " while fetching historical energy data for '%s'.",
+                entity_id,
             )
             return []
         except requests.exceptions.RequestException as e:
             logger.error(
                 "[LOAD-IF] HOMEASSISTANT - Request failed while fetching"
-                + " historical energy data: %s",
+                + " historical energy data for '%s' - error: %s",
+                entity_id,
                 e,
             )
             return []
@@ -185,7 +230,8 @@ class LoadInterface:
                         + ")"
                     )
                 logger.error(
-                    "[LOAD-IF] Error processing energy ('%s') data at index %d: %s (next: %s) - %s %s",
+                    "[LOAD-IF] Error processing energy ('%s') data"
+                    + " at index %d: %s (next: %s) - %s %s",
                     debug_sensor if debug_sensor is not None else "",
                     i,
                     data["data"][i],
@@ -217,10 +263,10 @@ class LoadInterface:
     #     Creates a load profile for energy consumption over the last `tgt_duration` hours.
 
     #     The function calculates the energy consumption for each hour from the current hour
-    #     going back `tgt_duration` hours. It fetches energy data for base load and additional loads,
-    #     processes the data, and sums the energy values. If the total energy for an hour is zero,
-    #     it skips that hour. The resulting load profile is a list of energy consumption values
-    #     for each hour.
+    #     going back `tgt_duration` hours. It fetches energy data for base load and
+    #     additional loads, processes the data, and sums the energy values. If the total energy
+    #     for an hour is zero, it skips that hour. The resulting load profile is a list of energy
+    #      consumption values for each hour.
 
     #     """
     #     logger.info("[LOAD-IF] Creating load profile from openhab ...")
@@ -510,25 +556,30 @@ class LoadInterface:
                 )
                 return []
 
-            # car_load_data = self.__get_car_load_list_from_to(current_hour, next_hour)
-            car_load_data = self.__get_additional_load_list_from_to(
-                self.car_charge_load_sensor, current_hour, next_hour
-            )
-            car_load_energy = abs(
-                self.__process_energy_data(
-                    {"data": car_load_data}, self.car_charge_load_sensor
+            car_load_energy = 0
+            # check if car load sensor is configured
+            if self.car_charge_load_sensor != "":
+                car_load_data = self.__get_additional_load_list_from_to(
+                    self.car_charge_load_sensor, current_hour, next_hour
                 )
-            )
+                car_load_energy = abs(
+                    self.__process_energy_data(
+                        {"data": car_load_data}, self.car_charge_load_sensor
+                    )
+                )
             car_load_energy = max(car_load_energy, 0)  # prevent negative values
 
-            add_load_data_1 = self.__get_additional_load_list_from_to(
-                self.additional_load_1_sensor, current_hour, next_hour
-            )
-            add_load_data_1_energy = abs(
-                self.__process_energy_data(
-                    {"data": add_load_data_1}, self.additional_load_1_sensor
+            add_load_data_1_energy = 0
+            # check if additional load 1 sensor is configured
+            if self.additional_load_1_sensor != "":
+                add_load_data_1 = self.__get_additional_load_list_from_to(
+                    self.additional_load_1_sensor, current_hour, next_hour
                 )
-            )
+                add_load_data_1_energy = abs(
+                    self.__process_energy_data(
+                        {"data": add_load_data_1}, self.additional_load_1_sensor
+                    )
+                )
             add_load_data_1_energy = max(
                 add_load_data_1_energy, 0
             )  # prevent negative values
@@ -566,8 +617,8 @@ class LoadInterface:
                 )
             if energy == 0:
                 logger.warning(
-                    "[LOAD-IF] load = 0 ... Energy for %s: %5.1f Wh" +
-                    " (sum add energy %5.1f Wh - car load: %5.1f Wh)",
+                    "[LOAD-IF] load = 0 ... Energy for %s: %5.1f Wh"
+                    + " (sum add energy %5.1f Wh - car load: %5.1f Wh)",
                     current_hour,
                     round(energy, 1),
                     round(sum_controlable_energy_load, 1),
@@ -685,59 +736,59 @@ class LoadInterface:
             list: A list of energy consumption values for the specified duration.
         """
         default_profile = [
-                200.0,  # 0:00 - 1:00 -- day 1
-                200.0,  # 1:00 - 2:00
-                200.0,  # 2:00 - 3:00
-                200.0,  # 3:00 - 4:00
-                200.0,  # 4:00 - 5:00
-                300.0,  # 5:00 - 6:00
-                350.0,  # 6:00 - 7:00
-                400.0,  # 7:00 - 8:00
-                350.0,  # 8:00 - 9:00
-                300.0,  # 9:00 - 10:00
-                300.0,  # 10:00 - 11:00
-                550.0,  # 11:00 - 12:00
-                450.0,  # 12:00 - 13:00
-                400.0,  # 13:00 - 14:00
-                300.0,  # 14:00 - 15:00
-                300.0,  # 15:00 - 16:00
-                400.0,  # 16:00 - 17:00
-                450.0,  # 17:00 - 18:00
-                500.0,  # 18:00 - 19:00
-                500.0,  # 19:00 - 20:00
-                500.0,  # 20:00 - 21:00
-                400.0,  # 21:00 - 22:00
-                300.0,  # 22:00 - 23:00
-                200.0,  # 23:00 - 0:00
-                200.0,  # 0:00 - 1:00 -- day 2
-                200.0,  # 1:00 - 2:00
-                200.0,  # 2:00 - 3:00
-                200.0,  # 3:00 - 4:00
-                200.0,  # 4:00 - 5:00
-                300.0,  # 5:00 - 6:00
-                350.0,  # 6:00 - 7:00
-                400.0,  # 7:00 - 8:00
-                350.0,  # 8:00 - 9:00
-                300.0,  # 9:00 - 10:00
-                300.0,  # 10:00 - 11:00
-                550.0,  # 11:00 - 12:00
-                450.0,  # 12:00 - 13:00
-                400.0,  # 13:00 - 14:00
-                300.0,  # 14:00 - 15:00
-                300.0,  # 15:00 - 16:00
-                400.0,  # 16:00 - 17:00
-                450.0,  # 17:00 - 18:00
-                500.0,  # 18:00 - 19:00
-                500.0,  # 19:00 - 20:00
-                500.0,  # 20:00 - 21:00
-                400.0,  # 21:00 - 22:00
-                300.0,  # 22:00 - 23:00
-                200.0,  # 23:00 - 0:00
-            ]
+            200.0,  # 0:00 - 1:00 -- day 1
+            200.0,  # 1:00 - 2:00
+            200.0,  # 2:00 - 3:00
+            200.0,  # 3:00 - 4:00
+            200.0,  # 4:00 - 5:00
+            300.0,  # 5:00 - 6:00
+            350.0,  # 6:00 - 7:00
+            400.0,  # 7:00 - 8:00
+            350.0,  # 8:00 - 9:00
+            300.0,  # 9:00 - 10:00
+            300.0,  # 10:00 - 11:00
+            550.0,  # 11:00 - 12:00
+            450.0,  # 12:00 - 13:00
+            400.0,  # 13:00 - 14:00
+            300.0,  # 14:00 - 15:00
+            300.0,  # 15:00 - 16:00
+            400.0,  # 16:00 - 17:00
+            450.0,  # 17:00 - 18:00
+            500.0,  # 18:00 - 19:00
+            500.0,  # 19:00 - 20:00
+            500.0,  # 20:00 - 21:00
+            400.0,  # 21:00 - 22:00
+            300.0,  # 22:00 - 23:00
+            200.0,  # 23:00 - 0:00
+            200.0,  # 0:00 - 1:00 -- day 2
+            200.0,  # 1:00 - 2:00
+            200.0,  # 2:00 - 3:00
+            200.0,  # 3:00 - 4:00
+            200.0,  # 4:00 - 5:00
+            300.0,  # 5:00 - 6:00
+            350.0,  # 6:00 - 7:00
+            400.0,  # 7:00 - 8:00
+            350.0,  # 8:00 - 9:00
+            300.0,  # 9:00 - 10:00
+            300.0,  # 10:00 - 11:00
+            550.0,  # 11:00 - 12:00
+            450.0,  # 12:00 - 13:00
+            400.0,  # 13:00 - 14:00
+            300.0,  # 14:00 - 15:00
+            300.0,  # 15:00 - 16:00
+            400.0,  # 16:00 - 17:00
+            450.0,  # 17:00 - 18:00
+            500.0,  # 18:00 - 19:00
+            500.0,  # 19:00 - 20:00
+            500.0,  # 20:00 - 21:00
+            400.0,  # 21:00 - 22:00
+            300.0,  # 22:00 - 23:00
+            200.0,  # 23:00 - 0:00
+        ]
         if self.src == "default":
             logger.info("[LOAD-IF] Using load source default")
             return default_profile[:tgt_duration]
-        if self.src in ('openhab', 'homeassistant'):
+        if self.src in ("openhab", "homeassistant"):
             if self.load_sensor == "" or self.load_sensor is None:
                 logger.error(
                     "[LOAD-IF] Load sensor not configured for source '%s'. Using default.",

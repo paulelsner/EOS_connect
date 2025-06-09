@@ -1,5 +1,6 @@
 """
-This module provides the `PriceInterface` class for retrieving and processing electricity price data from various sources.
+This module provides the `PriceInterface` class for retrieving and processing electricity price
+data from various sources.
 
 Supported sources:
     - Akkudoktor API (default)
@@ -43,10 +44,12 @@ SMARTENERGY_API = "https://apis.smartenergy.at/market/v1/price"
 
 class PriceInterface:
     """
-    The PriceInterface class manages electricity price data retrieval and processing from various sources.
+    The PriceInterface class manages electricity price data retrieval and processing from
+    various sources.
 
     Attributes:
-        src (str): Source of the price data (e.g., 'tibber', 'default', 'smartenergy_at', 'fixed_24h').
+        src (str): Source of the price data
+                   (e.g., 'tibber', 'default', 'smartenergy_at', 'fixed_24h').
         access_token (str): Access token for authenticating with the price source.
         fixed_24h_array (list): Optional fixed 24-hour price array.
         feed_in_tariff_price (float): Feed-in tariff price in cents per kWh.
@@ -87,7 +90,7 @@ class PriceInterface:
         self.access_token = config.get("token", "")
         self.fixed_24h_array = config.get("fixed_24h_array", False)
         # for HA addon config - if string, convert to list of floats
-        if isinstance(self.fixed_24h_array, str):
+        if isinstance(self.fixed_24h_array, str) and self.fixed_24h_array != "":
             self.fixed_24h_array = [
                 float(price) for price in self.fixed_24h_array.split(",")
             ]
@@ -100,6 +103,37 @@ class PriceInterface:
         self.current_prices_direct = []  # without tax
         self.current_feedin = []
         self.default_prices = [0.0001] * 48  # if external data are not available
+
+        self.__check_config()  # Validate configuration parameters
+        logger.info(
+            "[PRICE-IF] Initialized with"
+            + " source: %s, feed_in_tariff_price: %s, negative_price_switch: %s",
+            self.src,
+            self.feed_in_tariff_price,
+            self.negative_price_switch,
+        )
+
+    def __check_config(self):
+        """
+        Checks the configuration for required parameters.
+
+        This function checks if the necessary parameters are present in the configuration.
+        If any required parameter is missing, it raises a ValueError.
+
+        Raises:
+            ValueError: If any required parameter is missing from the configuration.
+        """
+        if not self.src:
+            self.src = "default"  # Default to 'default' if no source is specified
+            logger.error(
+                "[PRICE-IF] No source specified in configuration. Defaulting to 'default'."
+            )
+        if self.src == "tibber" and not self.access_token:
+            self.src = "default"  # Fallback to default if no access token is provided
+            logger.error(
+                "[PRICE-IF] Access token is required for Tibber source but not provided."
+                + " Usiung default price source."
+            )
 
     def update_prices(self, tgt_duration, start_time):
         """
@@ -120,7 +154,7 @@ class PriceInterface:
         """
         self.current_prices = self.__retrieve_prices(tgt_duration, start_time)
         self.current_feedin = self.__create_feedin_prices()
-        logger.debug("[PRICE-IF] Prices updated")
+        logger.info("[PRICE-IF] Prices updated")
 
     def get_current_prices(self):
         """
@@ -132,6 +166,7 @@ class PriceInterface:
         Returns:
             list: A list of current prices.
         """
+        # logger.debug("[PRICE-IF] Returning current prices: %s", self.current_prices)
         return self.current_prices
 
     def get_current_feedin_prices(self):
@@ -144,6 +179,9 @@ class PriceInterface:
         Returns:
             list: A list of current feed-in prices.
         """
+        # logger.debug(
+        #     "[PRICE-IF] Returning current feed-in prices: %s", self.current_feedin
+        # )
         return self.current_feedin
 
     def __create_feedin_prices(self):
@@ -163,11 +201,19 @@ class PriceInterface:
                 0 if price < 0 else round(self.feed_in_tariff_price / 1000, 9)
                 for price in self.current_prices_direct
             ]
+            logger.debug(
+                "[PRICE-IF] Negative price switch is enabled."
+                + " Feed-in prices set to 0 for negative prices."
+            )
         else:
             self.current_feedin = [
                 round(self.feed_in_tariff_price / 1000, 9)
-                for price in self.current_prices_direct
+                for _ in self.current_prices_direct
             ]
+            logger.debug(
+                "[PRICE-IF] Feed-in prices created based on current"
+                + " prices and feed-in tariff price."
+            )
         return self.current_feedin
 
     def __retrieve_prices(self, tgt_duration, start_time=None):
@@ -186,16 +232,35 @@ class PriceInterface:
             list: A list of prices for the specified duration and start time. Returns an empty list
             if the price source is not supported.
         """
+        prices = []
         if self.src == "tibber":
-            return self.__retrieve_prices_from_tibber(tgt_duration, start_time)
+            prices = self.__retrieve_prices_from_tibber(tgt_duration, start_time)
         elif self.src == "smartenergy_at":
-            return self.__retrieve_prices_from_smartenergy_at(tgt_duration, start_time)
+            prices = self.__retrieve_prices_from_smartenergy_at(
+                tgt_duration, start_time
+            )
         elif self.src == "fixed_24h":
-            return self.__retrieve_prices_from_fixed24h_array(tgt_duration, start_time)
+            prices = self.__retrieve_prices_from_fixed24h_array(
+                tgt_duration, start_time
+            )
         elif self.src == "default":
-            return self.__retrieve_prices_from_akkudoktor(tgt_duration, start_time)
-        logger.error("[PRICE-IF] Price source currently not supported.")
-        return []
+            prices = self.__retrieve_prices_from_akkudoktor(tgt_duration, start_time)
+        else:
+            prices = self.default_prices
+            self.current_prices_direct = self.default_prices.copy()
+            logger.error(
+                "[PRICE-IF] Price source currently not supported."
+                + " Using default prices (0,10 ct/kWh)."
+            )
+
+        if not prices:
+            logger.error(
+                "[PRICE-IF] No prices retrieved. Using default prices (0,10 ct/kWh)."
+            )
+            prices = self.default_prices
+            self.current_prices_direct = self.default_prices.copy()
+
+        return prices
 
     def __retrieve_prices_from_akkudoktor(self, tgt_duration, start_time=None):
         """
@@ -216,7 +281,7 @@ class PriceInterface:
         """
         if self.src != "default":
             logger.error(
-                "[PRICE-IF] Price source %s currently not supported. Default prices will be used.", 
+                "[PRICE-IF] Price source %s currently not supported. Default prices will be used.",
                 self.src,
             )
             return self.default_prices
@@ -240,15 +305,15 @@ class PriceInterface:
             data = response.json()
         except requests.exceptions.Timeout:
             logger.error(
-                "[PRICE-IF] Request timed out while fetching prices from akkudoktor." +
-                " Default prices will be used."
+                "[PRICE-IF] Request timed out while fetching prices from akkudoktor."
+                + " Default prices will be used."
             )
             return self.default_prices
         except requests.exceptions.RequestException as e:
             logger.error(
-                "[PRICE-IF] Request failed while fetching prices from akkudoktor: %s" +
-                " Default prices will be used.",
-                e
+                "[PRICE-IF] Request failed while fetching prices from akkudoktor: %s"
+                + " Default prices will be used.",
+                e,
             )
             return self.default_prices
 
@@ -270,7 +335,7 @@ class PriceInterface:
         if len(extended_prices) < tgt_duration:
             remaining_hours = tgt_duration - len(extended_prices)
             extended_prices.extend(prices[:remaining_hours])
-        logger.info("[PRICE-IF] Prices from AKKUDOKTOR fetched successfully.")
+        logger.debug("[PRICE-IF] Prices from AKKUDOKTOR fetched successfully.")
         self.current_prices_direct = extended_prices.copy()
         return extended_prices
 
@@ -293,7 +358,9 @@ class PriceInterface:
         """
         logger.debug("[PRICE-IF] Prices fetching from TIBBER started")
         if self.src != "tibber":
-            logger.error("[PRICE-IF] Price source '%s' currently not supported.", self.src)
+            logger.error(
+                "[PRICE-IF] Price source '%s' currently not supported.", self.src
+            )
             return self.default_prices
         headers = {
             "Authorization": self.access_token,
@@ -399,15 +466,16 @@ class PriceInterface:
             extended_prices.extend(prices[:remaining_hours])
             extended_prices_direct.extend(prices_direct[:remaining_hours])
         self.current_prices_direct = extended_prices_direct.copy()
-        logger.info("[PRICE-IF] Prices from TIBBER fetched successfully.")
+        logger.debug("[PRICE-IF] Prices from TIBBER fetched successfully.")
         return extended_prices
 
     def __retrieve_prices_from_smartenergy_at(self, tgt_duration, start_time=None):
         logger.debug("[PRICE-IF] Prices fetching from SMARTENERGY_AT started")
         if self.src != "smartenergy_at":
             logger.error(
-                "[PRICE-IF] Price source '%s' currently not supported. Default prices will be used.",
-                self.src
+                "[PRICE-IF] Price source '%s' currently not supported."
+                + " Default prices will be used.",
+                self.src,
             )
             return self.default_prices
         if start_time is None:
@@ -455,7 +523,7 @@ class PriceInterface:
             remaining_hours = tgt_duration - len(extended_prices)
             extended_prices.extend(hourly_prices[:remaining_hours])
 
-        logger.info("[PRICE-IF] Prices from SMARTENERGY_AT fetched successfully.")
+        logger.debug("[PRICE-IF] Prices from SMARTENERGY_AT fetched successfully.")
         self.current_prices_direct = extended_prices.copy()
         return extended_prices
 
@@ -484,12 +552,14 @@ class PriceInterface:
                 + " but no 'fixed_24h_array' is provided."
                 + " Default prices will be used."
             )
+            self.current_prices_direct = self.default_prices
             return self.default_prices
         if len(self.fixed_24h_array) != 24:
             logger.error(
                 "[PRICE-IF] fixed_24h_array must contain exactly 24 entries."
                 + " Default prices will be used."
             )
+            self.current_prices_direct = self.default_prices
             return self.default_prices
         # Convert each entry in fixed_24h_array from ct/kWh to €/Wh (divide by 100000)
         extended_prices = [round(price / 100000, 9) for price in self.fixed_24h_array]

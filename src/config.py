@@ -112,7 +112,7 @@ class ConfigManager:
                 ),
                 "evcc": CommentedMap(
                     {
-                        "url": "http://yourEVCCserver:7070",  # URL for EVCC server
+                        "url": "http://yourEVCCserver:7070",  # URL to your evcc installation, if not used set to "" or leave as http://yourEVCCserver:7070
                     }
                 ),
                 "mqtt": CommentedMap(
@@ -193,8 +193,8 @@ class ConfigManager:
         )
         config["price"].yaml_add_eol_comment("Token for electricity price", "token")
         config["price"].yaml_add_eol_comment(
-            "24 hours array with fixed end customer prices in ct/kWh over the day", 
-            "fixed_24h_array"
+            "24 hours array with fixed end customer prices in ct/kWh over the day",
+            "fixed_24h_array",
         )
         config["price"].yaml_add_eol_comment(
             "feed in price for the grid in €/kWh", "feed_in_price"
@@ -309,7 +309,8 @@ class ConfigManager:
         # evcc configuration
         config.yaml_set_comment_before_after_key("evcc", before="EVCC configuration")
         config["evcc"].yaml_add_eol_comment(
-            "URL for EVCC server - default: http://yourEVCCserver:7070",
+            '# URL to your evcc installation, if not used set to ""'
+            + " or leave as http://yourEVCCserver:7070",
             "url",
         )
         # mqtt configuration

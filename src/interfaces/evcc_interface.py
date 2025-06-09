@@ -93,8 +93,13 @@ class EvccInterface:
         self.on_charging_state_change = on_charging_state_change  # Store the callback
         self._update_thread = None
         self._stop_event = threading.Event()
-        if not self.__check_config():
+
+        check_result = self.__check_config()
+        if check_result is False:
             logger.error("[EVCC] Invalid configuration. Update service not started.")
+            return
+        elif check_result == 2:
+            logger.info("[EVCC] Not configured. Update service not started.")
             return
         self.start_update_service()
 
@@ -103,8 +108,13 @@ class EvccInterface:
         Checks if the configuration is valid.
         """
         if not self.url or self.url == "http://yourEVCCserver:7070":
-            logger.error("[EVCC] URL is not set. Please provide a valid URL.")
-            return False
+            logger.info("[EVCC] URL is not set. Assuming no evcc connection is needed.")
+            if self.external_battery_mode_en:
+                logger.error(
+                    "[EVCC] External battery mode is enabled, but no EVCC URL is set."
+                )
+                return False
+            return 2
         # check reachability of the EVCC server
         try:
             response = requests.get(self.url, timeout=5)

@@ -186,7 +186,7 @@ mqtt_interface = MqttInterface(
 )
 
 evcc_interface = EvccInterface(
-    url=config_manager.config["evcc"]["url"],
+    url=config_manager.config.get("evcc", {}).get("url", ""),
     ext_bat_mode=config_manager.config["inverter"]["type"] == "evcc",
     update_interval=10,
     on_charging_state_change=None,

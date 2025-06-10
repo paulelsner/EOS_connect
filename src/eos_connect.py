@@ -400,7 +400,9 @@ def create_optimize_request():
         return eauto_object
 
     def get_dishwasher_data():
-        consumption_wh = config_manager.config["load"].get("additional_load_1_consumption", 1)
+        consumption_wh = config_manager.config["load"].get(
+            "additional_load_1_consumption", 1
+        )
         if not consumption_wh or consumption_wh == 0:
             consumption_wh = 1
         duration_h = config_manager.config["load"].get("additional_load_1_runtime", 1)
@@ -646,6 +648,9 @@ class OptimizationScheduler:
         )
         if error is not True:
             setting_control_data(ac_charge_demand, dc_charge_demand, discharge_allowed)
+            # get recent evcc states
+            base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
+            base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
             change_control_state()
         # +++++++++
 
@@ -1012,7 +1017,7 @@ def get_controls():
         "evcc": {
             "charging_state": base_control.get_current_evcc_charging_state(),
             "charging_mode": base_control.get_current_evcc_charging_mode(),
-            "current_session": evcc_interface.get_current_detail_data(),
+            "current_sessions": evcc_interface.get_current_detail_data(),
         },
         "battery": {
             "soc": current_battery_soc,

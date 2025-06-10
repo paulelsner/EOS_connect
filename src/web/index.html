@@ -130,7 +130,7 @@
                 </div>
                 <div class="content" style="text-align: center;">
                     <span id="ecar_charging_table_off">no car connected</span>
-                    <table style="width: 100%; text-align: left;padding-top: 10px;" id="ecar_charging_table">
+                    <table style="width: 100%; text-align: left;padding-top: 10px;" id="ecar_charging_table_single">
                         <tr>
                             <!-- <th style="text-align: left;">Vehicle</th> -->
                             <th style="text-align: left; cursor: help;" colspan="2" title="name of vehicle in EVCC"><i
@@ -176,6 +176,9 @@
                                 id="ecar_charging_duration_remain" title="remaining time until charging is done">00:00
                             </td>
                         </tr>
+                    </table>
+                    <table style="width: 100%; text-align: left;padding-top: 10px;" id="ecar_charging_table_multiple">
+                        <!-- will be filled with multiple vehicles -->
                     </table>
                 </div>
             </div>
@@ -488,74 +491,156 @@
             }
         }
 
+        function getChargingColorAndText(evcc_mode, evcc_state) {
+            let color = "white";
+            let text = "N/A";
+
+            if (evcc_mode === "off") {
+                text = "Off";
+            } else if (evcc_mode === "pv") {
+                text = "PV";
+                if (evcc_state) {
+                    color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
+                }
+            } else if (evcc_mode === "minpv") {
+                text = "Min+PV";
+                if (evcc_state) {
+                    color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
+                }
+            } else if (evcc_mode === "now") {
+                text = "Fast charge";
+                if (evcc_state) {
+                    color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                }
+            } else if (evcc_mode === "pv+now" || evcc_mode === "minpv+now") {
+                text = "Smart Cost Fast";
+                if (evcc_state) {
+                    color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
+                }
+            }
+
+            return { color, text };
+
+        }
+
+        function showSingleLoadpoint(session) {
+            document.getElementById('ecar_charging_table_single').style.display = "";
+            document.getElementById('ecar_charging_table_multiple').style.display = "none";
+            document.getElementById('ecar_charging_table_off').style.display = "none";
+
+            displayName = session["vehicleName"] || "Unknown Vehicle";
+            if (displayName.length > 25)
+                displayName = displayName.substring(0, 25) + "...";
+
+            writeIfValueChanged('ecar_charging_name', displayName);
+            writeIfValueChanged('ecar_charging_soc', (session["vehicleSoc"]).toFixed(1) + " %");
+            writeIfValueChanged('ecar_charging_odometer', session["vehicleOdometer"] + " km");
+            writeIfValueChanged('ecar_charging_range', session["vehicleRange"] + " km");
+            writeIfValueChanged('ecar_charging_charged', (session["chargedEnergy"] / 1000).toFixed(1) + " kWh");
+            writeIfValueChanged('ecar_charging_charged_remain', (session["chargeRemainingEnergy"] / 1000).toFixed(1) + " kWh");
+            let chargeDuration = session["chargeDuration"];
+            let hours = Math.floor(chargeDuration / 3600);
+            let minutes = Math.floor((chargeDuration % 3600) / 60);
+            writeIfValueChanged('ecar_charging_duration', hours.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0'));
+            let chargeRemainingDuration = session["chargeRemainingDuration"];
+            let remainingHours = Math.floor(chargeRemainingDuration / 3600);
+            let remainingMinutes = Math.floor((chargeRemainingDuration % 3600) / 60);
+            writeIfValueChanged('ecar_charging_duration_remain', remainingHours.toString().padStart(2, '0') + ":" + remainingMinutes.toString().padStart(2, '0'));
+        }
+
         function showCarChargingData(data_controls) {
             // car charging - current states of EVCC
             let evcc_mode = data_controls["evcc"]["charging_mode"];
             let evcc_state = data_controls["evcc"]["charging_state"];
 
-            if (evcc_mode === "off") {
-                document.getElementById('evcc_mode').innerText = "Off";
-                document.getElementById('evcc_mode').style.color = "white";
-            } else if (evcc_mode === "pv") {
-                document.getElementById('evcc_mode').innerText = "PV";
-                if (evcc_state) {
-                    document.getElementById('evcc_mode').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
-                    document.getElementById('evcc_state').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_PV;
-                }
-            } else if (evcc_mode === "minpv") {
-                document.getElementById('evcc_mode').innerText = "Min+PV";
-                if (evcc_state) {
-                    document.getElementById('evcc_mode').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
-                    document.getElementById('evcc_state').style.color = COLOR_MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV;
-                }
-            } else if (evcc_mode === "now") {
-                document.getElementById('evcc_mode').innerText = "Fast charge";
-                if (evcc_state) {
-                    document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
-                    document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
-                }
-            } else if (evcc_mode === "pv+now" || evcc_mode === "minpv+now") {
-                document.getElementById('evcc_mode').innerText = "Smart Cost Fast";
-                if (evcc_state) {
-                    document.getElementById('evcc_mode').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
-                    document.getElementById('evcc_state').style.color = COLOR_MODE_AVOID_DISCHARGE_EVCC_FAST;
-                }
-            } else {
-                document.getElementById('evcc_mode').innerText = "N/A";
-                document.getElementById('evcc_mode').style.color = "white";
-            }
+            document.getElementById('evcc_mode').innerText = getChargingColorAndText(evcc_mode, evcc_state).text;
+            document.getElementById('evcc_mode').style.color = getChargingColorAndText(evcc_mode, evcc_state).color;
+            document.getElementById('evcc_state').style.color = getChargingColorAndText(evcc_mode, evcc_state).color;
 
 
             if (evcc_state) {
                 document.getElementById('evcc_state').innerText = "charging";
             } else {
                 document.getElementById('evcc_state').innerText = "not charging";
-                document.getElementById('evcc_state').style.color = "white";
             }
+            
+            let numOfConnectedVehicles = data_controls["evcc"]["current_sessions"].filter(session => session["connected"]).length;
+            if (numOfConnectedVehicles > 1) {
+                data_controls["evcc"]["current_sessions"].forEach((session) => {
+                    if (session["connected"]) {
+                        document.getElementById('ecar_charging_table_single').style.display = "none";
+                        document.getElementById('ecar_charging_table_multiple').style.display = "";
+                        document.getElementById('ecar_charging_table_off').style.display = "none";
 
-            if (data_controls["evcc"]["current_session"]["connected"]) {
-                document.getElementById('ecar_charging_table').style.display = "";
-                document.getElementById('ecar_charging_table_off').style.display = "none";
+                        let vehicle_name = session["vehicleName"] || "Unknown Vehicle";
+                        vehicle_name = vehicle_name.replace(/[^a-zA-Z0-9_]/g, '_'); // sanitize vehicle name for id
+                        
+                        let displayName = session["vehicleName"] || "Unknown Vehicle";
+                        // reduce vehicle name to 10 characters
+                        if (displayName.length > 10)
+                            displayName = displayName.substring(0, 10) + "...";
 
-                // fill current session data
-                writeIfValueChanged('ecar_charging_name', data_controls["evcc"]["current_session"]["vehicleName"]);
-                writeIfValueChanged('ecar_charging_soc', (data_controls["evcc"]["current_session"]["vehicleSoc"]).toFixed(1) + " %");
-                writeIfValueChanged('ecar_charging_odometer', data_controls["evcc"]["current_session"]["vehicleOdometer"] + " km");
-                writeIfValueChanged('ecar_charging_range', data_controls["evcc"]["current_session"]["vehicleRange"] + " km");
-                writeIfValueChanged('ecar_charging_charged', (data_controls["evcc"]["current_session"]["chargedEnergy"] / 1000).toFixed(1) + " kWh");
-                writeIfValueChanged('ecar_charging_charged_remain', (data_controls["evcc"]["current_session"]["chargeRemainingEnergy"] / 1000).toFixed(1) + " kWh");
-                let chargeDuration = data_controls["evcc"]["current_session"]["chargeDuration"];
-                let hours = Math.floor(chargeDuration / 3600);
-                let minutes = Math.floor((chargeDuration % 3600) / 60);
-                writeIfValueChanged('ecar_charging_duration', hours.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0'));
-                let chargeRemainingDuration = data_controls["evcc"]["current_session"]["chargeRemainingDuration"];
-                let remainingHours = Math.floor(chargeRemainingDuration / 3600);
-                let remainingMinutes = Math.floor((chargeRemainingDuration % 3600) / 60);
-                writeIfValueChanged('ecar_charging_duration_remain', remainingHours.toString().padStart(2, '0') + ":" + remainingMinutes.toString().padStart(2, '0'));
+                        let row = document.createElement('tr');
+                        // set id for the row
+                        row.id = 'ecar_charging_row_' + vehicle_name;
+                        row.style.color = getChargingColorAndText(session["mode"], session["charging"]).color; // set color based on charging state
+                        row.innerHTML = `
+                            <td style="text-align: left; cursor: help;" colspan="2" title="name of vehicle in EVCC">
+                                <i class="fa-solid fa-car"></i> <span id="ecar_charging_name_${vehicle_name}">${displayName}</span>
+                            </td>
+                            <td class="valueChange" style="text-align: left; cursor: help;" colspan="2" title="eCar SOC">
+                                <span id="ecar_charging_soc_${vehicle_name}">${(session["vehicleSoc"]).toFixed(1)} %</span> 
+                                <i class="fa-solid fa-car-battery"></i>
+                            </td>
+                            <td style="text-align: right; cursor: help;" class="valueChange" id="ecar_charging_charged_${vehicle_name}"
+                                title="already charged energy">${(session["chargedEnergy"] / 1000).toFixed(1) + " kWh"}</td>
+                            <td style="text-align: right;"><i class="fa-solid fa-right-long"> <i
+                                        class="fa-solid fa-bolt"> </i></td>
+                            <td style="text-align: right; border-left-width: 1px; border-left-style: solid;"> <i
+                                    class="fa-solid fa-road"></i></td>
+                            <td style="text-align: right; cursor: help;" class="valueChange" style="text-align: right;"
+                                id="ecar_charging_range_${vehicle_name}" title="current vehicle range">${session["vehicleRange"] + " km"}</td>
+                        `;
+                        // check if the row already exists
+                        let existingRow = document.getElementById('ecar_charging_row_' + vehicle_name);
+                        if (existingRow) {
+                            // update the existing row
+                            existingRow.style.color = row.style.color; // update color based on charging state
+                            existingRow.innerHTML = row.innerHTML;
+                        } else {
+                            // append the new row to the table
+                            document.getElementById('ecar_charging_table_multiple').appendChild(row);
+                        }
+                    }
+                });
+                // cleanup, remove rows for vehicles that are not connected anymore
+                let connectedVehicles = data_controls["evcc"]["current_sessions"]
+                    .filter(session => session["connected"])
+                    .map(session => session["vehicleName"].replace(/[^a-zA-Z0-9_]/g, '_'));
+                // console.log("Connected Vehicles: ", connectedVehicles);
+                let rows = document.querySelectorAll('#ecar_charging_table_multiple tr');
+                rows.forEach(row => {
+                    // check if the row id starts with 'ecar_charging_row_' and if the vehicle is not connected anymore
+                    // and remove it if not connected
+                    if (row.id.startsWith('ecar_charging_row_') && !connectedVehicles.includes(row.id.replace('ecar_charging_row_', ''))) {
+                        console.log("Removing row: ", row.id);
+                        row.remove();
+                    }
+                });
+                if (rows.length === 0) {
+                    document.getElementById('ecar_charging_table_single').style.display = "none";
+                    document.getElementById('ecar_charging_table_multiple').style.display = "none";
+                    document.getElementById('ecar_charging_table_off').style.display = "";
+                }
+
+            } else if (numOfConnectedVehicles == 1) {
+                let entryOfConnectedVehicle = data_controls["evcc"]["current_sessions"].find(session => session["connected"]);
+                showSingleLoadpoint(entryOfConnectedVehicle);
             }
             else {
+                document.getElementById('ecar_charging_table_single').style.display = "none";
+                document.getElementById('ecar_charging_table_multiple').style.display = "none";
                 document.getElementById('ecar_charging_table_off').style.display = "";
-                document.getElementById('ecar_charging_table').style.display = "none";
             }
         }
 

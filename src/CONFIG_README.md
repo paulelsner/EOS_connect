@@ -52,17 +52,17 @@ A default config file will be created with the first start, if there is no `conf
 
 - **`load.car_charge_load_sensor`**:  
   Item/entity name for wallbox power data. 
-  Must be in watts. (If not needed set to `load.car_charge_load_sensor: ""`.)
+  Must be in watts. (If not needed set to `load.car_charge_load_sensor: ""`)
 
 - **`additional_load_1_sensor`**:
   Item / entity for additional load power data. e.g. heatpump or dishwasher - this energy will also removed from optimization load prediction.
-  Must be in watts. (If not needed set to `additional_load_1_sensor: ""`.)
+  Must be in watts. (If not needed set to `additional_load_1_sensor: ""`)
 
 - **`additional_load_1_runtime`**:
-  Runtime of additional load 1 in hours. Set to 0 if not needed. (If not needed set to `additional_load_1_runtime: ""`.)
+  Runtime of additional load 1 in hours. Set to 0 if not needed. (If not needed set to `additional_load_1_runtime: ""`)
 
 - **`additional_load_1_consumption`**:
-  Overall consumption of additional load 1 in Wh for the given hours. Set to 0 if not needed. (If not needed set to `additional_load_1_consumption: ""`.)
+  Overall consumption of additional load 1 in Wh for the given hours. Set to 0 if not needed. (If not needed set to `additional_load_1_consumption: ""`)
 
 ---
 
@@ -85,7 +85,7 @@ A default config file will be created with the first start, if there is no `conf
   Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`fixed_24h`,`default` (default uses akkudoktor API).
 
 - **`price.token`**:  
-  Token for accessing electricity price data. (If not needed set to `token: ""`.)
+  Token for accessing electricity price data. (If not needed set to `token: ""`)
 
 - **`price.fixed_24h_array`**:
   24 hours array with fixed end customer prices in ct/kWh over the day.
@@ -94,12 +94,12 @@ A default config file will be created with the first start, if there is no `conf
   - (If not needed set to `fixed_24h_array: ""`.)
 
 - **`price.feed_in_price`**:  
-  Feed-in price for the grid, in €/kWh. (If not needed set to `feed_in_price: ""`.)
+  Feed-in price for the grid, in €/kWh. (If not needed set to `feed_in_price: ""`)
 
 - **`price.negative_price_switch`**:  
   Switch for handling negative electricity prices.  
   - `True`: Limits the feed-in price to `0` if there is a negative stock price for the hour.  
-  - `False`: Ignores negative stock prices and uses the constant feed-in price. (If not needed set to `negative_price_switch: ""`.)
+  - `False`: Ignores negative stock prices and uses the constant feed-in price. (If not needed set to `negative_price_switch: ""`)
 
 ---
 
@@ -290,7 +290,7 @@ load:
   access_token: abc123 # access token for homeassistant (optional)
   load_sensor: Load_Power # item / entity for load power data in watts
   car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. Leave empty if not used.
-  additional_load_1_sensor: "additional_load_1_sensor", # item / entity for wallbox power data in watts. Leave empty if not used.
+  additional_load_1_sensor: "additional_load_1_sensor" # item / entity for wallbox power data in watts. Leave empty if not used.
   additional_load_1_runtime: 2 # runtime for additional load 1 in minutes - default: 0 (or empty) = not used
   additional_load_1_consumption: 1500 # consumption for additional load 1 in Wh - default: 0 (or empty) = not used
 # EOS server configuration

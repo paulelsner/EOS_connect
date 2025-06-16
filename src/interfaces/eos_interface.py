@@ -154,6 +154,9 @@ class EosInterface:
             logger.error(
                 "[EOS] OPTIMIZE Request failed: %s - response: %s", e, response.text
             )
+            logger.debug(
+                "[EOS] The payload for the optimization request was: %s", payload
+            )
             return {"error": str(e)}
 
     def examine_response_to_control_data(self, optimized_response_in):

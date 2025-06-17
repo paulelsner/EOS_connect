@@ -236,6 +236,50 @@ def create_forecast_request(pv_config_entry):
         + horizont_string
     )
 
+def get_default_pv_forcast(pv_power):
+    """
+    Creates a default PV forecast with fixed values based on max power.
+    """
+    # Create a 24-hour default forecast
+    forecast_24h = [
+        pv_power * 0.0, # 0% at 00:00
+        pv_power * 0.0, # 0% at 01:00
+        pv_power * 0.0, # 0% at 02:00
+        pv_power * 0.0, # 0% at 03:00
+        pv_power * 0.0, # 0% at 04:00
+        pv_power * 0.0, # 0% at 05:00
+        pv_power * 0.1, # 30% at 06:00
+        pv_power * 0.2, # 50% at 07:00
+        pv_power * 0.3, # 60% at 08:00
+        pv_power * 0.4, # 70% at 09:00
+        pv_power * 0.5, # 90% at 10:00
+        pv_power * 0.6, # 80% at 11:00
+        pv_power * 0.7, # 70% at 12:00
+        pv_power * 0.6, # 60% at 13:00
+        pv_power * 0.5, # 50% at 14:00 
+        pv_power * 0.4, # 40% at 15:00
+        pv_power * 0.3, # 30% at 16:00
+        pv_power * 0.2, # 20% at 17:00
+        pv_power * 0.1, # 10% at 18:00
+        pv_power * 0.0, # 0% at 19:00
+        pv_power * 0.0, # 0% at 20:00
+        pv_power * 0.0, # 0% at 21:00
+        pv_power * 0.0, # 0% at 22:00
+        pv_power * 0.0, # 0% at 23:00,
+    ]
+    # Repeat for the next day (48 hours total)
+    logger.debug("[PV-FORECAST] Using default PV forecast with %s W max power", pv_power)
+    return forecast_24h * 2
+
+def get_default_temperature_forecast():
+    """
+    Creates a default temperature forecast with fixed values.
+    The values are set to 20 degrees Celsius for the entire day.
+    """
+    # Create a 24-hour default temperature forecast
+    forecast_24h = [15.0] * 24  # 15 degrees Celsius for each hour
+    logger.debug("[PV-FORECAST] Using default temperature forecast with 15 degrees")
+    return forecast_24h * 2  # Repeat for the next day (48 hours total)
 
 def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
     """
@@ -243,7 +287,7 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
     power and temperature values for the specified duration starting from the current hour.
     """
     if pv_config_entry is None:
-        logger.error("[FORECAST] No PV config entry provided.")
+        logger.error("[PV-FORECAST] No PV config entry provided.")
         return []
     forecast_request_payload = create_forecast_request(pv_config_entry)
     # print(forecast_request_payload)
@@ -253,11 +297,24 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
         day_values = response.json()
         day_values = day_values["values"]
     except requests.exceptions.Timeout:
-        logger.error("[FORECAST] Request timed out while fetching PV forecast.")
+        logger.error("[PV-FORECAST] Request timed out while fetching PV forecast. (%s)", tgt_value)
         return []
     except requests.exceptions.RequestException as e:
-        logger.error("[FORECAST] Request failed while fetching PV forecast: %s", e)
-        return []
+        logger.error("[PV-FORECAST] Request failed while fetching PV forecast (%s): %s", tgt_value, e)
+        if tgt_value == "power":
+            logger.info(
+                "[PV-FORECAST] Using default PV forecast for %s W",
+                pv_config_entry["power"],
+            )
+            # return a default forecast with 0% at night and 100% at noon
+            return get_default_pv_forcast(pv_config_entry["power"])
+        else:
+            logger.info(
+                "[PV-FORECAST] Using default temperature forecast for %s W",
+                pv_config_entry["power"],
+            )
+            # return a default temperature forecast with 0% at night and 100% at noon
+            return get_default_temperature_forecast()
 
     forecast_values = []
     # current_time = datetime.now(time_zone).astimezone()
@@ -283,7 +340,7 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
         request_type = "Temperature forecast"
         pv_config_name = ""
     logger.info(
-        "[FORECAST] %s fetched successfully %s",
+        "[PV-FORECAST] %s fetched successfully %s",
         request_type,
         pv_config_name,
     )
@@ -291,7 +348,7 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
     if len(forecast_values) > tgt_duration:
         forecast_values = forecast_values[:tgt_duration]
         logger.debug(
-            "[FORECAST] Day of time change %s values reduced to %s for %s",
+            "[PV-FORECAST] Day of time change %s values reduced to %s for %s",
             request_type,
             tgt_duration,
             pv_config_name,
@@ -301,7 +358,7 @@ def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
             [forecast_values[-1]] * (tgt_duration - len(forecast_values))
         )
         logger.debug(
-            "[FORECAST] Day of time change %s values extended to %s for %s",
+            "[PV-FORECAST] Day of time change %s values extended to %s for %s",
             request_type,
             tgt_duration,
             pv_config_name,
@@ -315,7 +372,7 @@ def get_summarized_pv_forecast(tgt_duration=24):
     """
     forecast_values = []
     for config_entry in config_manager.config["pv_forecast"]:
-        logger.debug("[FORECAST] fetching forecast for %s", config_entry["name"])
+        logger.debug("[PV-FORECAST] fetching forecast for %s", config_entry["name"])
         forecast = get_pv_forecast("power", config_entry, tgt_duration)
         # print("values for " + config_entry+ " -> ")
         # print(forecast)

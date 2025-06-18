@@ -23,9 +23,9 @@ from interfaces.evcc_interface import EvccInterface
 from interfaces.eos_interface import EosInterface
 from interfaces.price_interface import PriceInterface
 from interfaces.mqtt_interface import MqttInterface
+from interfaces.pv_interface import PvInterface
 
 EOS_TGT_DURATION = 48
-EOS_API_GET_PV_FORECAST = "https://api.akkudoktor.net/forecast"
 
 
 ###################################################################################################
@@ -209,178 +209,7 @@ battery_interface = BatteryInterface(
 
 price_interface = PriceInterface(config_manager.config["price"])
 
-
-def create_forecast_request(pv_config_entry):
-    """
-    Creates a forecast request URL for the EOS server.
-    """
-    horizont_string = ""
-    if pv_config_entry["horizont"] != "":
-        horizont_string = "&horizont=" + str(pv_config_entry["horizont"])
-    return (
-        EOS_API_GET_PV_FORECAST
-        + "?lat="
-        + str(pv_config_entry["lat"])
-        + "&lon="
-        + str(pv_config_entry["lon"])
-        + "&azimuth="
-        + str(pv_config_entry["azimuth"])
-        + "&tilt="
-        + str(pv_config_entry["tilt"])
-        + "&power="
-        + str(pv_config_entry["power"])
-        + "&powerInverter="
-        + str(pv_config_entry["powerInverter"])
-        + "&inverterEfficiency="
-        + str(pv_config_entry["inverterEfficiency"])
-        + horizont_string
-    )
-
-def get_default_pv_forcast(pv_power):
-    """
-    Creates a default PV forecast with fixed values based on max power.
-    """
-    # Create a 24-hour default forecast
-    forecast_24h = [
-        pv_power * 0.0, # 0% at 00:00
-        pv_power * 0.0, # 0% at 01:00
-        pv_power * 0.0, # 0% at 02:00
-        pv_power * 0.0, # 0% at 03:00
-        pv_power * 0.0, # 0% at 04:00
-        pv_power * 0.0, # 0% at 05:00
-        pv_power * 0.1, # 30% at 06:00
-        pv_power * 0.2, # 50% at 07:00
-        pv_power * 0.3, # 60% at 08:00
-        pv_power * 0.4, # 70% at 09:00
-        pv_power * 0.5, # 90% at 10:00
-        pv_power * 0.6, # 80% at 11:00
-        pv_power * 0.7, # 70% at 12:00
-        pv_power * 0.6, # 60% at 13:00
-        pv_power * 0.5, # 50% at 14:00 
-        pv_power * 0.4, # 40% at 15:00
-        pv_power * 0.3, # 30% at 16:00
-        pv_power * 0.2, # 20% at 17:00
-        pv_power * 0.1, # 10% at 18:00
-        pv_power * 0.0, # 0% at 19:00
-        pv_power * 0.0, # 0% at 20:00
-        pv_power * 0.0, # 0% at 21:00
-        pv_power * 0.0, # 0% at 22:00
-        pv_power * 0.0, # 0% at 23:00,
-    ]
-    # Repeat for the next day (48 hours total)
-    logger.debug("[PV-FORECAST] Using default PV forecast with %s W max power", pv_power)
-    return forecast_24h * 2
-
-def get_default_temperature_forecast():
-    """
-    Creates a default temperature forecast with fixed values.
-    The values are set to 20 degrees Celsius for the entire day.
-    """
-    # Create a 24-hour default temperature forecast
-    forecast_24h = [15.0] * 24  # 15 degrees Celsius for each hour
-    logger.debug("[PV-FORECAST] Using default temperature forecast with 15 degrees")
-    return forecast_24h * 2  # Repeat for the next day (48 hours total)
-
-def get_pv_forecast(tgt_value="power", pv_config_entry=None, tgt_duration=24):
-    """
-    Fetches the PV forecast data from the EOS API and processes it to extract
-    power and temperature values for the specified duration starting from the current hour.
-    """
-    if pv_config_entry is None:
-        logger.error("[PV-FORECAST] No PV config entry provided.")
-        return []
-    forecast_request_payload = create_forecast_request(pv_config_entry)
-    # print(forecast_request_payload)
-    try:
-        response = requests.get(forecast_request_payload, timeout=10)
-        response.raise_for_status()
-        day_values = response.json()
-        day_values = day_values["values"]
-    except requests.exceptions.Timeout:
-        logger.error("[PV-FORECAST] Request timed out while fetching PV forecast. (%s)", tgt_value)
-        return []
-    except requests.exceptions.RequestException as e:
-        logger.error("[PV-FORECAST] Request failed while fetching PV forecast (%s): %s", tgt_value, e)
-        if tgt_value == "power":
-            logger.info(
-                "[PV-FORECAST] Using default PV forecast for %s W",
-                pv_config_entry["power"],
-            )
-            # return a default forecast with 0% at night and 100% at noon
-            return get_default_pv_forcast(pv_config_entry["power"])
-        else:
-            logger.info(
-                "[PV-FORECAST] Using default temperature forecast for %s W",
-                pv_config_entry["power"],
-            )
-            # return a default temperature forecast with 0% at night and 100% at noon
-            return get_default_temperature_forecast()
-
-    forecast_values = []
-    # current_time = datetime.now(time_zone).astimezone()
-    current_time = (
-        datetime.now(time_zone)
-        .replace(hour=0, minute=0, second=0, microsecond=0)
-        .astimezone()
-    )
-    end_time = current_time + timedelta(hours=tgt_duration)
-
-    for forecast_entry in day_values:
-        for forecast in forecast_entry:
-            entry_time = datetime.fromisoformat(forecast["datetime"]).astimezone()
-            if current_time <= entry_time < end_time:
-                value = forecast.get(tgt_value, 0)
-                # if power is negative, set it to 0 (fixing wrong values form api)
-                if tgt_value == "power" and value < 0:
-                    value = 0
-                forecast_values.append(value)
-    request_type = "PV forecast"
-    pv_config_name = "for " + pv_config_entry["name"]
-    if tgt_value == "temperature":
-        request_type = "Temperature forecast"
-        pv_config_name = ""
-    logger.info(
-        "[PV-FORECAST] %s fetched successfully %s",
-        request_type,
-        pv_config_name,
-    )
-    # fix for time changes e.g. western europe then fill or reduce the array to 48 values
-    if len(forecast_values) > tgt_duration:
-        forecast_values = forecast_values[:tgt_duration]
-        logger.debug(
-            "[PV-FORECAST] Day of time change %s values reduced to %s for %s",
-            request_type,
-            tgt_duration,
-            pv_config_name,
-        )
-    elif len(forecast_values) < tgt_duration:
-        forecast_values.extend(
-            [forecast_values[-1]] * (tgt_duration - len(forecast_values))
-        )
-        logger.debug(
-            "[PV-FORECAST] Day of time change %s values extended to %s for %s",
-            request_type,
-            tgt_duration,
-            pv_config_name,
-        )
-    return forecast_values
-
-
-def get_summarized_pv_forecast(tgt_duration=24):
-    """
-    requesting pv forecast freach config entry and summarize the values
-    """
-    forecast_values = []
-    for config_entry in config_manager.config["pv_forecast"]:
-        logger.debug("[PV-FORECAST] fetching forecast for %s", config_entry["name"])
-        forecast = get_pv_forecast("power", config_entry, tgt_duration)
-        # print("values for " + config_entry+ " -> ")
-        # print(forecast)
-        if not forecast_values:
-            forecast_values = forecast
-        else:
-            forecast_values = [x + y for x, y in zip(forecast_values, forecast)]
-    return forecast_values
+pv_interface = PvInterface(config_manager.config["pv_forecast"])
 
 
 # summarize all date
@@ -397,7 +226,7 @@ def create_optimize_request():
 
     def get_ems_data():
         return {
-            "pv_prognose_wh": get_summarized_pv_forecast(EOS_TGT_DURATION),
+            "pv_prognose_wh": pv_interface.get_current_pv_forecast(),
             "strompreis_euro_pro_wh": price_interface.get_current_prices(),
             "einspeiseverguetung_euro_pro_wh": price_interface.get_current_feedin_prices(),
             "preis_euro_pro_wh_akku": config_manager.config["battery"][
@@ -479,11 +308,7 @@ def create_optimize_request():
         "inverter": get_wechselrichter_data(),
         "eauto": get_eauto_data(),
         "dishwasher": get_dishwasher_data(),
-        "temperature_forecast": get_pv_forecast(
-            tgt_value="temperature",
-            pv_config_entry=config_manager.config["pv_forecast"][0],
-            tgt_duration=EOS_TGT_DURATION,
-        ),
+        "temperature_forecast": pv_interface.get_current_temp_forecast(),
         "start_solution": eos_interface.get_last_start_solution(),
     }
     logger.debug(
@@ -1232,6 +1057,7 @@ if __name__ == "__main__":
             and inverter_interface is not None
         ):
             inverter_interface.shutdown()
+        pv_interface.shutdown()
         mqtt_interface.shutdown()
         evcc_interface.shutdown()
         battery_interface.shutdown()

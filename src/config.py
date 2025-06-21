@@ -83,6 +83,11 @@ class ConfigManager:
                         "price_euro_per_wh_accu": 0.0,  # price for battery in euro/kWh
                     }
                 ),
+                "pv_forecast_source": CommentedMap(
+                        {
+                            "source": "akkudoktor",  # openmeteo # forecast_solar # akkudoktor
+                        }
+                ),
                 "pv_forecast": [
                     CommentedMap(
                         {
@@ -239,6 +244,15 @@ class ConfigManager:
         )
         config["battery"].yaml_add_eol_comment(
             "price for battery in euro/kWh - default: 0.0", "price_euro_per_wh_accu"
+        )
+        # pv forecast source configuration
+        config.yaml_set_comment_before_after_key(
+            "pv_forecast_source", before="pv forecast source configuration"
+        )
+        config["pv_forecast_source"].yaml_add_eol_comment(
+            "data source forsolar forecast providers akkudoktor, openmeteo,"
+            + " forecast_solar, default (default uses akkudoktor)",
+            "source",
         )
         # pv forecast configuration
         config.yaml_set_comment_before_after_key(

@@ -209,7 +209,11 @@ battery_interface = BatteryInterface(
 
 price_interface = PriceInterface(config_manager.config["price"])
 
-pv_interface = PvInterface(config_manager.config["pv_forecast"])
+pv_interface = PvInterface(
+    config_manager.config["pv_forecast_source"], config_manager.config["pv_forecast"]
+)
+
+time.sleep(10)  # wait for the interfaces to initialize
 
 
 # summarize all date
@@ -531,8 +535,12 @@ class OptimizationScheduler:
         if error is not True:
             setting_control_data(ac_charge_demand, dc_charge_demand, discharge_allowed)
             # get recent evcc states
-            base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
-            base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
+            base_control.set_current_evcc_charging_state(
+                evcc_interface.get_charging_state()
+            )
+            base_control.set_current_evcc_charging_mode(
+                evcc_interface.get_charging_mode()
+            )
             change_control_state()
         # +++++++++
 

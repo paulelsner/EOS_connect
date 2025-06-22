@@ -94,15 +94,6 @@ class PvInterface:
             logger.debug("[PV-IF] Initialize - pv entries found: %s", len(self.config))
             for config_entry in self.config:
                 # check for each entries the mandatory params
-                # name: Garden
-                # lat: 45.2328
-                # lon: 8.32742
-                # azimuth: 13
-                # tilt: 31
-                # power: 860
-                # powerInverter: 800
-                # inverterEfficiency: 0.95
-                # horizont: 0,0,0,0,0,0,0,0,50t0.4,70,0,0,0,0,0,0,0,0
                 if config_entry.get("name", ""):
                     logger.debug(
                         "[PV-IF] Initialize - config entry name: %s",
@@ -130,7 +121,7 @@ class PvInterface:
                     )
                 # if config_entry.get("horizon", None) is None:
                 #     config_entry["horizon"] = ""
-                #     logger.debug("[PV-IF] Init - horizont not found in config entry,"+
+                #     logger.debug("[PV-IF] Init - horizon not found in config entry,"+
                 # "using default empty value")
 
     def __start_update_service(self):
@@ -219,9 +210,9 @@ class PvInterface:
         """
         Creates a forecast request URL for the EOS server.
         """
-        horizont_string = ""
+        horizon_string = ""
         if pv_config_entry["horizon"] != "":
-            horizont_string = "&horizont=" + str(pv_config_entry["horizon"])
+            horizon_string = "&horizont=" + str(pv_config_entry["horizon"])
         return (
             EOS_API_GET_PV_FORECAST
             + "?lat="
@@ -238,7 +229,7 @@ class PvInterface:
             + str(pv_config_entry["powerInverter"])
             + "&inverterEfficiency="
             + str(pv_config_entry["inverterEfficiency"])
-            + horizont_string
+            + horizon_string
         )
 
     def __get_default_pv_forcast(self, pv_power):
@@ -439,6 +430,9 @@ class PvInterface:
 
     def __get_horizon_elevation(self, sun_azimuth, horizon):
 
+        if not horizon or len(horizon) == 0:
+            horizon = [0] * 36
+
         # Normalize horizon string to a list of integers (handle '50t0.4' as 50)
         if isinstance(horizon, str):
             horizon = [
@@ -482,7 +476,7 @@ class PvInterface:
         )  # value in config is in watts
         horizon = pv_config_entry.get("horizon", [0] * 36)  # default: no shading
         pv_efficiency = pv_config_entry.get("inverterEfficiency", 0.85)
-        cloud_factor = 0.1  # factor to adjust radiation based on cloud cover
+        cloud_factor = 0.3  # factor to adjust radiation based on cloud cover
         timezone = self.time_zone
         logger.debug(
             "[PV-IF] Open-Meteo PV forecast for"
@@ -520,6 +514,10 @@ class PvInterface:
 
         # Get sun position
         solpos = pvlib.solarposition.get_solarposition(times, latitude, longitude)
+        logger.debug(
+            "[PV-IF] Open-Meteo solar position calculated solpos - %s",
+            solpos
+        )
 
         # Calculate angle of incidence (AOI)
         aoi = pvlib.irradiance.aoi(
@@ -556,7 +554,7 @@ class PvInterface:
                 #     horizon_elev,
                 #     sun_az,
                 # )
-                eff_rad_panel = 0  # Sun is behind local horizon
+                eff_rad_panel = eff_rad_panel * 0.25  # Sun is behind local horizon - 25% of radiation
 
             # Estimate PV energy output (Wh)
             energy_wh = (
@@ -676,3 +674,43 @@ class PvInterface:
         pv_forecast = forecast_wh
         # logger.debug("[PV-IF] Forecast.Solar PV forecast (Wh): %s", pv_forecast)
         return pv_forecast
+
+    def test_output(self):
+        """
+        Test method to print the current PV and temperature forecasts.
+        """
+        self.config_source["source"] = "akkudoktor"
+        pv_forcast_array1 = self.get_summarized_pv_forecast(48)
+        self.config_source["source"] = "openmeteo"
+        pv_forcast_array2 = self.get_summarized_pv_forecast(48)
+        # self.config_source["source"] = "forecast_solar"
+        # pv_forcast_array3 = self.get_summarized_pv_forecast(48)
+
+        # print out to csv file - first column is the hour, second column is the value
+        # Set start to today at midnight in the configured timezone
+        tz = pytz.timezone(self.time_zone)
+        start_midnight = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        df = pd.DataFrame(
+            {
+            "Hour": pd.date_range(
+                start=start_midnight,
+                periods=48,
+                freq="h",
+            ),
+            "Akkudoktor": pv_forcast_array1,
+            "OpenMeteo": pv_forcast_array2,
+            # "ForecastSolar": pv_forcast_array3,
+            }
+        )
+        df.set_index("Hour", inplace=True)
+        # Save as HTML with right-aligned numbers and 1px border
+        styles = [
+            dict(selector="th, td", props=[("text-align", "right")]),
+            dict(selector="th.index_name", props=[("text-align", "left")]),
+            dict(selector="th.blank", props=[("text-align", "left")]),
+            dict(selector="table", props=[("border-width", "1px"), ("border-style", "solid")]),
+        ]
+        df.style.format("{:.1f}").set_table_styles(styles).to_html(
+            "pv_forecast_test_output_2.html", border=1
+        )
+        logger.info("[PV-IF] PV forecast test output saved to pv_forecast_test_output_2.csv")

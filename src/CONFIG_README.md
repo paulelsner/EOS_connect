@@ -192,7 +192,7 @@ pv_forecast:
 - **`inverterEfficiency`**:  
   The efficiency of the inverter, as a decimal value between `0` and `1`.
 
-- **`horizont`**:  
+- **`horizon`**:  
   (Optional) A list of up to 36 values describing the shading situation for the PV installation. The list always covers 360° – 4 entries will represent 90° steps, e.g.
   - 10,20,10,15 – 0–90° is shadowed if sun elevation is below 10°, and so on.
   - 0,0,0,0,0,0,0,0,50,70,0,0,0,0,0,0,0,0 – 18 entries → 20° steps; here, 180°–200° requires 50° of sun elevation, otherwise the panel is shadowed.

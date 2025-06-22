@@ -1,41 +1,39 @@
-
 # Configuration Guide
+
+<!-- TOC -->
+- [Configuration Guide](#configuration-guide)
+- [Configuration](#configuration)
+  - [Configuration Sections](#configuration-sections)
+    - [Load Configuration](#load-configuration)
+    - [EOS Server Configuration](#eos-server-configuration)
+    - [Electricity Price Configuration](#electricity-price-configuration)
+    - [Battery Configuration](#battery-configuration)
+    - [PV Forecast Configuration](#pv-forecast-configuration)
+      - [Parameters](#parameters)
+    - [Inverter Configuration](#inverter-configuration)
+    - [EVCC Configuration](#evcc-configuration)
+    - [MQTT Configuration](#mqtt-configuration)
+      - [Parameters](#parameters-1)
+    - [Other Configuration Settings](#other-configuration-settings)
+  - [Notes](#notes)
+  - [Config examples](#config-examples)
+    - [Full Config Example (will be generated at first startup)](#full-config-example-will-be-generated-at-first-startup)
+    - [Minimal possible Config Example](#minimal-possible-config-example)
+<!-- /TOC -->
+
+# Configuration
 
 This document provides an overview of the configuration settings for the application. The configuration settings are stored in a `config.yaml` file.  
 A default config file will be created with the first start, if there is no `config.yaml` in the `src` folder.
 
-*Hint: There are different combinations of parameters possible. If there is a problem with missing or incorrect configuration, it will be shown in the log as an error.*
+*Hint: There are different combinations of parameters possible. If there is a problem with missing or incorrect configuration, it will be shown in the logs as an error.*
 
 ---
 
-<!-- vscode-markdown-toc -->
-* 1. [Configuration Sections](#ConfigurationSections)
-	* 1.1. [Load Configurationon](#LoadConfigurationon)
-	* 1.2. [EOS Server Configurationon](#EOSServerConfigurationon)
-	* 1.3. [Electricity Price Configurationon](#ElectricityPriceConfigurationon)
-	* 1.4. [Battery Configurationon](#BatteryConfigurationon)
-	* 1.5. [PV Forecast Configurationon](#PVForecastConfigurationon)
-		* 1.5.1. [Parametersrs](#Parametersrs)
-	* 1.6. [Inverter Configurationon](#InverterConfigurationon)
-	* 1.7. [EVCC Configurationon](#EVCCConfigurationon)
-	* 1.8. [MQTT Configurationon](#MQTTConfigurationon)
-		* 1.8.1. [Parametersrs](#Parametersrs-1)
-	* 1.9. [Other Configuration Settingsgs](#OtherConfigurationSettingsgs)
-* 2. [Notes](#Notes)
-* 3. [Config examples](#Configexamples)
-	* 3.1. [Full Config Example (will be generated at first startup)](#FullConfigExamplewillbegeneratedatfirststartup)
-	* 3.2. [Minimal possible Config Example](#MinimalpossibleConfigExample)
 
-<!-- vscode-markdown-toc-config
-	numbering=true
-	autoSave=true
-	/vscode-markdown-toc-config -->
-<!-- /vscode-markdown-toc -->
+##  Configuration Sections
 
-
-##  1. <a name='ConfigurationSections'></a>Configuration Sections
-
-###  1.1. <a name='LoadConfigurationon'></a>Load Configurationon
+###  Load Configuration
 
 - **`load.source`**:  
   Data source for load power. Possible values: `openhab`, `homeassistant`, `default` (default will use a primitive static consumption scheme).
@@ -44,7 +42,7 @@ A default config file will be created with the first start, if there is no `conf
   URL for OpenHAB (e.g., `http://<ip>:8080`) or Home Assistant (e.g., `http://<ip>:8123`).
 
 - **`load.access_token`**:  
-  Access token for Home Assistant (optional). If not needed set to `load.access_token: ""`.
+  Access token for Home Assistant (optional). If not needed, set to `load.access_token: ""`
 
 - **`load.load_sensor`**:  
   Item/entity name for load power data (OpenHAB item/Home Assistant sensor).
@@ -52,21 +50,21 @@ A default config file will be created with the first start, if there is no `conf
 
 - **`load.car_charge_load_sensor`**:  
   Item/entity name for wallbox power data. 
-  Must be in watts. (If not needed set to `load.car_charge_load_sensor: ""`)
+  Must be in watts. (If not needed, set to `load.car_charge_load_sensor: ""`)
 
 - **`additional_load_1_sensor`**:
   Item / entity for additional load power data. e.g. heatpump or dishwasher - this energy will also removed from optimization load prediction.
   Must be in watts. (If not needed set to `additional_load_1_sensor: ""`)
 
 - **`additional_load_1_runtime`**:
-  Runtime of additional load 1 in hours. Set to 0 if not needed. (If not needed set to `additional_load_1_runtime: ""`)
+  Runtime of additional load 1 in hours. Set to 0 if not needed. (If not needed, set to `additional_load_1_runtime: ""`)
 
 - **`additional_load_1_consumption`**:
-  Overall consumption of additional load 1 in Wh for the given hours. Set to 0 if not needed. (If not needed set to `additional_load_1_consumption: ""`)
+  Overall consumption of additional load 1 in Wh for the given hours. Set to 0 if not needed. (If not needed, set to `additional_load_1_consumption: ""`)
 
 ---
 
-###  1.2. <a name='EOSServerConfigurationon'></a>EOS Server Configurationon
+### EOS Server Configuration
 
 - **`eos.server`**:  
   EOS server address (e.g., `192.168.1.94`). (Mandatory)
@@ -79,13 +77,13 @@ A default config file will be created with the first start, if there is no `conf
 
 ---
 
-###  1.3. <a name='ElectricityPriceConfigurationon'></a>Electricity Price Configurationon
+### Electricity Price Configuration
 
 - **`price.source`**:  
   Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`fixed_24h`,`default` (default uses akkudoktor API).
 
 - **`price.token`**:  
-  Token for accessing electricity price data. (If not needed set to `token: ""`)
+  Token for accessing electricity price data. (If not needed, set to `token: ""`)
 
 - **`price.fixed_24h_array`**:
   24 hours array with fixed end customer prices in ct/kWh over the day.
@@ -94,16 +92,16 @@ A default config file will be created with the first start, if there is no `conf
   - (If not needed set to `fixed_24h_array: ""`.)
 
 - **`price.feed_in_price`**:  
-  Feed-in price for the grid, in €/kWh. (If not needed set to `feed_in_price: ""`)
+  Feed-in price for the grid, in €/kWh. (If not needed, set to `feed_in_price: ""`)
 
 - **`price.negative_price_switch`**:  
   Switch for handling negative electricity prices.  
   - `True`: Limits the feed-in price to `0` if there is a negative stock price for the hour.  
-  - `False`: Ignores negative stock prices and uses the constant feed-in price. (If not needed set to `negative_price_switch: ""`)
+  - `False`: Ignores negative stock prices and uses the constant feed-in price. (If not needed, set to `negative_price_switch: ""`)
 
 ---
 
-###  1.4. <a name='BatteryConfigurationon'></a>Battery Configurationon
+### Battery Configuration
 
 - **`battery.source`**:  
   Data source for battery SOC (State of Charge). Possible values: `openhab`, `homeassistant`, `default` (static data).
@@ -136,15 +134,27 @@ A default config file will be created with the first start, if there is no `conf
   Maximum state of charge for the battery, as a percentage.
 
 - **`price_euro_per_wh_accu`**:
-  Price for battery in €/Wh - can be used to shifting the result over the day according to the available energy (more details follow)
+  Price for battery in €/Wh - can be used to shift the result over the day according to the available energy (more details follow).
 
 ---
 
-###  1.5. <a name='PVForecastConfigurationon'></a>PV Forecast Configurationon
+### PV Forecast Configuration
 
-The `pv_forecast` section allows you to define multiple PV forecast entries, each distinguished by a user-given name. Below is an example of a default PV forecast configuration:
+This section contains two subsections:
+- `pv_forecast_source`
+- `pv_forecast`
+
+`pv_forecast_source` section declares the provider of solar forecast that should be used. Available providers are
+- akkudoktor - https://api.akkudoktor.net/ - direct request and results
+- openmeteo - https://open-meteo.com/en/docs - gathering radiation and cloudcover data and calculating locally with an own model
+- forecast_solar - https://doc.forecast.solar/api - direct request and results
+default (uses akkudoktor by default)
+
+`pv_forecast` section allows you to define multiple PV forecast entries, each distinguished by a user-given name. Below is an example of a default PV forecast configuration:
 
 ```yaml
+pv_forecast_source:
+  source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, forecast_solar, default (default uses akkudoktor)
 pv_forecast:
   - name: myPvInstallation1  # User-defined identifier for the PV installation, must be unique if you use multiple installations
     lat: 47.5  # Latitude for PV forecast @ Akkudoktor API
@@ -154,10 +164,10 @@ pv_forecast:
     power: 4600  # Power for PV forecast @ Akkudoktor API
     powerInverter: 5000  # Power Inverter for PV forecast @ Akkudoktor API
     inverterEfficiency: 0.9  # Inverter Efficiency for PV forecast @ Akkudoktor API
-    horizont: 10,20,10,15  # Horizont to calculate shading up to 360 values to describe shading situation for your PV.
+    horizon: 10,20,10,15  # Horizon to calculate shading, up to 360 values to describe the shading situation for your PV.
 ```
 
-####  1.5.1. <a name='Parametersrs'></a>Parametersrs
+#### Parameters
 - **`name`**:  
   A user-defined identifier for the PV installation. Must be unique if you use multiple installations.
 
@@ -183,11 +193,13 @@ pv_forecast:
   The efficiency of the inverter, as a decimal value between `0` and `1`.
 
 - **`horizont`**:  
-  (Optional) A list of up to 360 values describing the shading situation for the PV installation.
+  (Optional) A list of up to 36 values describing the shading situation for the PV installation. The list always covers 360° – 4 entries will represent 90° steps, e.g.
+  - 10,20,10,15 – 0–90° is shadowed if sun elevation is below 10°, and so on.
+  - 0,0,0,0,0,0,0,0,50,70,0,0,0,0,0,0,0,0 – 18 entries → 20° steps; here, 180°–200° requires 50° of sun elevation, otherwise the panel is shadowed.
 
 ---
 
-###  1.6. <a name='InverterConfigurationon'></a>Inverter Configurationon
+### Inverter Configuration
 
 - **`inverter.type`**:  
   Specifies the type of inverter. Possible values:  
@@ -212,18 +224,18 @@ pv_forecast:
 
 ---
 
-###  1.7. <a name='EVCCConfigurationon'></a>EVCC Configurationon
+### EVCC Configuration
 
 - **`evcc.url`**:  
   The URL for the EVCC instance (e.g., `http://<ip>:7070`). If not used set to `url: ""` or leave as `url: http://yourEVCCserver:7070`
 
 ---
 
-###  1.8. <a name='MQTTConfigurationon'></a>MQTT Configurationon
+### MQTT Configuration
 
 The `mqtt` section allows you to configure the MQTT broker and Home Assistant MQTT Auto Discovery settings.
 
-####  1.8.1. <a name='Parametersrs-1'></a>Parametersrs
+#### Parameters
 
 - **`mqtt.enabled`**:  
   Enable or disable MQTT functionality. 
@@ -257,7 +269,7 @@ The `mqtt` section allows you to configure the MQTT broker and Home Assistant MQ
 
 ---
 
-###  1.9. <a name='OtherConfigurationSettingsgs'></a>Other Configuration Settingsgs
+### Other Configuration Settings
 
 - **`refresh_time`**:  
   Default refresh time for the application, in minutes.
@@ -273,14 +285,14 @@ The `mqtt` section allows you to configure the MQTT broker and Home Assistant MQ
 
 ---
 
-##  2. <a name='Notes'></a>Notes
+## Notes
 
 - Ensure that the `config.yaml` file is located in the same directory as the application.
 - If the configuration file does not exist, the application will create one with default values and prompt you to restart the server after configuring the settings.
 
-##  3. <a name='Configexamples'></a>Config examples
+## Config examples
 
-###  3.1. <a name='FullConfigExamplewillbegeneratedatfirststartup'></a>Full Config Example (will be generated at first startup)
+### Full Config Example (will be generated at first startup)
 
 ```yaml
 # Load configuration
@@ -318,6 +330,9 @@ battery:
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
   price_euro_per_wh_accu: 0 # price for battery in €/Wh
+# List of PV forecast source configuration
+pv_forecast_source:
+  source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, forecast_solar, default (default uses akkudoktor)
 # List of PV forecast configurations. Add multiple entries as needed.
 # See Akkudoktor API (https://api.akkudoktor.net/#/pv%20generation%20calculation/getForecast) for more details.
 pv_forecast:
@@ -329,7 +344,7 @@ pv_forecast:
     power: 4600 # Power for PV forecast @ Akkudoktor API
     powerInverter: 5000 # Power Inverter for PV forecast @ Akkudoktor API
     inverterEfficiency: 0.9 # Inverter Efficiency for PV forecast @ Akkudoktor API
-    horizont: 10,20,10,15 # Horizont to calculate shading up to 360 values to describe shading situation for your PV.
+    horizon: 10,20,10,15 # Horizon to calculate shading up to 360 values to describe shading situation for your PV.
 # Inverter configuration
 inverter:
   type: default  # Type of inverter - fronius_gen24, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
@@ -356,7 +371,7 @@ eos_connect_web_port: 8081 # Default port for EOS connect server - default: 8081
 log_level: info # Log level for the application : debug, info, warning, error - default: info
 ```
 
-###  3.2. <a name='MinimalpossibleConfigExample'></a>Minimal possible Config Example
+### Minimal possible Config Example
 
 *Hint: Within HA addon config the params that are not needed will be integrated automatically again after saving. Here please use the setting for unsed params wit `""`.*
 
@@ -384,6 +399,9 @@ battery:
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
   price_euro_per_wh_accu: 0 # price for battery in €/Wh
+# List of PV forecast source configuration
+pv_forecast_source:
+  source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, forecast_solar, default (default uses akkudoktor)
 # List of PV forecast configurations. Add multiple entries as needed.
 # See Akkudoktor API (https://api.akkudoktor.net/#/pv%20generation%20calculation/getForecast) for more details.
 pv_forecast:
@@ -395,7 +413,7 @@ pv_forecast:
     power: 4600 # Power for PV forecast @ Akkudoktor API
     powerInverter: 5000 # Power Inverter for PV forecast @ Akkudoktor API
     inverterEfficiency: 0.9 # Inverter Efficiency for PV forecast @ Akkudoktor API
-    horizont: 10,20,10,15 # Horizont to calculate shading up to 360 values to describe shading situation for your PV.
+    horizon: 10,20,10,15 # Horizon to calculate shading up to 360 values to describe shading situation for your PV.
 # Inverter configuration
 inverter:
   type: default  # Type of inverter - fronius_gen24, evcc, default (default will disable inverter control - only displaying the target state) - preset: default

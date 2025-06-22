@@ -101,7 +101,7 @@ class ConfigManager:
                             "powerInverter": 5000,  # Inverter Power
                             "inverterEfficiency": 0.9,  # Inverter Efficiency for
                             # PV forecast @ Akkudoktor API
-                            "horizont": "10,20,10,15",  # Horizont to calculate shading
+                            "horizon": "10,20,10,15",  # Horizon to calculate shading
                         }
                     )
                 ],
@@ -250,7 +250,7 @@ class ConfigManager:
             "pv_forecast_source", before="pv forecast source configuration"
         )
         config["pv_forecast_source"].yaml_add_eol_comment(
-            "data source forsolar forecast providers akkudoktor, openmeteo,"
+            "data source for solar forecast providers akkudoktor, openmeteo,"
             + " forecast_solar, default (default uses akkudoktor)",
             "source",
         )
@@ -291,9 +291,9 @@ class ConfigManager:
                 "inverterEfficiency",
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Horizont to calculate shading up to 360 values"
-                + " to describe shading situation for your PV.",
-                "horizont",
+                "Horizon to calculate shading, up to 360 values"
+                + " to describe the shading situation for your PV.",
+                "horizon",
             )
         # inverter configuration
         config.yaml_set_comment_before_after_key(

@@ -128,8 +128,8 @@ class PvInterface:
                     raise ValueError(
                         "[PV-IF] Init - inverterEfficiency not found in config entry"
                     )
-                # if config_entry.get("horizont", None) is None:
-                #     config_entry["horizont"] = ""
+                # if config_entry.get("horizon", None) is None:
+                #     config_entry["horizon"] = ""
                 #     logger.debug("[PV-IF] Init - horizont not found in config entry,"+
                 # "using default empty value")
 
@@ -220,8 +220,8 @@ class PvInterface:
         Creates a forecast request URL for the EOS server.
         """
         horizont_string = ""
-        if pv_config_entry["horizont"] != "":
-            horizont_string = "&horizont=" + str(pv_config_entry["horizont"])
+        if pv_config_entry["horizon"] != "":
+            horizont_string = "&horizont=" + str(pv_config_entry["horizon"])
         return (
             EOS_API_GET_PV_FORECAST
             + "?lat="
@@ -480,7 +480,7 @@ class PvInterface:
         installed_power_watt = pv_config_entry.get(
             "power", 200
         )  # value in config is in watts
-        horizon = pv_config_entry.get("horizont", [0] * 36)  # default: no shading
+        horizon = pv_config_entry.get("horizon", [0] * 36)  # default: no shading
         pv_efficiency = pv_config_entry.get("inverterEfficiency", 0.85)
         cloud_factor = 0.1  # factor to adjust radiation based on cloud cover
         timezone = self.time_zone
@@ -592,8 +592,8 @@ class PvInterface:
         # Convert to kW for API and round to 4 decimal places
         installed_power_watt = round(pv_config_entry.get("power", 200) / 1000, 4)
         horizon = ""
-        if pv_config_entry.get("horizont", None) is not None:
-            horizon = pv_config_entry.get("horizont", "")
+        if pv_config_entry.get("horizon", None) is not None:
+            horizon = pv_config_entry.get("horizon", "")
             if horizon:
                 # Convert horizon string to a list of floats
                 # Handle entries like '50t0.4' by taking only the value before 't'

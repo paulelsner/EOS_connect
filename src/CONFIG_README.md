@@ -44,6 +44,8 @@ A default config file will be created with the first start, if there is no `conf
 - **`load.access_token`**:  
   Access token for Home Assistant (optional). If not needed, set to `load.access_token: ""`
 
+  *Hint: If you use Home Assistant as the source for load sensors, you must set the access token here as well. This token is independent from the one in the battery configuration.*
+
 - **`load.load_sensor`**:  
   Item/entity name for load power data (OpenHAB item/Home Assistant sensor).
   Must be in watts. It's mandatory if not choosen 'default' as source.
@@ -114,6 +116,8 @@ A default config file will be created with the first start, if there is no `conf
 
 - **`battery.access_token`**:  
   Access token for Home Assistant (optional).
+
+  *Hint: If you use Home Assistant as the source for load sensors, you must set the access token here as well. This token is independent from the one in the load configuration.*
 
 - **`battery.capacity_wh`**:  
   Total capacity of the battery, in watt-hours (Wh).

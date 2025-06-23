@@ -230,6 +230,8 @@ class PvInterface:
             + str(pv_config_entry["powerInverter"])
             + "&inverterEfficiency="
             + str(pv_config_entry["inverterEfficiency"])
+            + "&timezone="
+            + str(self.time_zone)
             + horizon_string
         )
 
@@ -347,7 +349,7 @@ class PvInterface:
             )
             return []
         forecast_request_payload = self.__create_forecast_request(pv_config_entry)
-        print(forecast_request_payload)
+        # print(forecast_request_payload)
         recv_error = False
         try:
             response = requests.get(forecast_request_payload, timeout=5)
@@ -385,18 +387,35 @@ class PvInterface:
 
         forecast_values = []
         tz = pytz.timezone(self.time_zone)
-        current_time = (
-            datetime.now(tz)
-            .replace(hour=0, minute=0, second=0, microsecond=0)
-            .astimezone()
+        current_time = tz.localize(
+            datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         )
         end_time = current_time + timedelta(hours=tgt_duration)
+        # logger.debug(
+        #     "[PV-IF] Fetching %s forecast for %s from %s to %s",
+        #     tgt_value,
+        #     pv_config_entry["name"],
+        #     current_time.isoformat(),
+        #     end_time.isoformat(),
+        # )
 
         for forecast_entry in day_values:
             for forecast in forecast_entry:
-                entry_time = datetime.fromisoformat(forecast["datetime"]).astimezone()
+                entry_time = datetime.fromisoformat(forecast["datetime"])
+                if entry_time.tzinfo is None:
+                    # If datetime is naive, localize it
+                    entry_time = pytz.timezone(self.time_zone).localize(entry_time)
+                else:
+                    # Convert to configured timezone
+                    entry_time = entry_time.astimezone(pytz.timezone(self.time_zone))
                 if current_time <= entry_time < end_time:
                     value = forecast.get(tgt_value, 0)
+
+                    # logger.debug(
+                    #     "[PV-IF] Processing forecast entry at %s (%s) for value:  %s",
+                    #     entry_time.isoformat(), forecast["datetime"],
+                    #     value,
+                    # )
                     # if power is negative, set it to 0 (fixing wrong values form api)
                     if tgt_value == "power" and value < 0:
                         value = 0
@@ -615,6 +634,7 @@ class PvInterface:
             now = datetime.now(estimate.timezone).replace(
                 minute=0, second=0, microsecond=0
             )
+            # print("[PV-IF] OpenMeteo Lib PV forecast for '%s' at %s", pv_config_entry["name"], now)
             # Find tomorrow's midnight in the forecast's timezone
             tomorrow_midnight = (now + timedelta(days=2)).replace(
                 hour=0, minute=0, second=0, microsecond=0
@@ -628,9 +648,9 @@ class PvInterface:
                 ).total_seconds()
                 // 3600
             )
-            for hour in range(hours_from_today_midnight - 1):
+            for hour in range(hours_from_today_midnight + 1):
                 pv_forecast.append(0)
-            for hour in range(hours_until_tomorrow_midnight + 1):
+            for hour in range(hours_until_tomorrow_midnight - 1):
                 current_hour_energy = 0
                 for minute in range(59):
                     current_hour_energy += estimate.power_production_at_time(
@@ -645,13 +665,12 @@ class PvInterface:
                 #     now + timedelta(hours=hour),
                 # )
                 pv_forecast.append(current_hour_energy)
-            # logger.debug("[PV-IF] Open-Meteo PV forecast (Wh): %
 
-            # logger.debug(
-            #     "[PV-IF] Forecast.Solar PV forecast (Wh) (length: %s): %s",
-            #     len(pv_forecast),
-            #     pv_forecast,
-            # )
+            logger.debug(
+                "[PV-IF] Openmeteo Lib PV forecast (Wh) (length: %s): %s",
+                len(pv_forecast),
+                pv_forecast,
+            )
             return pv_forecast
 
     def __get_pv_forecast_forecast_solar_api(self, pv_config_entry, hours=48):
@@ -756,10 +775,11 @@ class PvInterface:
         """
         self.config_source["source"] = "akkudoktor"
         pv_forcast_array1 = self.get_summarized_pv_forecast(48)
+        # print("[PV-IF] PV forecast (Akkudoktor):", pv_forcast_array1)
         self.config_source["source"] = "openmeteo"
         pv_forcast_array2 = self.get_summarized_pv_forecast(48)
-        # self.config_source["source"] = "forecast_solar"
-        # pv_forcast_array3 = self.get_summarized_pv_forecast(48)
+        self.config_source["source"] = "forecast_solar"
+        pv_forcast_array3 = self.get_summarized_pv_forecast(48)
 
         # print out to csv file - first column is the hour, second column is the value
         # Set start to today at midnight in the configured timezone
@@ -776,7 +796,7 @@ class PvInterface:
                 ),
                 "Akkudoktor": pv_forcast_array1,
                 "OpenMeteo": pv_forcast_array2,
-                # "ForecastSolar": pv_forcast_array3,
+                "ForecastSolar": pv_forcast_array3,
             }
         )
         df.set_index("Hour", inplace=True)

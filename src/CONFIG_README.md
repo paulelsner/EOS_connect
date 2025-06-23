@@ -145,10 +145,11 @@ This section contains two subsections:
 - `pv_forecast`
 
 `pv_forecast_source` section declares the provider of solar forecast that should be used. Available providers are
-- akkudoktor - https://api.akkudoktor.net/ - direct request and results
-- openmeteo - https://open-meteo.com/en/docs - gathering radiation and cloudcover data and calculating locally with an own model
-- forecast_solar - https://doc.forecast.solar/api - direct request and results
-default (uses akkudoktor by default)
+- `akkudoktor` - https://api.akkudoktor.net/ - direct request and results
+- `openmeteo` - https://open-meteo.com/en/docs - uses the [open-meteo-solar-forecast](https://github.com/rany2/open-meteo-solar-forecast) (no horizon possible by the lib at this time)
+- `openmeteo_local` - https://open-meteo.com/en/docs - gathering radiation and cloudcover data and calculating locally with an own model - still in dev to improve the calculation
+- `forecast_solar` - https://doc.forecast.solar/api - direct request and results
+default is uses akkudoktor
 
 `pv_forecast` section allows you to define multiple PV forecast entries, each distinguished by a user-given name. Below is an example of a default PV forecast configuration:
 

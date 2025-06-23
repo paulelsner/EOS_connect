@@ -210,11 +210,15 @@ battery_interface = BatteryInterface(
 price_interface = PriceInterface(config_manager.config["price"])
 
 pv_interface = PvInterface(
-    config_manager.config["pv_forecast_source"], config_manager.config["pv_forecast"]
+    config_manager.config["pv_forecast_source"],
+    config_manager.config["pv_forecast"],
+    config_manager.config.get("time_zone", "UTC"),
 )
 
-time.sleep(10)  # wait for the interfaces to initialize
+time.sleep(5)  # wait for the interfaces to initialize
 
+# pv_interface.test_output()
+# sys.exit(0)  # exit if the interfaces are not initialized correctly
 
 # summarize all date
 def create_optimize_request():

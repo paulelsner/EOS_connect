@@ -85,7 +85,7 @@ class ConfigManager:
                 ),
                 "pv_forecast_source": CommentedMap(
                         {
-                            "source": "akkudoktor",  # openmeteo # forecast_solar # akkudoktor
+                            "source": "akkudoktor",  # openmeteo, openmeteo_local, forecast_solar, akkudoktor
                         }
                 ),
                 "pv_forecast": [
@@ -93,14 +93,13 @@ class ConfigManager:
                         {
                             "name": "myPvInstallation1",  # Placeholder for user-defined
                             # configuration name
-                            "lat": 47.5,  # Latitude for PV forecast @ Akkudoktor API
-                            "lon": 8.5,  # Longitude for PV forecast @ Akkudoktor API
-                            "azimuth": 90.0,  # Azimuth for PV forecast @ Akkudoktor API
-                            "tilt": 30.0,  # Tilt for PV forecast @ Akkudoktor API
+                            "lat": 47.5,  # Latitude for PV forecast
+                            "lon": 8.5,  # Longitude for PV forecast
+                            "azimuth": 90.0,  # Azimuth for PV forecast
+                            "tilt": 30.0,  # Tilt for PV forecast
                             "power": 4600,  # Power of PV system in Wp
                             "powerInverter": 5000,  # Inverter Power
-                            "inverterEfficiency": 0.9,  # Inverter Efficiency for
-                            # PV forecast @ Akkudoktor API
+                            "inverterEfficiency": 0.9,  # Inverter Efficiency for PV forecast
                             "horizon": "10,20,10,15",  # Horizon to calculate shading
                         }
                     )
@@ -250,8 +249,8 @@ class ConfigManager:
             "pv_forecast_source", before="pv forecast source configuration"
         )
         config["pv_forecast_source"].yaml_add_eol_comment(
-            "data source for solar forecast providers akkudoktor, openmeteo,"
-            + " forecast_solar, default (default uses akkudoktor)",
+            "data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local,"
+            + " forecast_solar, (default uses akkudoktor)",
             "source",
         )
         # pv forecast configuration
@@ -269,25 +268,25 @@ class ConfigManager:
                 "name",
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Latitude for PV forecast @ Akkudoktor API", "lat"
+                "Latitude for PV forecast", "lat"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Longitude for PV forecast @ Akkudoktor API", "lon"
+                "Longitude for PV forecast", "lon"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Azimuth for PV forecast @ Akkudoktor API", "azimuth"
+                "Azimuth for PV forecast", "azimuth"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Tilt for PV forecast @ Akkudoktor API", "tilt"
+                "Tilt for PV forecast", "tilt"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Power for PV forecast @ Akkudoktor API", "power"
+                "Power for PV forecast", "power"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Power Inverter for PV forecast @ Akkudoktor API", "powerInverter"
+                "Power Inverter for PV forecast", "powerInverter"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Inverter Efficiency for PV forecast @ Akkudoktor API",
+                "Inverter Efficiency for PV forecast",
                 "inverterEfficiency",
             )
             config["pv_forecast"][index].yaml_add_eol_comment(

@@ -152,11 +152,20 @@ class EosInterface:
             return {"error": "Request timed out - trying again with next run"}
         except requests.exceptions.RequestException as e:
             logger.error(
-                "[EOS] OPTIMIZE Request failed: %s - response: %s", e, response.text
+                "[EOS] OPTIMIZE Request failed: %s - response: %s", e, response
             )
             logger.debug(
-                "[EOS] The payload for the optimization request was: %s", payload
+                "[EOS] OPTIMIZE ERROR - payload for the request was:"+
+                "\n---REQUEST--------------------------------------------------\n %s"+
+                "\n------------------------------------------------------------",
+                payload
             )
+            logger.debug(
+                "[EOS] OPTIMIZE ERROR - response of EOS is:"+
+                "\n---RESPONSE-------------------------------------------------\n %s"+
+                "\n------------------------------------------------------------",
+                 response.text
+            )            
             return {"error": str(e)}
 
     def examine_response_to_control_data(self, optimized_response_in):

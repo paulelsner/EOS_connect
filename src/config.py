@@ -49,7 +49,8 @@ class ConfigManager:
                         # item / entity for additional load power data
                         "additional_load_1_sensor": "additional_load_1_sensor",
                         "additional_load_1_runtime": 0,  # runtime for additional load 1 in minutes
-                        "additional_load_1_consumption": 0,  # consumption for additional load 1 in Wh
+                        "additional_load_1_consumption": 0,  # consumption for
+                        # additional load 1 in Wh
                     }
                 ),
                 "eos": CommentedMap(
@@ -63,7 +64,10 @@ class ConfigManager:
                     {
                         "source": "default",
                         "token": "tibberBearerToken",  # token for electricity price
-                        "fixed_24h_array": "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23,28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,34.28,34.28,34.28,34.28,28,23",  # 24 hours array with fixed end customer prices in ct/kWh over the day
+                         # 24 hours array with fixed end customer prices in ct/kWh over the day
+                        "fixed_24h_array": "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23"+
+                        ",28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,"+
+                        "34.28,34.28,34.28,34.28,28,23",
                         "feed_in_price": 0.0,  # feed in price for the grid
                         "negative_price_switch": False,  # switch for negative price
                     }
@@ -84,9 +88,10 @@ class ConfigManager:
                     }
                 ),
                 "pv_forecast_source": CommentedMap(
-                        {
-                            "source": "akkudoktor",  # openmeteo, openmeteo_local, forecast_solar, akkudoktor
-                        }
+                    {
+                        # openmeteo, openmeteo_local, forecast_solar, akkudoktor
+                        "source": "akkudoktor",  
+                    }
                 ),
                 "pv_forecast": [
                     CommentedMap(
@@ -116,7 +121,9 @@ class ConfigManager:
                 ),
                 "evcc": CommentedMap(
                     {
-                        "url": "http://yourEVCCserver:7070",  # URL to your evcc installation, if not used set to "" or leave as http://yourEVCCserver:7070
+                        # URL to your evcc installation, if not used set to ""
+                        # or leave as http://yourEVCCserver:7070
+                        "url": "http://yourEVCCserver:7070",  
                     }
                 ),
                 "mqtt": CommentedMap(
@@ -159,19 +166,23 @@ class ConfigManager:
             "item / entity for load power data in watts", "load_sensor"
         )
         config["load"].yaml_add_eol_comment(
-            "item / entity for wallbox power data in watts. Leave empty if not used.",
+            'item / entity for wallbox power data in watts. '+
+            '(If not needed, set to `load.car_charge_load_sensor: ""`)',
             "car_charge_load_sensor",
         )
         config["load"].yaml_add_eol_comment(
-            "item / entity for additional load power data in watts. Leave empty if not used.",
+            'item / entity for additional load power data in watts.'+
+            ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_sensor",
         )
         config["load"].yaml_add_eol_comment(
-            "runtime for additional load 1 in minutes - default: 0 (or empty) = not used",
+            'runtime for additional load 1 in minutes - default: 0'+
+            ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_runtime",
         )
         config["load"].yaml_add_eol_comment(
-            "consumption for additional load 1 in Wh - default: 0 (or empty) = not used",
+            'consumption for additional load 1 in Wh - default: 0'+
+            ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_consumption",
         )
 

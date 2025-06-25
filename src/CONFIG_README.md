@@ -306,10 +306,10 @@ load:
   url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:8080 or http://homeassistant:8123)
   access_token: abc123 # access token for homeassistant (optional)
   load_sensor: Load_Power # item / entity for load power data in watts
-  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. Leave empty if not used.
-  additional_load_1_sensor: "additional_load_1_sensor" # item / entity for wallbox power data in watts. Leave empty if not used.
-  additional_load_1_runtime: 2 # runtime for additional load 1 in minutes - default: 0 (or empty) = not used
-  additional_load_1_consumption: 1500 # consumption for additional load 1 in Wh - default: 0 (or empty) = not used
+  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. (If not needed, set to `load.car_charge_load_sensor: ""`)
+  additional_load_1_sensor: "additional_load_1_sensor" # item / entity for wallbox power data in watts. (If not needed set to `additional_load_1_sensor: ""`)
+  additional_load_1_runtime: 2 # runtime for additional load 1 in minutes - default: 0 (If not needed set to `additional_load_1_sensor: ""`)
+  additional_load_1_consumption: 1500 # consumption for additional load 1 in Wh - default: 0 (If not needed set to `additional_load_1_sensor: ""`)
 # EOS server configuration
 eos:
   server: 192.168.1.94  # EOS server address
@@ -385,7 +385,7 @@ log_level: info # Log level for the application : debug, info, warning, error - 
 load:
   source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
   load_sensor: Load_Power # item / entity for load power data in watts
-  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. Leave empty if not used.
+  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. (If not needed, set to `load.car_charge_load_sensor: ""`)
 # EOS server configuration
 eos:
   server: 192.168.1.94  # EOS server address

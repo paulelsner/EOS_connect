@@ -308,6 +308,7 @@ class PriceInterface:
                 "[PRICE-IF] Request timed out while fetching prices from akkudoktor."
                 + " Default prices will be used."
             )
+            self.current_prices_direct = self.default_prices.copy()
             return self.default_prices
         except requests.exceptions.RequestException as e:
             logger.error(
@@ -315,6 +316,7 @@ class PriceInterface:
                 + " Default prices will be used.",
                 e,
             )
+            self.current_prices_direct = self.default_prices.copy()
             return self.default_prices
 
         prices = []

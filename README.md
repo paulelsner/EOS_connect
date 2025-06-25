@@ -148,7 +148,19 @@ Load data is retrieved from the last two days:
 - **Car Load Adjustment**: Similar to Home Assistant, the EV load is subtracted from the household load to isolate non-EV energy consumption.
 
 #### PV Forecast
-PV forecasts are retrieved directly from the [AKKUDOKTOR API](https://api.akkudoktor.net/forecast).
+EOS Connect supports multiple sources for solar (PV) production forecasts. You can choose the provider that best fits your location and needs. The following PV forecast sources are available and configurable:
+
+- **Akkudoktor** (default)  
+  Direct integration with the [Akkudoktor API](https://api.akkudoktor.net/forecast) for reliable PV forecasts.
+
+- **Open-Meteo**  
+  Uses the [Open-Meteo API](https://open-meteo.com/en/docs) and [open-meteo-solar-forecast Python library](https://github.com/rany2/open-meteo-solar-forecast) for library-based calculation
+
+- **Open-Meteo Local**  
+  Gathers radiation and cloud cover data from Open-Meteo and calculates PV output locally using an own model (experimental).
+
+- **Forecast.Solar**  
+  Connects to the [Forecast.Solar API](https://doc.forecast.solar/api) for detailed PV production forecasts.
 
 #### Energy Price Forecast
 Energy price forecasts are retrieved from the chosen source (TIBBER or AKKUDOKTOR API). **Note**: Prices for tomorrow are available earliest at 1 PM. Until then, today's prices are used to feed the model.

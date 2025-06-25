@@ -29,6 +29,17 @@ import requests
 logger = logging.getLogger("__main__")
 logger.info("[EVCC] loading module ")
 
+# mapping of charging modes to their priorities:
+# off: 0, pv: 1, pvmin: 2, now: 3
+CHARGING_MODE_PRIORITY = {
+    "off": 0,
+    "pv": 1,
+    "minpv": 2,
+    "pv+now": 3,
+    "minpv+now": 4,
+    "now": 5,
+}
+
 
 class EvccInterface:
     """
@@ -58,7 +69,9 @@ class EvccInterface:
         fetch_evcc_state_via_api():
     """
 
-    def __init__(self, url, ext_bat_mode=False, update_interval=15, on_charging_state_change=None):
+    def __init__(
+        self, url, ext_bat_mode=False, update_interval=15, on_charging_state_change=None
+    ):
         """
         Initializes the EVCC interface and starts the update service.
 
@@ -74,19 +87,23 @@ class EvccInterface:
         self.last_known_charging_state = False
         # off, pv, pvmin, now
         self.last_known_charging_mode = None
-        self.current_detail_data = {
-            "connected": False,
-            "chargeDuration": 0,
-            "chargeRemainingDuration": 0,
-            "chargedEnergy": 0,
-            "chargeRemainingEnergy": 0,
-            "sessionEnergy": 0,
-            "vehicleSoc": 0,
-            "vehicleRange": 0,
-            "vehicleOdometer": 0,
-            "vehicleName": "",
-            "smartCostActive": False,
-        }
+        self.current_detail_data_list = [
+            {
+                "connected": False,
+                "charging": False,
+                "mode": "off",
+                "chargeDuration": 0,
+                "chargeRemainingDuration": 0,
+                "chargedEnergy": 0,
+                "chargeRemainingEnergy": 0,
+                "sessionEnergy": 0,
+                "vehicleSoc": 0,
+                "vehicleRange": 0,
+                "vehicleOdometer": 0,
+                "vehicleName": "",
+                "smartCostActive": False,
+            }
+        ]
         self.external_battery_mode_en = ext_bat_mode
         self.external_battery_mode = "off"  # Default mode
         self.update_interval = update_interval
@@ -163,7 +180,7 @@ class EvccInterface:
         """
         Returns the current detail data of the EVCC.
         """
-        return self.current_detail_data
+        return self.current_detail_data_list
 
     def start_update_service(self):
         """
@@ -194,8 +211,16 @@ class EvccInterface:
         """
         while not self._stop_event.is_set():
             try:
-                self.__request_charging_state()
-                if self.external_battery_mode_en and self.external_battery_mode != "off":
+                loadpoints, vehicles = self.__get_evcc_loadpoints_vehicles()
+                self.__get_states_of_loadpoints(loadpoints, vehicles)
+
+                sum_states = self.__get_states_modes_of_connected_loadpoints(loadpoints)
+                self.__get_summerized_charging_state_n_mode(sum_states)
+
+                if (
+                    self.external_battery_mode_en
+                    and self.external_battery_mode != "off"
+                ):
                     # Set the external battery mode if it is set
                     self.__set_external_battery_mode_loop()
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
@@ -210,78 +235,124 @@ class EvccInterface:
 
         self.start_update_service()
 
-    def __request_charging_state(self):
-        """
-        Fetches the EVCC state from the API and updates the charging state and mode.
-        """
+    def __get_evcc_loadpoints_vehicles(self):
         data = self.__fetch_evcc_state_via_api()
         if not data or not isinstance(data.get("result", {}).get("loadpoints"), list):
             logger.error("[EVCC] Invalid or missing loadpoints in the response.")
             return None
-        loadpoint = (
-            data["result"]["loadpoints"][0] if data["result"]["loadpoints"] else None
+        # check if there are more than one loadpoints
+        loadpoints = (
+            data["result"]["loadpoints"] if data["result"]["loadpoints"] else None
         )
-        charging_state = loadpoint.get("charging") if loadpoint else None
-        if not isinstance(charging_state, bool):
-            logger.error("[EVCC] Charging state is not a valid boolean value.")
-            return None
-        # logger.debug("[EVCC] Charging state: %s", charging_state)
-        # Check if the charging state has changed
-        if charging_state != self.last_known_charging_state:
-            logger.info("[EVCC] Charging state changed to: %s", charging_state)
-            self.last_known_charging_state = charging_state
-            # Trigger the callback if provided
-            if self.on_charging_state_change:
-                self.on_charging_state_change(charging_state)
 
-        charging_mode = loadpoint.get("mode") if loadpoint else None
-        if charging_mode not in ["off", "pv", "minpv", "now"]:
-            logger.error(
-                "[EVCC] Charging mode is not a valid state."
-                + " Expected one of ['off', 'pv', 'minpv', 'now']. Got: %s",
-                charging_mode,
+        vehicles = data.get("result", {}).get("vehicles", {})
+
+        return loadpoints, vehicles
+
+    def __get_states_modes_of_connected_loadpoints(self, loadpoints):
+        # check if there are more than one loadpoints
+        collected_states_modes = []
+        if len(loadpoints) > 0:
+            # check for connected loadpoints
+            for lp in loadpoints:
+                if lp.get("connected", False):
+                    # logger.info("[EVCC] Using connected loadpoint: %s", lp.get("title"))
+                    collected_states_modes.append(
+                        {
+                            "charging": lp.get("charging", False),
+                            "mode": lp.get("mode", "off"),
+                            "smartCostActive": lp.get("smartCostActive", False),
+                        }
+                    )
+        # logger.debug(
+        #     "[EVCC] Collected states and modes from connected loadpoints: %s",
+        #     collected_states_modes,
+        # )
+        return collected_states_modes
+
+    def __get_summerized_charging_state_n_mode(self, collected_states_modes):
+
+        sum_mode_priority = 0
+        sum_charging_mode = "off"
+        sum_charging_state = False
+        sum_smart_cost_active = False
+        for entry in collected_states_modes:
+            if entry["charging"]:
+                mode = entry["mode"]
+                sum_charging_state = True
+                if mode in ("pv", "minpv") and entry.get("smartCostActive", False):
+                    mode = mode + "+now"
+                if sum_mode_priority < CHARGING_MODE_PRIORITY[mode]:
+                    sum_mode_priority = CHARGING_MODE_PRIORITY[mode]
+                    sum_charging_mode = mode
+        # if no loadpoints are charging, set charging mode to the first one
+        if sum_charging_state is False:
+            sum_charging_mode = (
+                collected_states_modes[0]["mode"] if collected_states_modes else "off"
             )
-            return None
+            if sum_charging_mode in ("pv", "minpv") and collected_states_modes[0].get(
+                "smartCostActive", False
+            ):
+                sum_charging_mode = sum_charging_mode + "+now"
 
-        vehicle_name = (
-            data.get("result", {})
-            .get("vehicles", {})
-            .get(loadpoint.get("vehicleName", ""), {})
-            .get("title", "")
-        )
-        self.current_detail_data = {
-            "connected": loadpoint.get("connected", False),
-            "chargeDuration": loadpoint.get("chargeDuration", 0),
-            "chargeRemainingDuration": loadpoint.get("chargeRemainingDuration", 0),
-            "chargedEnergy": loadpoint.get("chargedEnergy", 0),
-            "chargeRemainingEnergy": loadpoint.get("chargeRemainingEnergy", 0),
-            "sessionEnergy": loadpoint.get("sessionEnergy", 0),
-            "vehicleSoc": loadpoint.get("vehicleSoc", 0),
-            "vehicleRange": loadpoint.get("vehicleRange", 0),
-            "vehicleOdometer": loadpoint.get("vehicleOdometer", 0),
-            "vehicleName": vehicle_name,
-            "smartCostActive": loadpoint.get("smartCostActive", False),
-        }
-        # override charging mode if pv and smartcost is active
-        if (
-            charging_mode in ("pv", "minpv")
-            and self.current_detail_data["smartCostActive"]
-        ):
-            charging_mode = charging_mode + "+now"
-        logger.debug(
-            "[EVCC] Charging state: %s - Charging mode: %s",
-            charging_mode,
-            charging_state,
-        )
+            logger.debug(
+                "[EVCC] No charging loadpoints found."
+                + " Setting charging mode to first connected loadpoint."
+            )
+
         # Check if the charging state has changed
-        if charging_mode != self.last_known_charging_mode:
-            logger.info("[EVCC] Charging mode changed to: %s", charging_mode)
-            self.last_known_charging_mode = charging_mode
+        if sum_charging_state != self.last_known_charging_state:
+            logger.info("[EVCC] SUM Charging state changed to: %s", sum_charging_state)
+            self.last_known_charging_state = sum_charging_state
             # Trigger the callback if provided
             if self.on_charging_state_change:
-                self.on_charging_state_change(charging_state)
+                self.on_charging_state_change(sum_charging_state)
 
-        return charging_state, charging_mode
+        logger.debug(
+            "[EVCC] SUM Charging state: %s - Charging mode: %s - SmartCostActive: %s",
+            sum_charging_state,
+            sum_charging_mode,
+            sum_smart_cost_active,
+        )
+        # Check if the charging state has changed
+        if sum_charging_mode != self.last_known_charging_mode:
+            logger.info("[EVCC] SUM Charging mode changed to: %s", sum_charging_mode)
+            self.last_known_charging_mode = sum_charging_mode
+            # Trigger the callback if provided
+            if self.on_charging_state_change:
+                self.on_charging_state_change(sum_charging_state)
+
+        return sum_charging_state, sum_charging_mode
+
+    def __get_states_of_loadpoints(self, loadpoints, vehicles):
+        """
+        Fetches the EVCC state from the API and updates the charging state and mode.
+        """
+        self.current_detail_data_list = []
+        for loadpoint in loadpoints:
+            vehicle_name = vehicles.get(loadpoint.get("vehicleName", ""), {}).get(
+                "title", ""
+            )
+            mode = loadpoint.get("mode", "off")
+            if mode in ("pv", "minpv") and loadpoint.get("smartCostActive", False):
+                mode = mode + "+now"
+            detail_data = {
+                "connected": loadpoint.get("connected", False),
+                "charging": loadpoint.get("charging", False),
+                "mode": mode,
+                "chargeDuration": loadpoint.get("chargeDuration", 0),
+                "chargeRemainingDuration": loadpoint.get("chargeRemainingDuration", 0),
+                "chargedEnergy": loadpoint.get("chargedEnergy", 0),
+                "chargeRemainingEnergy": loadpoint.get("chargeRemainingEnergy", 0),
+                "sessionEnergy": loadpoint.get("sessionEnergy", 0),
+                "vehicleSoc": loadpoint.get("vehicleSoc", 0),
+                "vehicleRange": loadpoint.get("vehicleRange", 0),
+                "vehicleOdometer": loadpoint.get("vehicleOdometer", 0),
+                "vehicleName": vehicle_name,
+                "smartCostActive": loadpoint.get("smartCostActive", False),
+            }
+            self.current_detail_data_list.append(detail_data)
+        return True
 
     def __fetch_evcc_state_via_api(self):
         """

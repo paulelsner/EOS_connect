@@ -49,7 +49,8 @@ class ConfigManager:
                         # item / entity for additional load power data
                         "additional_load_1_sensor": "additional_load_1_sensor",
                         "additional_load_1_runtime": 0,  # runtime for additional load 1 in minutes
-                        "additional_load_1_consumption": 0,  # consumption for additional load 1 in Wh
+                        "additional_load_1_consumption": 0,  # consumption for
+                        # additional load 1 in Wh
                     }
                 ),
                 "eos": CommentedMap(
@@ -63,7 +64,10 @@ class ConfigManager:
                     {
                         "source": "default",
                         "token": "tibberBearerToken",  # token for electricity price
-                        "fixed_24h_array": "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23,28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,34.28,34.28,34.28,34.28,28,23",  # 24 hours array with fixed end customer prices in ct/kWh over the day
+                         # 24 hours array with fixed end customer prices in ct/kWh over the day
+                        "fixed_24h_array": "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23"+
+                        ",28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,"+
+                        "34.28,34.28,34.28,34.28,28,23",
                         "feed_in_price": 0.0,  # feed in price for the grid
                         "negative_price_switch": False,  # switch for negative price
                     }
@@ -83,20 +87,25 @@ class ConfigManager:
                         "price_euro_per_wh_accu": 0.0,  # price for battery in euro/kWh
                     }
                 ),
+                "pv_forecast_source": CommentedMap(
+                    {
+                        # openmeteo, openmeteo_local, forecast_solar, akkudoktor
+                        "source": "akkudoktor",  
+                    }
+                ),
                 "pv_forecast": [
                     CommentedMap(
                         {
                             "name": "myPvInstallation1",  # Placeholder for user-defined
                             # configuration name
-                            "lat": 47.5,  # Latitude for PV forecast @ Akkudoktor API
-                            "lon": 8.5,  # Longitude for PV forecast @ Akkudoktor API
-                            "azimuth": 90.0,  # Azimuth for PV forecast @ Akkudoktor API
-                            "tilt": 30.0,  # Tilt for PV forecast @ Akkudoktor API
+                            "lat": 47.5,  # Latitude for PV forecast
+                            "lon": 8.5,  # Longitude for PV forecast
+                            "azimuth": 90.0,  # Azimuth for PV forecast
+                            "tilt": 30.0,  # Tilt for PV forecast
                             "power": 4600,  # Power of PV system in Wp
                             "powerInverter": 5000,  # Inverter Power
-                            "inverterEfficiency": 0.9,  # Inverter Efficiency for
-                            # PV forecast @ Akkudoktor API
-                            "horizont": "10,20,10,15",  # Horizont to calculate shading
+                            "inverterEfficiency": 0.9,  # Inverter Efficiency for PV forecast
+                            "horizon": "10,20,10,15",  # Horizon to calculate shading
                         }
                     )
                 ],
@@ -112,7 +121,9 @@ class ConfigManager:
                 ),
                 "evcc": CommentedMap(
                     {
-                        "url": "http://yourEVCCserver:7070",  # URL to your evcc installation, if not used set to "" or leave as http://yourEVCCserver:7070
+                        # URL to your evcc installation, if not used set to ""
+                        # or leave as http://yourEVCCserver:7070
+                        "url": "http://yourEVCCserver:7070",  
                     }
                 ),
                 "mqtt": CommentedMap(
@@ -155,19 +166,23 @@ class ConfigManager:
             "item / entity for load power data in watts", "load_sensor"
         )
         config["load"].yaml_add_eol_comment(
-            "item / entity for wallbox power data in watts. Leave empty if not used.",
+            'item / entity for wallbox power data in watts. '+
+            '(If not needed, set to `load.car_charge_load_sensor: ""`)',
             "car_charge_load_sensor",
         )
         config["load"].yaml_add_eol_comment(
-            "item / entity for additional load power data in watts. Leave empty if not used.",
+            'item / entity for additional load power data in watts.'+
+            ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_sensor",
         )
         config["load"].yaml_add_eol_comment(
-            "runtime for additional load 1 in minutes - default: 0 (or empty) = not used",
+            'runtime for additional load 1 in minutes - default: 0'+
+            ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_runtime",
         )
         config["load"].yaml_add_eol_comment(
-            "consumption for additional load 1 in Wh - default: 0 (or empty) = not used",
+            'consumption for additional load 1 in Wh - default: 0'+
+            ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_consumption",
         )
 
@@ -240,6 +255,15 @@ class ConfigManager:
         config["battery"].yaml_add_eol_comment(
             "price for battery in euro/kWh - default: 0.0", "price_euro_per_wh_accu"
         )
+        # pv forecast source configuration
+        config.yaml_set_comment_before_after_key(
+            "pv_forecast_source", before="pv forecast source configuration"
+        )
+        config["pv_forecast_source"].yaml_add_eol_comment(
+            "data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local,"
+            + " forecast_solar, (default uses akkudoktor)",
+            "source",
+        )
         # pv forecast configuration
         config.yaml_set_comment_before_after_key(
             "pv_forecast",
@@ -255,31 +279,31 @@ class ConfigManager:
                 "name",
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Latitude for PV forecast @ Akkudoktor API", "lat"
+                "Latitude for PV forecast", "lat"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Longitude for PV forecast @ Akkudoktor API", "lon"
+                "Longitude for PV forecast", "lon"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Azimuth for PV forecast @ Akkudoktor API", "azimuth"
+                "Azimuth for PV forecast", "azimuth"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Tilt for PV forecast @ Akkudoktor API", "tilt"
+                "Tilt for PV forecast", "tilt"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Power for PV forecast @ Akkudoktor API", "power"
+                "Power for PV forecast", "power"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Power Inverter for PV forecast @ Akkudoktor API", "powerInverter"
+                "Power Inverter for PV forecast", "powerInverter"
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Inverter Efficiency for PV forecast @ Akkudoktor API",
+                "Inverter Efficiency for PV forecast",
                 "inverterEfficiency",
             )
             config["pv_forecast"][index].yaml_add_eol_comment(
-                "Horizont to calculate shading up to 360 values"
-                + " to describe shading situation for your PV.",
-                "horizont",
+                "Horizon to calculate shading, up to 360 values"
+                + " to describe the shading situation for your PV.",
+                "horizon",
             )
         # inverter configuration
         config.yaml_set_comment_before_after_key(

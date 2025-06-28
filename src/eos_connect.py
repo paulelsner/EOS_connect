@@ -215,7 +215,10 @@ pv_interface = PvInterface(
     config_manager.config.get("time_zone", "UTC"),
 )
 
-time.sleep(5)  # wait for the interfaces to initialize
+# wait for the interfaces to initialize - depend on entries for pv_forecast
+init_time = 3 + 1 * len(config_manager.config["pv_forecast"])
+logger.info("[Main] Waiting %s seconds for interfaces to initialize", init_time)
+time.sleep(init_time)
 
 # pv_interface.test_output()
 # sys.exit(0)  # exit if the interfaces are not initialized correctly

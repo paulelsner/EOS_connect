@@ -240,7 +240,7 @@ Energy price forecasts are retrieved from the chosen source (TIBBER or AKKUDOKTO
 
 The dashbaord of **EOS connect** is available at `http://localhost:8081`.
 
-![webpage screenshot](doc/screenshot_0.1.20.PNG)
+![webpage screenshot](doc/screenshot_0_1_20.png)
 
 ## Provided Data per **EOS connect** API
 

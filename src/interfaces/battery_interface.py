@@ -63,15 +63,15 @@ class BatteryInterface:
             Fetches the current SOC of the battery based on the configured source.
     """
 
-    def __init__(self, src, url, soc_sensor, access_token, battery_data, on_bat_max_changed=None):
-        self.src = src
-        self.url = url
-        self.soc_sensor = soc_sensor
-        self.access_token = access_token
-        self.max_charge_power_fix = battery_data.get("max_charge_power_w", 0)
+    def __init__(self, config, on_bat_max_changed=None):
+        self.src = config.get("source", "default")
+        self.url = config.get("url", "")
+        self.soc_sensor = config.get("soc_sensor", "")
+        self.access_token = config.get("access_token", "")
+        self.max_charge_power_fix = config.get("max_charge_power_w", 1000)
+        self.battery_data = config
         self.max_charge_power_dyn = 0
         self.last_max_charge_power_dyn = 0
-        self.battery_data = battery_data
         self.current_soc = 0
         self.current_usable_capacity = 0
         self.on_bat_max_changed = on_bat_max_changed
@@ -225,6 +225,13 @@ class BatteryInterface:
         Returns:
             float: The dynamically calculated maximum charge power in watts.
         """
+        if not self.battery_data.get("charging_curve_enabled", True):
+            self.max_charge_power_dyn = self.max_charge_power_fix
+            logger.debug(
+                "[BATTERY-IF] Charging curve is disabled, using fixed max charge power."
+            )
+            return
+
         if soc is None:
             soc = self.current_soc
 
@@ -313,7 +320,7 @@ class BatteryInterface:
                     / 100
                 )
                 self.__get_max_charge_power_dyn()
-                
+
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 logger.error("[BATTERY-IF] Error while updating state: %s", e)
                 # Break the sleep interval into smaller chunks to allow immediate shutdown

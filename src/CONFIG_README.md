@@ -81,6 +81,8 @@ A default config file will be created with the first start, if there is no `conf
 
 ### Electricity Price Configuration
 
+**Important: All price values must use the same base - either all prices include taxes and fees, or all prices exclude taxes and fees. Mixing different bases will lead to incorrect optimization results.**
+
 - **`price.source`**:  
   Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`fixed_24h`,`default` (default uses akkudoktor API).
 
@@ -90,11 +92,14 @@ A default config file will be created with the first start, if there is no `conf
 - **`price.fixed_24h_array`**:
   24 hours array with fixed end customer prices in ct/kWh over the day.
   - Leave empty if not set source to `fixed_24h`.
+  - **Important**: Ensure these prices use the same tax/fee basis as your `feed_in_price`.
   - e.g. 10.42, 10.42, 10.42, 10.42, 10.42, 23.52, 28.17, 28.17, 28.17, 28.17, 28.17, 23.52, 23.52, 23.52, 23.52, 28.17, 28.17, 34.28, 34.28, 34.28, 34.28, 34.28, 28.17, 23.52 means 10.42 ct/kWh from 00 - 01 hour (config entry have to be without any brackets)
   - (If not needed set to `fixed_24h_array: ""`.)
 
 - **`price.feed_in_price`**:  
-  Feed-in price for the grid, in €/kWh. (If not needed, set to `feed_in_price: ""`)
+  Feed-in price for the grid, in €/kWh. Single constant value for the whole day (e.g., `0.08` for 8 ct/kWh).
+  - **Important**: Must use the same tax/fee basis as your electricity purchase prices from your chosen source or `fixed_24h_array`.
+  - (If not needed, set to `feed_in_price: ""`)
 
 - **`price.negative_price_switch`**:  
   Switch for handling negative electricity prices.  

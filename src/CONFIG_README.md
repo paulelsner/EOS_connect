@@ -49,14 +49,21 @@ A default config file will be created with the first start, if there is no `conf
 - **`load.load_sensor`**:  
   Item/entity name for load power data (OpenHAB item/Home Assistant sensor).
   Must be in watts. It's mandatory if not choosen 'default' as source.
+  - Accepts positive (consumption) or negative (feed-in) values
+  - All values converted internally to absolute positive values
+  - Should represent the overall net household load
+  
 
 - **`load.car_charge_load_sensor`**:  
   Item/entity name for wallbox power data. 
   Must be in watts. (If not needed, set to `load.car_charge_load_sensor: ""`)
+  - When configured, this load is subtracted from the main load sensor
+  - Helps separate controllable EV charging from base household consumption
 
 - **`additional_load_1_sensor`**:
-  Item / entity for additional load power data. e.g. heatpump or dishwasher - this energy will also removed from optimization load prediction.
+  Item / entity for additional load power data. e.g. heatpump or dishwasher.
   Must be in watts. (If not needed set to `additional_load_1_sensor: ""`)
+  - Also subtracted from main load for more accurate base load calculation
 
 - **`additional_load_1_runtime`**:
   Runtime of additional load 1 in hours. Set to 0 if not needed. (If not needed, set to `additional_load_1_runtime: ""`)

@@ -208,6 +208,11 @@ Load data is retrieved from:
 - Tomorrow one week ago, averaged with tomorrow two weeks ago.
 - **Car Load Adjustment**: If an electric vehicle (EV) is/ was connected, its load is subtracted from the household load to ensure accurate forecasting of non-EV energy consumption.
 
+**Load Sensor Requirements:**
+- **Data Quality**: The sensor must provide numeric values and in unit 'watts'.
+- **Value Handling**: EOS Connect accepts both positive and negative values from your sensor. For the internal processing: all values are converted to absolute positive values for load calculations.
+- **Sensor Types**: Use sensors representing the overall net household consumption. Expected that all additonal loads as ev charge or an optional load are included here.
+
 (See [Home Assistant Persistance](#home-assistant-persistance) for more details.)
 
 #### OpenHAB

@@ -199,11 +199,7 @@ load_interface = LoadInterface(
 )
 
 battery_interface = BatteryInterface(
-    config_manager.config.get("battery", {}).get("source", ""),
-    config_manager.config.get("battery", {}).get("url", ""),
-    config_manager.config.get("battery", {}).get("soc_sensor", ""),
-    config_manager.config.get("battery", {}).get("access_token", ""),
-    config_manager.config.get("battery", {}),
+    config_manager.config["battery"],
     on_bat_max_changed=None,
 )
 

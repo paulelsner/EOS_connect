@@ -49,14 +49,21 @@ A default config file will be created with the first start, if there is no `conf
 - **`load.load_sensor`**:  
   Item/entity name for load power data (OpenHAB item/Home Assistant sensor).
   Must be in watts. It's mandatory if not choosen 'default' as source.
+  - Accepts positive (consumption) or negative (feed-in) values
+  - All values converted internally to absolute positive values
+  - Should represent the overall net household load
+  
 
 - **`load.car_charge_load_sensor`**:  
   Item/entity name for wallbox power data. 
   Must be in watts. (If not needed, set to `load.car_charge_load_sensor: ""`)
+  - When configured, this load is subtracted from the main load sensor
+  - Helps separate controllable EV charging from base household consumption
 
 - **`additional_load_1_sensor`**:
-  Item / entity for additional load power data. e.g. heatpump or dishwasher - this energy will also removed from optimization load prediction.
+  Item / entity for additional load power data. e.g. heatpump or dishwasher.
   Must be in watts. (If not needed set to `additional_load_1_sensor: ""`)
+  - Also subtracted from main load for more accurate base load calculation
 
 - **`additional_load_1_runtime`**:
   Runtime of additional load 1 in hours. Set to 0 if not needed. (If not needed, set to `additional_load_1_runtime: ""`)
@@ -81,6 +88,8 @@ A default config file will be created with the first start, if there is no `conf
 
 ### Electricity Price Configuration
 
+**Important: All price values must use the same base - either all prices include taxes and fees, or all prices exclude taxes and fees. Mixing different bases will lead to incorrect optimization results.**
+
 - **`price.source`**:  
   Data source for electricity prices. Possible values: `tibber`, `smartenergy_at`,`fixed_24h`,`default` (default uses akkudoktor API).
 
@@ -90,11 +99,14 @@ A default config file will be created with the first start, if there is no `conf
 - **`price.fixed_24h_array`**:
   24 hours array with fixed end customer prices in ct/kWh over the day.
   - Leave empty if not set source to `fixed_24h`.
+  - **Important**: Ensure these prices use the same tax/fee basis as your `feed_in_price`.
   - e.g. 10.42, 10.42, 10.42, 10.42, 10.42, 23.52, 28.17, 28.17, 28.17, 28.17, 28.17, 23.52, 23.52, 23.52, 23.52, 28.17, 28.17, 34.28, 34.28, 34.28, 34.28, 34.28, 28.17, 23.52 means 10.42 ct/kWh from 00 - 01 hour (config entry have to be without any brackets)
   - (If not needed set to `fixed_24h_array: ""`.)
 
 - **`price.feed_in_price`**:  
-  Feed-in price for the grid, in €/kWh. (If not needed, set to `feed_in_price: ""`)
+  Feed-in price for the grid, in €/kWh. Single constant value for the whole day (e.g., `0.08` for 8 ct/kWh).
+  - **Important**: Must use the same tax/fee basis as your electricity purchase prices from your chosen source or `fixed_24h_array`.
+  - (If not needed, set to `feed_in_price: ""`)
 
 - **`price.negative_price_switch`**:  
   Switch for handling negative electricity prices.  
@@ -139,6 +151,12 @@ A default config file will be created with the first start, if there is no `conf
 
 - **`price_euro_per_wh_accu`**:
   Price for battery in €/Wh - can be used to shift the result over the day according to the available energy (more details follow).
+
+- **`battery.charging_curve_enabled`**:  
+  Enables or disables the dynamic charging curve for the battery.  
+  - `true`: The system will automatically reduce the maximum charging power as the battery SOC increases, helping to protect battery health and optimize efficiency.  
+  - `false`: The battery will always charge at the configured maximum power, regardless of SOC.  
+  - **Default:** `true`
 
 ---
 
@@ -335,6 +353,7 @@ battery:
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
   price_euro_per_wh_accu: 0 # price for battery in €/Wh
+  charging_curve_enabled: true # enable dynamic charging curve for battery
 # List of PV forecast source configuration
 pv_forecast_source:
   source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, forecast_solar, default (default uses akkudoktor)
@@ -404,6 +423,7 @@ battery:
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
   price_euro_per_wh_accu: 0 # price for battery in €/Wh
+  charging_curve_enabled: true # enable dynamic charging curve for battery
 # List of PV forecast source configuration
 pv_forecast_source:
   source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, forecast_solar, default (default uses akkudoktor)

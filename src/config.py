@@ -64,10 +64,10 @@ class ConfigManager:
                     {
                         "source": "default",
                         "token": "tibberBearerToken",  # token for electricity price
-                         # 24 hours array with fixed end customer prices in ct/kWh over the day
-                        "fixed_24h_array": "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23"+
-                        ",28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,"+
-                        "34.28,34.28,34.28,34.28,28,23",
+                        # 24 hours array with fixed end customer prices in ct/kWh over the day
+                        "fixed_24h_array": "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23"
+                        + ",28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,"
+                        + "34.28,34.28,34.28,34.28,28,23",
                         "feed_in_price": 0.0,  # feed in price for the grid
                         "negative_price_switch": False,  # switch for negative price
                     }
@@ -85,12 +85,13 @@ class ConfigManager:
                         "min_soc_percentage": 5,
                         "max_soc_percentage": 100,
                         "price_euro_per_wh_accu": 0.0,  # price for battery in euro/kWh
+                        "charging_curve_enabled": True,  # enable charging curve
                     }
                 ),
                 "pv_forecast_source": CommentedMap(
                     {
                         # openmeteo, openmeteo_local, forecast_solar, akkudoktor
-                        "source": "akkudoktor",  
+                        "source": "akkudoktor",
                     }
                 ),
                 "pv_forecast": [
@@ -123,7 +124,7 @@ class ConfigManager:
                     {
                         # URL to your evcc installation, if not used set to ""
                         # or leave as http://yourEVCCserver:7070
-                        "url": "http://yourEVCCserver:7070",  
+                        "url": "http://yourEVCCserver:7070",
                     }
                 ),
                 "mqtt": CommentedMap(
@@ -166,23 +167,23 @@ class ConfigManager:
             "item / entity for load power data in watts", "load_sensor"
         )
         config["load"].yaml_add_eol_comment(
-            'item / entity for wallbox power data in watts. '+
-            '(If not needed, set to `load.car_charge_load_sensor: ""`)',
+            "item / entity for wallbox power data in watts. "
+            + '(If not needed, set to `load.car_charge_load_sensor: ""`)',
             "car_charge_load_sensor",
         )
         config["load"].yaml_add_eol_comment(
-            'item / entity for additional load power data in watts.'+
-            ' (If not needed set to `additional_load_1_sensor: ""`)',
+            "item / entity for additional load power data in watts."
+            + ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_sensor",
         )
         config["load"].yaml_add_eol_comment(
-            'runtime for additional load 1 in minutes - default: 0'+
-            ' (If not needed set to `additional_load_1_sensor: ""`)',
+            "runtime for additional load 1 in minutes - default: 0"
+            + ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_runtime",
         )
         config["load"].yaml_add_eol_comment(
-            'consumption for additional load 1 in Wh - default: 0'+
-            ' (If not needed set to `additional_load_1_sensor: ""`)',
+            "consumption for additional load 1 in Wh - default: 0"
+            + ' (If not needed set to `additional_load_1_sensor: ""`)',
             "additional_load_1_consumption",
         )
 
@@ -255,6 +256,12 @@ class ConfigManager:
         config["battery"].yaml_add_eol_comment(
             "price for battery in euro/kWh - default: 0.0", "price_euro_per_wh_accu"
         )
+        config["battery"].yaml_add_eol_comment(
+            "enabling charging curve for controlled charging power"+
+            " according to the SOC (default: true)",
+            "charging_curve_enabled",
+        )
+
         # pv forecast source configuration
         config.yaml_set_comment_before_after_key(
             "pv_forecast_source", before="pv forecast source configuration"

@@ -366,7 +366,7 @@ class FroniusWR:
 
         self.inverter_current_data = {
             "DEVICE_TEMPERATURE_AMBIENTEMEAN_F32": round(
-                result.get("DEVICE_TEMPERATURE_AMBIENTEMEAN_F32", 0), 2
+                result.get("DEVICE_TEMPERATURE_AMBIENTMEAN_01_F32", 0), 2
             ),
             "MODULE_TEMPERATURE_MEAN_01_F32": round(
                 result.get("MODULE_TEMPERATURE_MEAN_01_F32", 0), 2

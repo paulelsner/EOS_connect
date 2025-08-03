@@ -77,8 +77,7 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
     - Discharge allowed.
     - EVCC-specific modes (e.g., fast charge, PV mode).
   - **Dynamic Charging Curve**:
-    - Dynamically adjusts the maximum AC charging power based on system conditions.
-    - Ensures efficient and safe battery charging by adapting to real-time energy availability and battery state.
+    - If enabled, EOS Connect automatically adjusts the maximum battery charging power based on the current state of charge (SOC). This helps to optimize battery health and efficiency by reducing charge power as the battery approaches full capacity.
 - **Cost and Solar Optimization**:
   - Aligns energy usage with real-time electricity prices (e.g., from Tibber or [smartenergy.at](https://www.smartenergy.at/)) to minimize costs.
   - Incorporates PV forecasts to prioritize charging during periods of high solar output.
@@ -208,6 +207,11 @@ Load data is retrieved from:
 - Today one week ago, averaged with today two weeks ago.
 - Tomorrow one week ago, averaged with tomorrow two weeks ago.
 - **Car Load Adjustment**: If an electric vehicle (EV) is/ was connected, its load is subtracted from the household load to ensure accurate forecasting of non-EV energy consumption.
+
+**Load Sensor Requirements:**
+- **Data Quality**: The sensor must provide numeric values and in unit 'watts'.
+- **Value Handling**: EOS Connect accepts both positive and negative values from your sensor. For the internal processing: all values are converted to absolute positive values for load calculations.
+- **Sensor Types**: Use sensors representing the overall net household consumption. Expected that all additonal loads as ev charge or an optional load are included here.
 
 (See [Home Assistant Persistance](#home-assistant-persistance) for more details.)
 

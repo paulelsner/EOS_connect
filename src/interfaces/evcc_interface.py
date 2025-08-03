@@ -106,6 +106,14 @@ class EvccInterface:
         ]
         self.external_battery_mode_en = ext_bat_mode
         self.external_battery_mode = "off"  # Default mode
+
+        # Initialize with safe defaults
+        self.last_known_charging_state = False
+        self.last_known_charging_mode = "off"
+        self.current_detail_data_list = self.__get_default_detail_data()
+
+        self.evcc_version = None  # Placeholder for EVCC version if needed
+
         self.update_interval = update_interval
         self.on_charging_state_change = on_charging_state_change  # Store the callback
         self._update_thread = None
@@ -142,12 +150,33 @@ class EvccInterface:
                     response.status_code,
                 )
                 return False
+            response_api = requests.get(self.url + "/api/state", timeout=5)
+            # check if the first entry in JSON is "result"
+            if response_api.status_code == 200:
+                if "result" in response_api.json():
+                    self.evcc_version = (
+                        response_api.json().get("result", {}).get("version", None)
+                    )
+                    logger.info(
+                        "[EVCC] Successfully connected to EVCC server at %s. Old API Version: %s",
+                        self.url,
+                        self.evcc_version,
+                    )
+                else:  # assume new API version
+                    self.evcc_version = response_api.json().get("version", None)
+                    logger.info(
+                        "[EVCC] Successfully connected to EVCC server at %s. New API Version: %s",
+                        self.url,
+                        self.evcc_version,
+                    )
             return True
         except requests.exceptions.ConnectionError as e:
             logger.error(
-                "[EVCC] Connection error while checking EVCC server reachability: %s", e
+                "[EVCC] Connection error while checking EVCC server reachability: %s"
+                + "\n[EVCC] anyway ... starting loop and retrying...",
+                e,
             )
-            return False
+            return True
         except requests.exceptions.Timeout as e:
             logger.error(
                 "[EVCC] Timeout while checking EVCC server reachability: %s", e
@@ -163,6 +192,28 @@ class EvccInterface:
                 "[EVCC] Unexpected error while checking EVCC server reachability: %s", e
             )
             return False
+
+    def __get_default_detail_data(self):
+        """
+        Returns default detail data when EVCC is unreachable.
+        """
+        return [
+            {
+                "connected": False,
+                "charging": False,
+                "mode": "off",
+                "chargeDuration": 0,
+                "chargeRemainingDuration": 0,
+                "chargedEnergy": 0,
+                "chargeRemainingEnergy": 0,
+                "sessionEnergy": 0,
+                "vehicleSoc": 0,
+                "vehicleRange": 0,
+                "vehicleOdometer": 0,
+                "vehicleName": "",
+                "smartCostActive": False,
+            }
+        ]
 
     def get_charging_state(self):
         """
@@ -211,7 +262,20 @@ class EvccInterface:
         """
         while not self._stop_event.is_set():
             try:
-                loadpoints, vehicles = self.__get_evcc_loadpoints_vehicles()
+                result = self.__get_evcc_loadpoints_vehicles()
+                if result is None:
+                    # EVCC server unreachable, use last known values and continue
+                    logger.warning("[EVCC] Server unreachable, using last known values")
+                    # Skip this iteration but don't break the loop
+                    sleep_interval = self.update_interval
+                    while sleep_interval > 0:
+                        if self._stop_event.is_set():
+                            return
+                        time.sleep(min(1, sleep_interval))
+                        sleep_interval -= 1
+                    continue
+
+                loadpoints, vehicles = result
                 self.__get_states_of_loadpoints(loadpoints, vehicles)
 
                 sum_states = self.__get_states_modes_of_connected_loadpoints(loadpoints)
@@ -224,8 +288,12 @@ class EvccInterface:
                     # Set the external battery mode if it is set
                     self.__set_external_battery_mode_loop()
             except (requests.exceptions.RequestException, ValueError, KeyError) as e:
-                logger.error("[EVCC] Error while updating charging state: %s", e)
-                # Break the sleep interval into smaller chunks to allow immediate shutdown
+                logger.error(
+                    "[EVCC] Error while updating charging state: %s."
+                    + " Continuing with last known values",
+                    e,
+                )
+            # Break the sleep interval into smaller chunks to allow immediate shutdown
             sleep_interval = self.update_interval
             while sleep_interval > 0:
                 if self._stop_event.is_set():
@@ -233,19 +301,19 @@ class EvccInterface:
                 time.sleep(min(1, sleep_interval))  # Sleep in 1-second chunks
                 sleep_interval -= 1
 
-        self.start_update_service()
-
     def __get_evcc_loadpoints_vehicles(self):
         data = self.__fetch_evcc_state_via_api()
-        if not data or not isinstance(data.get("result", {}).get("loadpoints"), list):
+        if not data or not isinstance(data.get("loadpoints"), list):
             logger.error("[EVCC] Invalid or missing loadpoints in the response.")
             return None
         # check if there are more than one loadpoints
-        loadpoints = (
-            data["result"]["loadpoints"] if data["result"]["loadpoints"] else None
+        loadpoints = data["loadpoints"] if data["loadpoints"] else None
+        logger.debug(
+            "[EVCC] got 1st loadpoint: %s",
+            loadpoints[0].get("title") if loadpoints else "None",
         )
 
-        vehicles = data.get("result", {}).get("vehicles", {})
+        vehicles = data.get("vehicles", {})
 
         return loadpoints, vehicles
 
@@ -368,11 +436,15 @@ class EvccInterface:
                   or None if the request fails or times out.
         """
         evcc_url = self.url + "/api/state"
-        # logger.debug("[EVCC] fetching evcc state with url: %s", evcc_url)
+        logger.debug("[EVCC] fetching evcc state with url: %s", evcc_url)
         try:
             response = requests.get(evcc_url, timeout=6)
             response.raise_for_status()
-            data = response.json()
+
+            if "result" in response.json():
+                data = response.json()["result"]
+            else:
+                data = response.json()
             # logger.debug("[EVCC] successfully fetched EVCC state")
             return data
         except requests.exceptions.Timeout:

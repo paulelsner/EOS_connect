@@ -25,9 +25,18 @@ from interfaces.price_interface import PriceInterface
 from interfaces.mqtt_interface import MqttInterface
 from interfaces.pv_interface import PvInterface
 
+# Check Python version early
+if sys.version_info < (3, 11):
+    print(
+        (
+            f"ERROR: Python 3.11 or higher is required. "
+            f"You are running Python {sys.version_info.major}.{sys.version_info.minor}"
+        )
+    )
+    print("Please upgrade your Python installation.")
+    sys.exit(1)
+
 EOS_TGT_DURATION = 48
-
-
 ###################################################################################################
 # Custom formatter to use the configured timezone
 class TimezoneFormatter(logging.Formatter):
@@ -218,6 +227,7 @@ time.sleep(init_time)
 
 # pv_interface.test_output()
 # sys.exit(0)  # exit if the interfaces are not initialized correctly
+
 
 # summarize all date
 def create_optimize_request():

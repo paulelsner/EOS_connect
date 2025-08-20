@@ -24,6 +24,7 @@ from interfaces.eos_interface import EosInterface
 from interfaces.price_interface import PriceInterface
 from interfaces.mqtt_interface import MqttInterface
 from interfaces.pv_interface import PvInterface
+from interfaces.port_interface import PortInterface
 
 # Check Python version early
 if sys.version_info < (3, 11):
@@ -1056,21 +1057,49 @@ def handle_mode_override():
 
 
 if __name__ == "__main__":
-    http_server = WSGIServer(
-        ("0.0.0.0", config_manager.config["eos_connect_web_port"]),
-        app,
-        log=None,
-        error_log=logger,
-    )
-
+    http_server = None
     try:
+        # Create web server with port checking
+        HOST = "0.0.0.0"
+        desired_port = config_manager.config["eos_connect_web_port"]
+
+        logger.info("[Main] Initializing EOS Connect web server...")
+        http_server, actual_port = PortInterface.create_web_server_with_port_check(
+            HOST, desired_port, app, logger
+        )
+
+        logger.info(
+            "[Main] EOS Connect web server successfully created on %s:%s",
+            HOST,
+            actual_port,
+        )
+        logger.info(
+            "[Main] Web interface available at: http://localhost:%s", actual_port
+        )
+
+        # Start serving
+        logger.info("[Main] Starting EOS Connect web server...")
         http_server.serve_forever()
+
+    except RuntimeError as e:
+        # PortInterface already provides detailed error messages and solutions
+        logger.error("[Main] %s", str(e))
+        logger.error("[Main] EOS Connect cannot start without its web interface.")
+        sys.exit(1)
+
+    except Exception as e:
+        # Only handle truly unexpected errors (not port-related)
+        logger.error("[Main] Unexpected error: %s", str(e))
+        logger.error("[Main] EOS Connect cannot start. Please check the logs.")
+        sys.exit(1)
+
     except KeyboardInterrupt:
-        logger.info("[Main] Shutting down EOS connect")
+        logger.info("[Main] Shutting down EOS Connect (user requested)")
         optimization_scheduler.shutdown()
         base_control.shutdown()
-        http_server.stop()
-        logger.info("[Main] HTTP server stopped")
+        if http_server:
+            http_server.stop()
+            logger.info("[Main] HTTP server stopped")
 
         # restore the old config
         if (
@@ -1082,7 +1111,7 @@ if __name__ == "__main__":
         mqtt_interface.shutdown()
         evcc_interface.shutdown()
         battery_interface.shutdown()
-        logger.info("[Main] Server stopped")
+        logger.info("[Main] Server stopped gracefully")
     finally:
-        logger.info("[Main] Cleanup complete. Exiting.")
+        logger.info("[Main] Cleanup complete. Goodbye!")
         sys.exit(0)

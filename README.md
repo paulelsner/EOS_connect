@@ -106,6 +106,8 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
   - Supports fast charge, PV charging, and combined modes.
 - **Inverter Interfaces**:
   - OPTION 1: Communicates directly with a Fronius GEN24 to monitor and control energy flows.
+    - `fronius_gen24`: Legacy interface for older firmware versions
+    - `fronius_gen24_v2`: Enhanced interface with improved authentication for firmware 1.36.5-1+ and 1.38.6-1+, including automatic fallback support and better error handling
   - OPTION 2: Use the [evcc external battery control](https://docs.evcc.io/docs/integrations/rest-api) to interact with all inverter/ battery systems that [are supported by evcc](https://docs.evcc.io/en/docs/devices/meters) (hint: the dynamic max charge power is currently not supported by evcc external battery control)
   - OPTION 3: using without a direct control interface to get the resulting commands by **EOS connect** MQTT or web API to control within your own environment (e.g. [Integrate inverter e.g. sungrow SH10RT #35](https://github.com/ohAnd/EOS_connect/discussions/35)  )
   - Retrieves real-time data such as grid charge power, discharge power, and battery SOC.
@@ -123,6 +125,16 @@ This project is in its early stages and is actively being developed and enhanced
 - there were also changes in the API at '<your_ip>:8503' - unfortunately the API is not versioned (*ping* ;-) )
 - to fullfil both versions there is small hack to identify the connected EOS
 - finally the current version can run with both EOS versions
+
+2025-09-06
+
+- Added **Fronius GEN24 V2 Interface** (`fronius_gen24_v2`) with enhanced authentication support:
+  - ✅ **Improved Authentication**: Supports both SHA256 (new firmware) and MD5 (legacy) authentication
+  - ✅ **Firmware Compatibility**: Works with firmware 1.36.5-1+ and 1.38.6-1+ out of the box
+  - ✅ **Automatic Fallback**: Seamlessly falls back from SHA256 to MD5 for older passwords
+  - ✅ **Better Error Handling**: Provides helpful troubleshooting messages for authentication issues
+  - ✅ **100% Backward Compatibility**: Drop-in replacement for `fronius_gen24` interface
+  - **Recommended**: Use `fronius_gen24_v2` for new installations and firmware updates
 
 ---
 
@@ -397,12 +409,12 @@ EOS Connect publishes a wide range of real-time system data and control states t
 | `battery/soc`                                    | `myhome/eos_connect/battery/soc`                              | Float (%)                     | Battery state of charge                                  |
 | `battery/remaining_energy`                        | `myhome/eos_connect/battery/remaining_energy`                  | Integer (Wh)                  | Usable battery capacity                                  |
 | `battery/dyn_max_charge_power`                    | `myhome/eos_connect/battery/dyn_max_charge_power`              | Integer (W)                   | Dynamic max charge power                                 |
-| `inverter/special/temperature_inverter`           | `myhome/eos_connect/inverter/special/temperature_inverter`     | Float (°C)                    | Inverter temperature (if Fronius)                        |
-| `inverter/special/temperature_ac_module`          | `myhome/eos_connect/inverter/special/temperature_ac_module`    | Float (°C)                    | AC module temperature (if Fronius)                       |
-| `inverter/special/temperature_dc_module`          | `myhome/eos_connect/inverter/special/temperature_dc_module`    | Float (°C)                    | DC module temperature (if Fronius)                       |
-| `inverter/special/temperature_battery_module`     | `myhome/eos_connect/inverter/special/temperature_battery_module`| Float (°C)                   | Battery module temperature (if Fronius)                  |
-| `inverter/special/fan_control_01`                 | `myhome/eos_connect/inverter/special/fan_control_01`           | Integer                       | Fan control 1 (if Fronius)                               |
-| `inverter/special/fan_control_02`                 | `myhome/eos_connect/inverter/special/fan_control_02`           | Integer                       | Fan control 2 (if Fronius)                               |
+| `inverter/special/temperature_inverter`           | `myhome/eos_connect/inverter/special/temperature_inverter`     | Float (°C)                    | Inverter temperature (if Fronius V1/V2)                        |
+| `inverter/special/temperature_ac_module`          | `myhome/eos_connect/inverter/special/temperature_ac_module`    | Float (°C)                    | AC module temperature (if Fronius V1/V2)                       |
+| `inverter/special/temperature_dc_module`          | `myhome/eos_connect/inverter/special/temperature_dc_module`    | Float (°C)                    | DC module temperature (if Fronius V1/V2)                       |
+| `inverter/special/temperature_battery_module`     | `myhome/eos_connect/inverter/special/temperature_battery_module`| Float (°C)                   | Battery module temperature (if Fronius V1/V2)                  |
+| `inverter/special/fan_control_01`                 | `myhome/eos_connect/inverter/special/fan_control_01`           | Integer                       | Fan control 1 (if Fronius V1/V2)                               |
+| `inverter/special/fan_control_02`                 | `myhome/eos_connect/inverter/special/fan_control_02`           | Integer                       | Fan control 2 (if Fronius V1/V2)                               |
 | `evcc`                                            | `myhome/eos_connect/evcc`                                      | JSON object                   | Charging state, mode, and session info (if enabled)      |
 | `status`                                          | `myhome/eos_connect/status`                                    | String (`"online"`)           | Always set to `"online"`                                 |
 | `control/eos_ac_charge_demand`                    | `myhome/eos_connect/control/eos_ac_charge_demand`              | Integer (W)                   | AC charge demand                                         |
@@ -418,7 +430,7 @@ EOS Connect publishes a wide range of real-time system data and control states t
 - **Track optimization runs:**
   - Subscribe to `myhome/eos_connect/optimization/last_run` and `myhome/eos_connect/optimization/next_run` for scheduling info.
 - **Visualize inverter temperatures:**
-  - Subscribe to `myhome/eos_connect/inverter/special/temperature_inverter` (if Fronius inverter is connected).
+  - Subscribe to `myhome/eos_connect/inverter/special/temperature_inverter` (if Fronius V1/V2 inverter is connected).
 - **Check if override is active:**
   - Subscribe to `myhome/eos_connect/control/override_active`.
 

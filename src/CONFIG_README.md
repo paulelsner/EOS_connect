@@ -226,18 +226,21 @@ pv_forecast:
 
 - **`inverter.type`**:  
   Specifies the type of inverter. Possible values:  
-  - `fronius_gen24`: Use the Fronius Gen24 inverter.
+  - `fronius_gen24`: Use the Fronius Gen24 inverter (legacy interface).
+  - `fronius_gen24_v2`: Use the Fronius Gen24 inverter (V2 interface with enhanced authentication for firmware 1.36.5-1+ and 1.38.6-1+).
   - `evcc`: Use the universal interface via evcc external battery control (evcc config below has to be valid).
   - `default`: Disable inverter control (only display the target state).
 
 - **`inverter.address`**:  
-  The IP address of the inverter. (only needed for fronius_gen24)
+  The IP address of the inverter. (only needed for fronius_gen24/fronius_gen24_v2)
 
 - **`inverter.user`**:  
-  The username for the inverter's local portal. (only needed for fronius_gen24)
+  The username for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_v2)
 
 - **`inverter.password`**:  
-  The password for the inverter's local portal. (only needed for fronius_gen24)
+  The password for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_v2)
+  
+  **Note for V2 interface**: If you recently updated your inverter firmware to 1.38.6-1+ or newer, you may need to reset your password in the WebUI (http://your-inverter-ip/) under Settings -> User Management. New firmware versions require password reset after updates to enable the improved encryption method.
 
 - **`inverter.max_grid_charge_rate`**:  
   The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)

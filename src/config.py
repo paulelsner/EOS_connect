@@ -317,19 +317,19 @@ class ConfigManager:
             "inverter", before="Inverter configuration"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Type of inverter - fronius_gen24, evcc, default"
+            "Type of inverter - fronius_gen24, fronius_gen24_v2, evcc, default"
             + " (default will disable inverter control -"
             + " only displaying the target state) - preset: default",
             "type",
         )
         config["inverter"].yaml_add_eol_comment(
-            "Address of the inverter (fronius_gen24 only)", "address"
+            "Address of the inverter (fronius_gen24/fronius_gen24_v2 only)", "address"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Username for the inverter (fronius_gen24 only)", "user"
+            "Username for the inverter (fronius_gen24/fronius_gen24_v2 only)", "user"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Password for the inverter (fronius_gen24 only)", "password"
+            "Password for the inverter (fronius_gen24/fronius_gen24_v2 only)", "password"
         )
         config["inverter"].yaml_add_eol_comment(
             "Max inverter grid charge rate in W - default: 5000", "max_grid_charge_rate"

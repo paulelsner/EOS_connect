@@ -19,6 +19,7 @@ from interfaces.base_control import BaseControl
 from interfaces.load_interface import LoadInterface
 from interfaces.battery_interface import BatteryInterface
 from interfaces.inverter_fronius import FroniusWR
+from interfaces.inverter_fronius_v2 import FroniusWRV2
 from interfaces.evcc_interface import EvccInterface
 from interfaces.eos_interface import EosInterface
 from interfaces.price_interface import PriceInterface
@@ -110,6 +111,17 @@ if config_manager.config["inverter"]["type"] == "fronius_gen24":
         "password": config_manager.config["inverter"]["password"],
     }
     inverter_interface = FroniusWR(inverter_config)
+elif config_manager.config["inverter"]["type"] == "fronius_gen24_v2":
+    inverter_config = {
+        "address": config_manager.config["inverter"]["address"],
+        "max_grid_charge_rate": config_manager.config["inverter"][
+            "max_grid_charge_rate"
+        ],
+        "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
+        "user": config_manager.config["inverter"]["user"],
+        "password": config_manager.config["inverter"]["password"],
+    }
+    inverter_interface = FroniusWRV2(inverter_config)
 elif config_manager.config["inverter"]["type"] == "evcc":
     logger.info(
         "[Inverter] Inverter type %s - using the universal evcc external battery control.",
@@ -619,7 +631,7 @@ class OptimizationScheduler:
         self.__start_update_service_inner_loop()
 
     def __run_inner_loop(self):
-        if config_manager.config["inverter"]["type"] == "fronius_gen24":
+        if config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]:
             inverter_interface.fetch_inverter_data()
             mqtt_interface.update_publish_topics(
                 {
@@ -698,7 +710,7 @@ def change_control_state():
     """
     inverter_fronius_en = False
     inverter_evcc_en = False
-    if config_manager.config["inverter"]["type"] == "fronius_gen24":
+    if config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]:
         inverter_fronius_en = True
     elif config_manager.config["inverter"]["type"] == "evcc":
         inverter_evcc_en = True
@@ -934,7 +946,7 @@ def get_controls():
         "inverter": {
             "inverter_special_data": (
                 inverter_interface.get_inverter_current_data()
-                if config_manager.config["inverter"]["type"] == "fronius_gen24"
+                if config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]
                 and inverter_interface is not None
                 else None
             )
@@ -1103,7 +1115,7 @@ if __name__ == "__main__":
 
         # restore the old config
         if (
-            config_manager.config["inverter"]["type"] == "fronius_gen24"
+            config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]
             and inverter_interface is not None
         ):
             inverter_interface.shutdown()

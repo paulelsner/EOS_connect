@@ -106,8 +106,8 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
   - Supports fast charge, PV charging, and combined modes.
 - **Inverter Interfaces**:
   - OPTION 1: Communicates directly with a Fronius GEN24 to monitor and control energy flows.
-    - `fronius_gen24`: Legacy interface for older firmware versions
-    - `fronius_gen24_v2`: Enhanced interface with improved authentication for firmware 1.36.5-1+ and 1.38.6-1+, including automatic fallback support and better error handling
+    - `fronius_gen24`: Enhanced interface with firmware-based authentication for all firmware versions
+    - `fronius_gen24_legacy`: Legacy interface for corner cases or troubleshooting
   - OPTION 2: Use the [evcc external battery control](https://docs.evcc.io/docs/integrations/rest-api) to interact with all inverter/ battery systems that [are supported by evcc](https://docs.evcc.io/en/docs/devices/meters) (hint: the dynamic max charge power is currently not supported by evcc external battery control)
   - OPTION 3: using without a direct control interface to get the resulting commands by **EOS connect** MQTT or web API to control within your own environment (e.g. [Integrate inverter e.g. sungrow SH10RT #35](https://github.com/ohAnd/EOS_connect/discussions/35)  )
   - Retrieves real-time data such as grid charge power, discharge power, and battery SOC.
@@ -128,13 +128,15 @@ This project is in its early stages and is actively being developed and enhanced
 
 2025-09-06
 
-- Added **Fronius GEN24 V2 Interface** (`fronius_gen24_v2`) with enhanced authentication support:
-  - ✅ **Improved Authentication**: Supports both SHA256 (new firmware) and MD5 (legacy) authentication
-  - ✅ **Firmware Compatibility**: Works with firmware 1.36.5-1+ and 1.38.6-1+ out of the box
-  - ✅ **Automatic Fallback**: Seamlessly falls back from SHA256 to MD5 for older passwords
-  - ✅ **Better Error Handling**: Provides helpful troubleshooting messages for authentication issues
-  - ✅ **100% Backward Compatibility**: Drop-in replacement for `fronius_gen24` interface
-  - **Recommended**: Use `fronius_gen24_v2` for new installations and firmware updates
+- Added **Enhanced Fronius GEN24 Interface** (`fronius_gen24`) with intelligent authentication support:
+  - ✅ **Automatic Firmware Detection**: Detects firmware version and selects optimal authentication method
+  - ✅ **Universal Compatibility**: Works with all firmware versions (< 1.36.5-1, 1.36.5-1 to 1.38.5-x, ≥ 1.38.6-1)
+  - ✅ **Smart Authentication**: MD5 for older firmware, SHA256 with MD5 fallback for newest firmware  
+  - ✅ **Optimized Performance**: Reduces authentication overhead by using firmware-appropriate methods
+  - ✅ **Better Error Handling**: Clear troubleshooting guidance for authentication issues
+  - ✅ **100% Backward Compatibility**: Drop-in replacement for previous interface
+  - **Recommended**: Default interface for all Fronius GEN24 installations
+  - **Legacy Fallback**: Use `fronius_gen24_legacy` for corner cases if needed
 
 ---
 

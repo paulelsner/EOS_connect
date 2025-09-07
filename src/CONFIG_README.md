@@ -226,21 +226,21 @@ pv_forecast:
 
 - **`inverter.type`**:  
   Specifies the type of inverter. Possible values:  
-  - `fronius_gen24`: Use the Fronius Gen24 inverter (legacy interface).
-  - `fronius_gen24_v2`: Use the Fronius Gen24 inverter (V2 interface with enhanced authentication for firmware 1.36.5-1+ and 1.38.6-1+).
+  - `fronius_gen24`: Use the Fronius Gen24 inverter (enhanced V2 interface with firmware-based authentication for all firmware versions).
+  - `fronius_gen24_legacy`: Use the Fronius Gen24 inverter (legacy V1 interface for corner cases).
   - `evcc`: Use the universal interface via evcc external battery control (evcc config below has to be valid).
   - `default`: Disable inverter control (only display the target state).
 
 - **`inverter.address`**:  
-  The IP address of the inverter. (only needed for fronius_gen24/fronius_gen24_v2)
+  The IP address of the inverter. (only needed for fronius_gen24/fronius_gen24_legacy)
 
 - **`inverter.user`**:  
-  The username for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_v2)
+  The username for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_legacy)
 
 - **`inverter.password`**:  
-  The password for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_v2)
+  The password for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_legacy)
   
-  **Note for V2 interface**: If you recently updated your inverter firmware to 1.38.6-1+ or newer, you may need to reset your password in the WebUI (http://your-inverter-ip/) under Settings -> User Management. New firmware versions require password reset after updates to enable the improved encryption method.
+  **Note for enhanced interface**: The default `fronius_gen24` interface automatically detects your firmware version and uses the appropriate authentication method. If you recently updated your inverter firmware to 1.38.6-1+ or newer, you may need to reset your password in the WebUI (http://your-inverter-ip/) under Settings -> User Management. New firmware versions require password reset after updates to enable the improved encryption method.
 
 - **`inverter.max_grid_charge_rate`**:  
   The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
@@ -374,10 +374,10 @@ pv_forecast:
     horizon: 10,20,10,15 # Horizon to calculate shading up to 360 values to describe shading situation for your PV.
 # Inverter configuration
 inverter:
-  type: default  # Type of inverter - fronius_gen24, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
-  address: 192.168.1.12 # Address of the inverter (fronius_gen24 only)
-  user: customer # Username for the inverter (fronius_gen24 only)
-  password: abc123 # Password for the inverter (fronius_gen24 only)
+  type: default  # Type of inverter - fronius_gen24, fronius_gen24_legacy, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
+  address: 192.168.1.12 # Address of the inverter (fronius_gen24, fronius_gen24_legacy only)
+  user: customer # Username for the inverter (fronius_gen24, fronius_gen24_legacy only)
+  password: abc123 # Password for the inverter (fronius_gen24, fronius_gen24_legacy only)
   max_grid_charge_rate: 5000 # Max inverter grid charge rate in W - default: 5000
   max_pv_charge_rate: 5000 # Max imverter PV charge rate in W - default: 5000
 # EVCC configuration
@@ -444,7 +444,7 @@ pv_forecast:
     horizon: 10,20,10,15 # Horizon to calculate shading up to 360 values to describe shading situation for your PV.
 # Inverter configuration
 inverter:
-  type: default  # Type of inverter - fronius_gen24, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
+  type: default  # Type of inverter - fronius_gen24, fronius_gen24_legacy, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
   max_grid_charge_rate: 5000 # Max inverter grid charge rate in W - default: 5000
   max_pv_charge_rate: 5000 # Max imverter PV charge rate in W - default: 5000
 # EVCC configuration

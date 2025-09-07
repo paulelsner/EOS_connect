@@ -100,18 +100,20 @@ eos_interface = EosInterface(
 base_control = BaseControl(config_manager.config, time_zone)
 # initialize the inverter interface
 inverter_interface = None
-if config_manager.config["inverter"]["type"] == "fronius_gen24":
-    inverter_config = {
-        "address": config_manager.config["inverter"]["address"],
-        "max_grid_charge_rate": config_manager.config["inverter"][
-            "max_grid_charge_rate"
-        ],
-        "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
-        "user": config_manager.config["inverter"]["user"],
-        "password": config_manager.config["inverter"]["password"],
-    }
-    inverter_interface = FroniusWR(inverter_config)
-elif config_manager.config["inverter"]["type"] == "fronius_gen24_v2":
+
+# Handle backward compatibility for old interface names
+inverter_type = config_manager.config["inverter"]["type"]
+if inverter_type == "fronius_gen24_v2":
+    logger.warning(
+        "[Config] Interface name 'fronius_gen24_v2' is deprecated. "
+        "Please update your config.yaml to use 'fronius_gen24' instead. "
+        "Using enhanced interface for compatibility."
+    )
+    inverter_type = "fronius_gen24"  # Auto-migrate to new name
+
+if inverter_type == "fronius_gen24":
+    # Enhanced V2 interface (default for existing users)
+    logger.info("[Inverter] Using enhanced Fronius GEN24 interface with firmware-based authentication")
     inverter_config = {
         "address": config_manager.config["inverter"]["address"],
         "max_grid_charge_rate": config_manager.config["inverter"][
@@ -122,10 +124,23 @@ elif config_manager.config["inverter"]["type"] == "fronius_gen24_v2":
         "password": config_manager.config["inverter"]["password"],
     }
     inverter_interface = FroniusWRV2(inverter_config)
-elif config_manager.config["inverter"]["type"] == "evcc":
+elif inverter_type == "fronius_gen24_legacy":
+    # Legacy V1 interface (for corner cases)
+    logger.info("[Inverter] Using legacy Fronius GEN24 interface (V1) for compatibility")
+    inverter_config = {
+        "address": config_manager.config["inverter"]["address"],
+        "max_grid_charge_rate": config_manager.config["inverter"][
+            "max_grid_charge_rate"
+        ],
+        "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
+        "user": config_manager.config["inverter"]["user"],
+        "password": config_manager.config["inverter"]["password"],
+    }
+    inverter_interface = FroniusWR(inverter_config)
+elif inverter_type == "evcc":
     logger.info(
         "[Inverter] Inverter type %s - using the universal evcc external battery control.",
-        config_manager.config["inverter"]["type"],
+        inverter_type,
     )
 else:
     logger.info(
@@ -631,7 +646,7 @@ class OptimizationScheduler:
         self.__start_update_service_inner_loop()
 
     def __run_inner_loop(self):
-        if config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]:
+        if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]:
             inverter_interface.fetch_inverter_data()
             mqtt_interface.update_publish_topics(
                 {
@@ -710,7 +725,7 @@ def change_control_state():
     """
     inverter_fronius_en = False
     inverter_evcc_en = False
-    if config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]:
+    if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]:
         inverter_fronius_en = True
     elif config_manager.config["inverter"]["type"] == "evcc":
         inverter_evcc_en = True
@@ -946,7 +961,7 @@ def get_controls():
         "inverter": {
             "inverter_special_data": (
                 inverter_interface.get_inverter_current_data()
-                if config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]
+                if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]
                 and inverter_interface is not None
                 else None
             )

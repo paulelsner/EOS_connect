@@ -84,7 +84,10 @@ class FroniusWRV2:
         # Authentication state
         self.nonce = None
         self.is_authenticated = False
-        self.algorithm = "SHA256"  # Default to new algorithm, fallback to MD5
+        self.algorithm = "SHA256"  # Will be determined by firmware version
+
+        # Firmware version detection
+        self.inverter_sw_revision = {"major": 0, "minor": 0, "patch": 0, "build": 0}
 
         # API paths (auto-detected based on firmware)
         self.api_base = None  # Will be set to "/" or "/api/"
@@ -108,14 +111,105 @@ class FroniusWRV2:
             f"[InverterV2] Initialized for {self.address} with user '{self.user}'"
         )
 
-        # Test connection and detect firmware
-        self._detect_api_version()
-        
+        # Detect firmware version and set API configuration
+        self._detect_firmware_and_configure()
+
         # Simple connection verification (non-intrusive)
         logger.info("[InverterV2] Interface initialized and ready")
 
-    def _detect_api_version(self):
-        """Detect API version and set correct base path."""
+    def _detect_firmware_and_configure(self):
+        """Detect firmware version and configure API base path and authentication algorithm."""
+        # First get the firmware version
+        if not self._get_current_inverter_sw_version():
+            # Fallback to detection if version API fails
+            logger.warning(
+                "[InverterV2] Version detection failed, falling back to endpoint detection"
+            )
+            self._detect_api_version_fallback()
+            return
+
+        # Configure based on firmware version
+        self._set_api_configuration()
+
+        logger.info(
+            f"[InverterV2] Firmware {self.inverter_sw_revision['major']}."
+            f"{self.inverter_sw_revision['minor']}."
+            f"{self.inverter_sw_revision['patch']}-{self.inverter_sw_revision['build']} "
+            f"configured: API base='{self.api_base}', Auth={self.algorithm}"
+        )
+
+    def _get_current_inverter_sw_version(self):
+        """Get the current version of the inverter (similar to V1 logic)."""
+        try:
+            path = "/status/version"
+            response = self.session.get(f"http://{self.address}{path}", timeout=5)
+
+            if response.status_code != 200:
+                logger.error(
+                    f"[InverterV2] Failed to get firmware version: {response.status_code}"
+                )
+                return False
+
+            result = json.loads(response.text)
+            version_string = result.get("swrevisions", {}).get("GEN24")
+
+            if not version_string:
+                logger.error("[InverterV2] No GEN24 version found in response")
+                return False
+
+            # Parse version string like "1.38.6-1"
+            version_parts = version_string.split("-")[0].split(".")
+            self.inverter_sw_revision = {
+                "major": int(version_parts[0]),
+                "minor": int(version_parts[1]),
+                "patch": int(version_parts[2]),
+                "build": int(version_string.split("-")[1]),
+            }
+
+            logger.info(f"[InverterV2] Detected firmware version: {version_string}")
+            return True
+
+        except (requests.RequestException, ValueError, KeyError, IndexError) as e:
+            logger.error(f"[InverterV2] Error getting firmware version: {e}")
+            return False
+
+    def _set_api_configuration(self):
+        """Set API prefix and authentication algorithm based on firmware version."""
+        version_tuple = (
+            self.inverter_sw_revision["major"],
+            self.inverter_sw_revision["minor"],
+            self.inverter_sw_revision["patch"],
+            self.inverter_sw_revision["build"],
+        )
+
+        if version_tuple < (1, 36, 5, 1):
+            # Old firmware: no /api prefix, MD5 only
+            self.api_base = "/"
+            self.algorithm = "MD5"
+            logger.info(
+                "[InverterV2] Old firmware (<1.36.5-1): Using '/' base with MD5 auth"
+            )
+
+        elif version_tuple < (1, 38, 6, 1):
+            # Middle firmware: /api prefix, MD5 only
+            self.api_base = "/api/"
+            self.algorithm = "MD5"
+            logger.info(
+                "[InverterV2] Middle firmware (1.36.5-1 to 1.38.5-x): Using '/api/' base"
+                " with MD5 auth"
+            )
+
+        else:
+            # New firmware: /api prefix, SHA256 with MD5 fallback
+            self.api_base = "/api/"
+            self.algorithm = "SHA256"
+            logger.info(
+                "[InverterV2] New firmware (>=1.38.6-1): Using '/api/' base"
+                " with SHA256 auth (MD5 fallback)"
+            )
+
+    def _detect_api_version_fallback(self):
+        """Fallback API version detection if firmware version cannot be determined."""
         try:
             # Test new API path first (firmware 1.36.5-1+)
             test_url = f"http://{self.address}/api/config/timeofuse"
@@ -123,8 +217,10 @@ class FroniusWRV2:
 
             if response.status_code == 401:  # Needs auth but endpoint exists
                 self.api_base = "/api/"
+                self.algorithm = "SHA256"  # Assume newest for /api/ endpoints
                 logger.info(
-                    "[InverterV2] Detected new firmware (1.36.5-1+) - using /api/ base"
+                    "[InverterV2] Detected new firmware (fallback detection)"
+                    " - using /api/ base with SHA256"
                 )
                 return
         except (requests.RequestException, ValueError):
@@ -137,15 +233,20 @@ class FroniusWRV2:
 
             if response.status_code == 401:  # Needs auth but endpoint exists
                 self.api_base = "/"
-                logger.info("[InverterV2] Detected old firmware - using / base")
+                self.algorithm = "MD5"  # Old endpoints use MD5
+                logger.info(
+                    "[InverterV2] Detected old firmware (fallback detection)"
+                    " - using / base with MD5"
+                )
                 return
         except (requests.RequestException, ValueError):
             pass
 
         # Default fallback
         self.api_base = "/api/"
+        self.algorithm = "SHA256"
         logger.warning(
-            "[InverterV2] Could not detect firmware version, defaulting to /api/"
+            "[InverterV2] Could not detect firmware version, defaulting to /api/ with SHA256"
         )
 
     def _get_nonce(self, response):
@@ -181,18 +282,16 @@ class FroniusWRV2:
                 value = match[1] if match[1] else match[2]  # Prefer quoted value
                 auth_dict[key] = value
 
-            # Extract algorithm and nonce
-            self.algorithm = auth_dict.get("algorithm", "MD5")
+            # Extract nonce (algorithm is determined by firmware version, not server response)
             nonce = auth_dict.get("nonce")
 
-            # Fix firmware bug: "SHA256" should be "SHA-256" but we'll handle both
-            if self.algorithm == "SHA256":
-                logger.info("[InverterV2] Firmware reports SHA256, treating as SHA-256")
-
             logger.debug(
-                f"[InverterV2] Extracted nonce with algorithm: {self.algorithm}"
+                f"[InverterV2] Extracted nonce, using firmware-determined"
+                f" algorithm: {self.algorithm}"
             )
-            logger.debug(f"[InverterV2] Realm: '{auth_dict.get('realm', 'unknown')}'")
+            logger.debug(
+                f"[InverterV2] Server realm: '{auth_dict.get('realm', 'unknown')}'"
+            )
             return nonce
 
         except (requests.RequestException, ValueError, KeyError) as e:
@@ -297,27 +396,46 @@ class FroniusWRV2:
                             f"[InverterV2] Authentication successful with {self.algorithm}"
                         )
                         return response
-                    if response.status_code == 401 and self.algorithm == "SHA-256":
-                        # Fallback to MD5 for old passwords
-                        logger.info("[InverterV2] SHA256 failed, trying MD5 fallback")
-                        self.algorithm = "MD5"
-                        continue
 
                     if response.status_code == 401:
-                        logger.error(
-                            f"[InverterV2] Authentication failed: {response.status_code}"
-                            " - Invalid credentials"
+                        # Only try MD5 fallback for firmware >= 1.38.6-1 that supports SHA256
+                        version_tuple = (
+                            self.inverter_sw_revision["major"],
+                            self.inverter_sw_revision["minor"],
+                            self.inverter_sw_revision["patch"],
+                            self.inverter_sw_revision["build"],
                         )
-                        logger.error(
-                            f"[InverterV2] TROUBLESHOOTING: If you recently updated your inverter"
-                            f" firmware (to 1.38.x-y), you may need to reset your password in"
-                            f" the WebUI (http://{self.address}/). New firmware versions require"
-                            f" password reset after updates."
-                        )
-                        logger.error(
-                            "[InverterV2] Go to WebUI -> Settings -> User Management -> "
-                            "Change password for 'customer' user, then update your config."
-                        )
+
+                        if version_tuple >= (1, 38, 6, 1) and self.algorithm in [
+                            "SHA256",
+                            "SHA-256",
+                        ]:
+                            # This is new firmware that should support SHA256, but it failed
+                            # Try MD5 fallback for old passwords
+                            logger.info(
+                                "[InverterV2] SHA256 failed on new firmware,"
+                                " trying MD5 fallback for old password"
+                            )
+                            self.algorithm = "MD5"
+                            continue
+                        else:
+                            # For older firmware or already using MD5, auth failure is final
+                            logger.error(
+                                f"[InverterV2] Authentication failed with {self.algorithm}:"
+                                f" {response.status_code} - Invalid credentials"
+                            )
+                            logger.error(
+                                f"[InverterV2] TROUBLESHOOTING: If you recently updated your"
+                                f" inverter firmware (to 1.38.x-y), you may need to reset"
+                                f" your password in the WebUI (http://{self.address}/)."
+                                f" New firmware versions require"
+                                f" password reset after updates."
+                            )
+                            logger.error(
+                                "[InverterV2] Go to WebUI -> Settings -> User Management -> "
+                                "Change password for 'customer' user, then update your config."
+                            )
+                            break
                     else:
                         logger.error(
                             f"[InverterV2] Authentication failed: {response.status_code}"
@@ -757,17 +875,23 @@ class FroniusWRV2:
             if not response:
                 logger.debug("[InverterV2] Inverter monitoring endpoint not available")
                 return None
-                
+
             if response.status_code == 404:
-                logger.debug("[InverterV2] Inverter monitoring not supported by this firmware")
+                logger.debug(
+                    "[InverterV2] Inverter monitoring not supported by this firmware"
+                )
                 return None
-                
+
             if response.status_code != 200:
-                logger.debug(f"[InverterV2] Inverter monitoring returned {response.status_code}")
+                logger.debug(
+                    f"[InverterV2] Inverter monitoring returned {response.status_code}"
+                )
                 return None
 
             data = response.json()
-            channels = data.get("Body", {}).get("Data", {}).get("0", {}).get("channels", {})
+            channels = (
+                data.get("Body", {}).get("Data", {}).get("0", {}).get("channels", {})
+            )
 
             # Store inverter monitoring data compatible with V1 format
             self.inverter_current_data = {
@@ -809,13 +933,13 @@ class FroniusWRV2:
 
     def get_inverter_current_data(self):
         """Get the current inverter monitoring data."""
-        if not hasattr(self, 'inverter_current_data'):
+        if not hasattr(self, "inverter_current_data"):
             self.fetch_inverter_data()
-        return getattr(self, 'inverter_current_data', {})
+        return getattr(self, "inverter_current_data", {})
 
     def api_set_max_pv_charge_rate(self, max_pv_charge_rate: int):
         """Set the maximum power in W that can be used to charge the battery from PV.
-        
+
         Args:
             max_pv_charge_rate: Maximum PV charge power in watts
         """
@@ -832,7 +956,7 @@ class FroniusWRV2:
 
     def api_set_max_grid_charge_rate(self, max_grid_charge_rate: int):
         """Set the maximum power in W that can be used to charge the battery from grid.
-        
+
         Args:
             max_grid_charge_rate: Maximum grid charge power in watts
         """

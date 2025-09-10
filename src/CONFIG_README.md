@@ -124,7 +124,9 @@ A default config file will be created with the first start, if there is no `conf
   URL for OpenHAB (e.g., `http://<ip>:8080`) or Home Assistant (e.g., `http://<ip>:8123`).
 
 - **`battery.soc_sensor`**:  
-  Item/entity name for the SOC sensor (OpenHAB item/Home Assistant sensor).
+  Item/entity name for the SOC sensor (OpenHAB item/Home Assistant sensor). 
+
+  *Hint for openhab: Supported format is decimal (0-1) or percentage (0 -100) or with UoM ('0 %'- '100 %')*
 
 - **`battery.access_token`**:  
   Access token for Home Assistant (optional).

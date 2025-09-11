@@ -51,11 +51,13 @@ class PvInterface:
         self,
         config_source,
         config,
+        config_special,
         timezone="UTC",
     ):
         self.config = config
         self.time_zone = timezone
         self.config_source = config_source
+        self.config_special = config_special
         logger.debug(
             "[PV-IF] Initializing with 1st source: %s"
             # + " and 2nd source: %s"
@@ -173,10 +175,13 @@ class PvInterface:
                     "[PV-IF] Using previous PV forecast due to error: %s",
                     self.pv_forcast_request_error["message"],
                 )
-
-            self.temp_forecast_array = self.__get_pv_forecast_akkudoktor_api(
-                tgt_value="temperature", pv_config_entry=self.config[0], tgt_duration=48
-            )
+            # special temp forecast if pv config is not given in detail
+            if self.config and self.config[0]:
+                self.temp_forecast_array = self.__get_pv_forecast_akkudoktor_api(
+                    tgt_value="temperature", pv_config_entry=self.config[0], tgt_duration=48
+                )
+            else:
+                self.temp_forecast_array = self.__get_default_temperature_forecast()
             logger.info("[PV-IF] PV and Temperature updated")
             # Break the sleep interval into smaller chunks to allow immediate shutdown
             sleep_interval = self.update_interval
@@ -315,6 +320,8 @@ class PvInterface:
             return self.__get_pv_forecast_openmeteo_api(config_entry, tgt_duration)
         elif self.config_source.get("source") == "forecast_solar":
             return self.__get_pv_forecast_forecast_solar_api(config_entry, tgt_duration)
+        elif self.config_source.get("source") == "evcc":
+            return self.__get_pv_forecast_evcc_api(config_entry, tgt_duration)
         elif self.config_source.get("source") == "default":
             logger.warning("[PV-IF] Using default PV forecast source")
             return self.__get_default_pv_forcast(config_entry["power"])
@@ -327,15 +334,21 @@ class PvInterface:
         requesting pv forecast freach config entry and summarize the values
         """
         forecast_values = []
-        for config_entry in self.config:
-            logger.debug("[PV-IF] fetching forecast for '%s'", config_entry["name"])
-            forecast = self.get_pv_forecast(config_entry, tgt_duration)
-            # print("values for " + config_entry+ " -> ")
-            # print(forecast)
-            if not forecast_values:
-                forecast_values = forecast
-            else:
-                forecast_values = [x + y for x, y in zip(forecast_values, forecast)]
+        if self.config_special and self.config_source.get("source") == "evcc":
+            logger.debug("[PV-IF] fetching forecast for evcc config")
+            forecast = self.get_pv_forecast("evcc_config", tgt_duration)
+            forecast_values = forecast
+        else:
+            for config_entry in self.config:
+                logger.debug("[PV-IF] fetching forecast for '%s'", config_entry["name"])
+                forecast = self.get_pv_forecast(config_entry, tgt_duration)
+                # print("values for " + config_entry+ " -> ")
+                # print(forecast)
+                if not forecast_values:
+                    forecast_values = forecast
+                else:
+                    forecast_values = [x + y for x, y in zip(forecast_values, forecast)]
+        logger.debug("[PV-IF] Summarized PV forecast values: %s", forecast_values)
         return forecast_values
 
     def __get_pv_forecast_akkudoktor_api(
@@ -347,7 +360,8 @@ class PvInterface:
         """
         if pv_config_entry is None:
             logger.error(
-                "[PV-IF][akkudoktor] No PV config entry provided for target: %s", tgt_value
+                "[PV-IF][akkudoktor] No PV config entry provided for target: %s",
+                tgt_value,
             )
             return []
         forecast_request_payload = self.__create_forecast_request(pv_config_entry)
@@ -360,7 +374,8 @@ class PvInterface:
             day_values = day_values["values"]
         except requests.exceptions.Timeout:
             logger.error(
-                "[PV-IF][akkudoktor] Request timed out while fetching PV forecast. (%s)", tgt_value
+                "[PV-IF][akkudoktor] Request timed out while fetching PV forecast. (%s)",
+                tgt_value,
             )
             recv_error = True
         except requests.exceptions.RequestException as e:
@@ -654,15 +669,15 @@ class PvInterface:
                     // 3600
                 )
 
-                for hour in range(-1 * hours_from_today_midnight, hours_until_tomorrow_midnight):
+                for hour in range(
+                    -1 * hours_from_today_midnight, hours_until_tomorrow_midnight
+                ):
                     current_hour_energy = 0
                     for minute in range(59):
                         current_hour_energy += estimate.power_production_at_time(
                             now + timedelta(hours=hour, minutes=minute)
                         )
-                    current_hour_energy = round(
-                        current_hour_energy / 60, 1
-                    )
+                    current_hour_energy = round(current_hour_energy / 60, 1)
                     # time_point = now + timedelta(hours=hour, minutes=0)
                     # logger.debug("TEST - : %s - %s", current_hour_energy, time_point)
                     pv_forecast.append(current_hour_energy)
@@ -678,7 +693,9 @@ class PvInterface:
             # Return a default or empty forecast to avoid crashing the thread
             return self.__get_default_pv_forcast(pv_config_entry.get("power", 200))
         except (ValueError, KeyError, AttributeError, TypeError) as e:
-            logger.error("[PV-IF] Unexpected error in OpenMeteoLib SolarForecast: %s", e)
+            logger.error(
+                "[PV-IF] Unexpected error in OpenMeteoLib SolarForecast: %s", e
+            )
             return self.__get_default_pv_forcast(pv_config_entry.get("power", 200))
 
     def __get_pv_forecast_forecast_solar_api(self, pv_config_entry, hours=48):
@@ -776,6 +793,70 @@ class PvInterface:
         pv_forecast = forecast_wh
         # logger.debug("[PV-IF] Forecast.Solar PV forecast (Wh): %s", pv_forecast)
         return pv_forecast
+
+    def __get_pv_forecast_evcc_api(self, pv_config_entry, hours=48):
+        """
+        Fetches PV forecast from an EVCC instance.
+        """
+        if self.config_special.get("url", "") == "":
+            logger.error(
+                "[PV-IF] No EVCC URL configured for EVCC PV forecast - using default"
+            )
+            return self.__get_default_pv_forcast(pv_config_entry.get("power", 200))
+
+        url = self.config_special.get("url", "").rstrip("/") + "/api/state"
+        logger.debug("[PV-IF] Fetching PV forecast from EVCC API: %s", url)
+        try:
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+            self.pv_forcast_request_error["error"] = None
+        except requests.exceptions.Timeout:
+            logger.error("[PV-IF] EVCC API request timed out.")
+            self.pv_forcast_request_error["error"] = "timeout"
+            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
+            self.pv_forcast_request_error["message"] = "EVCC API request timed out."
+            self.pv_forcast_request_error["config_entry"] = pv_config_entry
+            self.pv_forcast_request_error["source"] = "evcc"
+            return []
+        except requests.exceptions.RequestException as e:
+            logger.error("[PV-IF] EVCC API request failed: %s", e)
+            self.pv_forcast_request_error["error"] = "request_failed"
+            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
+            self.pv_forcast_request_error["message"] = f"EVCC API request failed: {e}"
+            self.pv_forcast_request_error["config_entry"] = pv_config_entry
+            self.pv_forcast_request_error["source"] = "evcc"
+            return []
+        data = response.json()
+        # print("raw evcc api data: %s", data)
+        solar_forecast_all = data.get("forecast", []).get("solar", [])
+        solar_forecast_scale = solar_forecast_all.get("scale", "unknown")
+        logger.debug(
+            "[PV-IF] EVCC API solar forecast received with scale: %s",
+            solar_forecast_scale,
+        )
+        solar_forecast = solar_forecast_all.get("timeseries", [])
+
+
+        if solar_forecast and isinstance(solar_forecast, list):
+            # Extract values from the timeseries format
+            pv_forecast = [item.get("val", 0) for item in solar_forecast[:hours]]
+            # Ensure the list has exactly 'hours' entries
+            if len(pv_forecast) < hours:
+                pv_forecast.extend([0] * (hours - len(pv_forecast)))
+            elif len(pv_forecast) > hours:
+                pv_forecast = pv_forecast[:hours]
+
+            # Scale each value according to the solar_forecast_scale (e.g., 0.5 or 0.75)
+            try:
+                scale_factor = float(solar_forecast_scale)
+            except (TypeError, ValueError):
+                scale_factor = 1.0
+            pv_forecast = [val * scale_factor for val in pv_forecast]
+            logger.debug(
+                "[PV-IF] EVCC PV forecast for given evcc pv config (Wh): %s",
+                pv_forecast,
+            )
+            return pv_forecast
 
     def test_output(self):
         """

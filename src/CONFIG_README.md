@@ -19,6 +19,7 @@
   - [Config examples](#config-examples)
     - [Full Config Example (will be generated at first startup)](#full-config-example-will-be-generated-at-first-startup)
     - [Minimal possible Config Example](#minimal-possible-config-example)
+    - [Example: Using EVCC for PV Forecasts](#example-using-evcc-for-pv-forecasts)
 <!-- /TOC -->
 
 # Configuration
@@ -173,13 +174,16 @@ This section contains two subsections:
 - `openmeteo` - https://open-meteo.com/en/docs - uses the [open-meteo-solar-forecast](https://github.com/rany2/open-meteo-solar-forecast) (no horizon possible by the lib at this time)
 - `openmeteo_local` - https://open-meteo.com/en/docs - gathering radiation and cloudcover data and calculating locally with an own model - still in dev to improve the calculation
 - `forecast_solar` - https://doc.forecast.solar/api - direct request and results
+- `evcc` - retrieves forecasts from an existing EVCC installation via API - requires EVCC section to be configured
 default is uses akkudoktor
+
+**Temperature Forecasts**: EOS Connect also fetches temperature forecasts to improve optimization accuracy, as temperature affects battery efficiency and energy consumption patterns. When using provider-specific configurations (akkudoktor, openmeteo, etc.), temperature data is automatically retrieved using the same geographical coordinates. When using EVCC, localized temperature forecasts require at least one PV configuration entry with coordinates.
 
 `pv_forecast` section allows you to define multiple PV forecast entries, each distinguished by a user-given name. Below is an example of a default PV forecast configuration:
 
 ```yaml
 pv_forecast_source:
-  source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, forecast_solar, default (default uses akkudoktor)
+  source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local, forecast_solar, evcc, default (default uses akkudoktor)
 pv_forecast:
   - name: myPvInstallation1  # User-defined identifier for the PV installation, must be unique if you use multiple installations
     lat: 47.5  # Latitude for PV forecast @ Akkudoktor API
@@ -256,6 +260,8 @@ pv_forecast:
 
 - **`evcc.url`**:  
   The URL for the EVCC instance (e.g., `http://<ip>:7070`). If not used set to `url: ""` or leave as `url: http://yourEVCCserver:7070`
+
+**Note**: When using `evcc` as the `pv_forecast_source`, this EVCC configuration must be properly configured. EOS Connect will retrieve PV forecasts directly from the EVCC API instead of using individual PV installation configurations. In this case, the `pv_forecast` section can be left empty or minimal, as EVCC provides the aggregated forecast data.
 
 ---
 
@@ -459,3 +465,23 @@ time_zone: Europe/Berlin # Default time zone - default: Europe/Berlin
 eos_connect_web_port: 8081 # Default port for EOS connect server - default: 8081
 log_level: info # Log level for the application : debug, info, warning, error - default: info
 ```
+
+### Example: Using EVCC for PV Forecasts
+
+When using EVCC as your PV forecast source, the configuration is simplified as EVCC provides the aggregated forecast data:
+
+```yaml
+# PV forecast source configuration - using EVCC
+pv_forecast_source:
+  source: evcc # Use EVCC for PV forecasts
+pv_forecast: [] # Can be left empty when using EVCC
+# EVCC configuration - REQUIRED when using evcc as pv_forecast_source
+evcc:
+  url: http://192.168.1.100:7070  # URL to your EVCC installation
+```
+
+In this configuration:
+- EVCC handles all PV installation details and provides aggregated forecasts
+- The `pv_forecast` section can be empty, but adding location coordinates improves temperature forecasts
+- The `evcc.url` must point to a reachable EVCC instance with API access enabled
+- Better temperature forecasts lead to more accurate energy optimization results

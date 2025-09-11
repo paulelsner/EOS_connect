@@ -268,7 +268,7 @@ class ConfigManager:
         )
         config["pv_forecast_source"].yaml_add_eol_comment(
             "data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local,"
-            + " forecast_solar, (default uses akkudoktor)",
+            + " forecast_solar, evcc, default (default uses akkudoktor)",
             "source",
         )
         # pv forecast configuration

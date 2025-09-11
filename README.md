@@ -249,6 +249,9 @@ EOS Connect supports multiple sources for solar (PV) production forecasts. You c
 - **Forecast.Solar**  
   Connects to the [Forecast.Solar API](https://doc.forecast.solar/api) for detailed PV production forecasts.
 
+- **EVCC**  
+  Retrieves PV forecasts directly from an existing [EVCC](https://evcc.io/) installation via its API. This option leverages EVCC's built-in solar forecast capabilities, including its automatic scaling feature that adjusts forecasts based on your actual historical PV production data for improved accuracy.
+
 #### Energy Price Forecast
 Energy price forecasts are retrieved from the chosen source (TIBBER or AKKUDOKTOR API). **Note**: Prices for tomorrow are available earliest at 1 PM. Until then, today's prices are used to feed the model.
 

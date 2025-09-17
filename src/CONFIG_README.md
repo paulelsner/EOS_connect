@@ -169,6 +169,8 @@ This section contains two subsections:
 - `pv_forecast_source`
 - `pv_forecast`
 
+**Important:** All supported PV forecast providers (akkudoktor, openmeteo, openmeteo_local, forecast_solar, evcc) use the same azimuth convention where **0° = South** and **negative values = East**. No conversion is needed when switching between providers.
+
 `pv_forecast_source` section declares the provider of solar forecast that should be used. Available providers are
 - `akkudoktor` - https://api.akkudoktor.net/ - direct request and results
 - `openmeteo` - https://open-meteo.com/en/docs - uses the [open-meteo-solar-forecast](https://github.com/rany2/open-meteo-solar-forecast) (no horizon possible by the lib at this time)
@@ -207,7 +209,13 @@ pv_forecast:
   Longitude for the PV forecast.
 
 - **`azimuth`**:  
-  Azimuth angle for the PV forecast.
+  Azimuth angle for the PV forecast in degrees. **All supported forecast providers use the same solar/PV industry standard convention:**
+  - **0° = South** (optimal orientation for Northern Hemisphere)
+  - **90° = West**
+  - **180° = North** 
+  - **-90° = East** (negative values for east-facing)
+  
+  **Example orientations:** A south-facing roof would use `azimuth: 0`, while a garage facing southeast would use `azimuth: -45`, and a carport facing west would use `azimuth: 90`. An east-facing installation would use `azimuth: -90`.
 
 - **`tilt`**:  
   Tilt angle for the PV forecast.

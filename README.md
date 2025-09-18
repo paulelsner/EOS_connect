@@ -32,6 +32,10 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
     - [2. Install via Home Assistant Add-on](#2-install-via-home-assistant-add-on)
     - [3. Configure](#3-configure)
     - [4. Explore](#4-explore)
+  - [EOS Configuration Requirements](#eos-configuration-requirements)
+    - [Required EOS Prediction Settings](#required-eos-prediction-settings)
+    - [What EOS Connect Handles](#what-eos-connect-handles)
+    - [Troubleshooting](#troubleshooting)
   - [How it Works](#how-it-works)
     - [Base](#base)
     - [Collecting Data](#collecting-data)
@@ -150,6 +154,7 @@ Get up and running with EOS Connect in just a few steps!
   *(Or see [Installation and Running](#installation-and-running) for Docker and local options)*
 - **An already running instance of [EOS (Energy Optimization System)](https://github.com/Akkudoktor-EOS/EOS)**  
   EOS Connect acts as a client and requires a reachable EOS server for optimization and control.
+- **Properly configured EOS for prediction** (see [EOS Configuration Requirements](#eos-configuration-requirements) below)
 
 ### 2. Install via Home Assistant Add-on
 
@@ -175,7 +180,46 @@ Get up and running with EOS Connect in just a few steps!
 
 ---
 
-> If you’re new to Home Assistant add-ons, see [the official documentation](https://www.home-assistant.io/addons/) for help.
+## EOS Configuration Requirements
+
+**Important**: EOS Connect requires specific prediction settings in your EOS instance. The default EOS configuration should work out-of-the-box, but verify these settings if you experience issues with forecasting.
+
+### Required EOS Prediction Settings
+
+In your EOS `config.yml`, ensure these prediction parameters are configured:
+
+```yaml
+# EOS config.yml - Prediction and Optimization settings
+prediction:
+  # Prediction horizon (default: 48 hours)
+  # EOS Connect requires at least 48 hours for proper optimization
+  hours_ahead: 48
+  
+optimization:
+  # Optimization horizon (default: 48 hours) 
+  # Should match or be <= prediction hours_ahead
+  hours_ahead: 48
+```
+
+### What EOS Connect Handles
+
+- **Optimization Requests**: EOS Connect sends optimization requests to EOS on a configurable interval (e.g., every 3 minutes)
+- **No EOS Internal Scheduling**: EOS Connect manages all timing - no internal EOS optimization intervals are used
+- **48-Hour Forecasting**: EOS Connect provides 48-hour load and PV forecasts to EOS for optimal decision making
+
+### Troubleshooting
+
+- **Short/No predictions**: Verify `prediction.hours_ahead: 48` in EOS config
+- **Optimization errors**: Ensure `optimization.hours_ahead` is set to 48 or less than prediction horizon
+- **EOS Connect timing**: All optimization scheduling is handled by EOS Connect, not EOS internal timers
+
+The default EOS configuration typically includes these 48-hour settings. If you've customized your EOS config, ensure these values are properly set.
+
+For detailed EOS configuration, refer to the [EOS documentation](https://github.com/Akkudoktor-EOS/EOS#configuration).
+
+---
+
+> If you're new to Home Assistant add-ons, see [the official documentation](https://www.home-assistant.io/addons/) for help.
 
 > **Not using Home Assistant?**  
 > See [Installation and Running](#installation-and-running) for Docker and local installation instructions.

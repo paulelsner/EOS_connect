@@ -370,9 +370,18 @@
         }
 
         function updateChart(data_request, data_response) {
-            const currentHour = new Date().getHours();
-
-            chartInstance.data.labels = Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length }, (_, i) => `${(currentHour + i) % 24}:00`);
+            // Use server timestamp consistently for data processing
+            const serverTime = new Date(data_response["timestamp"]);
+            const currentHour = serverTime.getHours();
+            
+            // Create labels in user's local timezone - showing only hours with :00
+            chartInstance.data.labels = Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length }, 
+                (_, i) => {
+                    // Create a new date object for each hour label in user's timezone
+                    const labelTime = new Date(serverTime.getTime() + (i * 60 * 60 * 1000));
+                    const hour = labelTime.getHours();
+                    return `${hour.toString().padStart(2, '0')}:00`;
+                });
             //chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"].map(value => (value / 1000).toFixed(3));
             chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"].map((value, index) => {
                 const actHomeApplianceValue = data_response["result"]["Home_appliance_wh_per_hour"].map(value => value)
@@ -431,7 +440,7 @@
 
         function setBatteryChargingData(data_response) {
             // planned charging
-            var currentHour = new Date().getHours();
+            var currentHour = new Date(data_response["timestamp"]).getHours(); // ✅ Use server time
             price_data = data_response["result"]["Electricity_price"];
             ac_charge = data_response["ac_charge"];
             //ac_charge = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -890,7 +899,7 @@
             income_data = data_response["result"]["Einnahmen_Euro_pro_Stunde"];
             feed_in_data = data_response["result"]["Netzeinspeisung_Wh_pro_Stunde"];
 
-            let currentHour = new Date().getHours();
+            let currentHour = new Date(data_response["timestamp"]).getHours(); // ✅ Use server time
             let expense_today = expense_data.slice(0, 24 - currentHour).reduce((acc, value) => acc + value, 0).toFixed(2);
             document.getElementById('expense_summary').innerText = expense_today + " €";
             document.getElementById('expense_summary').title = "Expense for the rest of the day";

@@ -267,6 +267,16 @@
         </div>
     </div>
     <script>
+        /*
+         * TIME HANDLING STRATEGY
+         * ======================
+         * 
+         * SERVER TIME: Used for all data processing and calculations (from data_response["timestamp"])
+         * USER TIME: Used for display - chart labels and schedule show in user's local timezone
+         * 
+         * This allows users in different timezones to see when events happen in their local time
+         * while maintaining consistent server-based data processing.
+         */
         const TEST_MODE = false;
         if (TEST_MODE) {
             document.body.style.backgroundColor = 'lightgreen';
@@ -958,12 +968,14 @@
 
         function showSchedule(data_request, data_response) {
             //console.log("------- showSchedule -------");
-            var currentHour = new Date(data_response["timestamp"]).getHours();
+            var serverTime = new Date(data_response["timestamp"]);
+            var currentHour = serverTime.getHours();
             var discharge_allowed = data_response["discharge_allowed"];
             var ac_charge = data_response["ac_charge"];
-            // for testing
-            //discharge_allowed = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0];
-            //ac_charge = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
+            // Add timezone indicator to schedule header
+            document.getElementById('load_schedule_header').innerHTML =
+                ` Schedule next 24 hours <small>(Local Time)</small>`;
 
             ac_charge = ac_charge.map((value, index) => value * max_charge_power_w);
             var priceData = data_response["result"]["Electricity_price"];
@@ -994,7 +1006,10 @@
 
                 var cell1 = document.createElement('div');
                 cell1.className = 'table-cell';
-                cell1.innerHTML = ((index + currentHour) % 24) + ":00";
+                // cell1.innerHTML = ((index + currentHour) % 24) + ":00";
+                const labelTime = new Date(serverTime.getTime() + (index * 60 * 60 * 1000));
+                cell1.innerHTML = labelTime.getHours().toString().padStart(2, '0') + ":00";
+                
                 cell1.style.textAlign = "right";
                 row.appendChild(cell1);
 

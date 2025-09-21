@@ -84,7 +84,7 @@ class ConfigManager:
                         "max_charge_power_w": 5000,
                         "min_soc_percentage": 5,
                         "max_soc_percentage": 100,
-                        "price_euro_per_wh_accu": 0.0,  # price for battery in euro/kWh
+                        "price_euro_per_wh_accu": 0.0,  # price for battery in euro/Wh
                         "charging_curve_enabled": True,  # enable charging curve
                     }
                 ),
@@ -254,7 +254,7 @@ class ConfigManager:
             "URL for battery soc in %", "max_soc_percentage"
         )
         config["battery"].yaml_add_eol_comment(
-            "price for battery in euro/kWh - default: 0.0", "price_euro_per_wh_accu"
+            "price for battery in euro/Wh - default: 0.0", "price_euro_per_wh_accu"
         )
         config["battery"].yaml_add_eol_comment(
             "enabling charging curve for controlled charging power"+

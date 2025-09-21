@@ -942,6 +942,28 @@ def get_optimize_response():
         content_type="application/json",
     )
 
+@app.route("/json/optimize_request.test.json", methods=["GET"])
+def get_optimize_request_test():
+    """
+    Retrieves the last optimization request and returns it as a JSON response.
+    """
+    with open(base_path + "/json/optimize_request.test.json", "r", encoding="utf-8") as file:
+        return Response(
+            file.read(),
+            content_type="application/json",
+        )
+
+@app.route("/json/optimize_response.test.json", methods=["GET"])
+def get_optimize_response_test():
+    """
+    Retrieves the last optimization response and returns it as a JSON response.
+    """
+    with open(base_path + "/json/optimize_response.test.json", "r", encoding="utf-8") as file:
+        return Response(
+            file.read(),
+            content_type="application/json",
+        )
+
 
 @app.route("/json/current_controls.json", methods=["GET"])
 def get_controls():

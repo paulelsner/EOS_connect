@@ -39,6 +39,8 @@ if sys.version_info < (3, 11):
     sys.exit(1)
 
 EOS_TGT_DURATION = 48
+
+
 ###################################################################################################
 # Custom formatter to use the configured timezone
 class TimezoneFormatter(logging.Formatter):
@@ -113,7 +115,9 @@ if inverter_type == "fronius_gen24_v2":
 
 if inverter_type == "fronius_gen24":
     # Enhanced V2 interface (default for existing users)
-    logger.info("[Inverter] Using enhanced Fronius GEN24 interface with firmware-based authentication")
+    logger.info(
+        "[Inverter] Using enhanced Fronius GEN24 interface with firmware-based authentication"
+    )
     inverter_config = {
         "address": config_manager.config["inverter"]["address"],
         "max_grid_charge_rate": config_manager.config["inverter"][
@@ -126,7 +130,9 @@ if inverter_type == "fronius_gen24":
     inverter_interface = FroniusWRV2(inverter_config)
 elif inverter_type == "fronius_gen24_legacy":
     # Legacy V1 interface (for corner cases)
-    logger.info("[Inverter] Using legacy Fronius GEN24 interface (V1) for compatibility")
+    logger.info(
+        "[Inverter] Using legacy Fronius GEN24 interface (V1) for compatibility"
+    )
     inverter_config = {
         "address": config_manager.config["inverter"]["address"],
         "max_grid_charge_rate": config_manager.config["inverter"][
@@ -372,6 +378,20 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
         dc_charge_demand_rel (float): The relative DC charge demand.
         discharge_allowed (bool): Whether discharge is allowed (True/False).
     """
+    # Safety check: Prevent AC charging if battery SoC exceeds maximum
+    current_soc = battery_interface.get_current_soc()
+    max_soc = config_manager.config["battery"]["max_soc_percentage"]
+
+    if current_soc >= max_soc and ac_charge_demand_rel > 0:
+        logger.warning(
+            "[Main] EOS requested AC charging (%s) but battery SoC (%s%%)"
+            + " at/above maximum (%s%%) - overriding to 0",
+            ac_charge_demand_rel,
+            current_soc,
+            max_soc,
+        )
+        ac_charge_demand_rel = 0  # Override EOS decision for safety
+
     base_control.set_current_ac_charge_demand(ac_charge_demand_rel)
     base_control.set_current_dc_charge_demand(dc_charge_demand_rel)
     base_control.set_current_discharge_allowed(bool(discharge_allowed))
@@ -1131,7 +1151,8 @@ if __name__ == "__main__":
 
         # restore the old config
         if (
-            config_manager.config["inverter"]["type"] in ["fronius_gen24", "fronius_gen24_v2"]
+            config_manager.config["inverter"]["type"]
+            in ["fronius_gen24", "fronius_gen24_v2"]
             and inverter_interface is not None
         ):
             inverter_interface.shutdown()

@@ -43,6 +43,8 @@ class MqttInterface:
         :param will_message: Message for the Last Will and Testament (default: "offline")
         """
         self.enable_mqtt = config_mqtt.get("enabled", False)
+        self.mqtt_config_enabled = self.enable_mqtt  # Store original config value
+        self.mqtt_connection_failed = False  # Track connection failures
         if not self.enable_mqtt:
             logger.info("[MQTT] MQTT is disabled, skipping initialization.")
             return
@@ -399,6 +401,7 @@ class MqttInterface:
         if not self.__connect():
             logger.error("[MQTT] Failed to connect to MQTT broker, disabling MQTT.")
             self.enable_mqtt = False
+            self.mqtt_connection_failed = True  # Mark as connection failure
             return
         self.client.loop_start()
         logger.info("[MQTT] Successfully connected to MQTT broker.")
@@ -540,6 +543,7 @@ class MqttInterface:
                 e,
             )
             self.enable_mqtt = False
+            self.mqtt_connection_failed = True  # Mark as connection failure
         except mqtt.ssl.SSLError as e:
             logger.error(
                 "[MQTT] SSL error while" + " connecting to MQTT broker %s:%d - %s",
@@ -548,6 +552,7 @@ class MqttInterface:
                 e,
             )
             self.enable_mqtt = False
+            self.mqtt_connection_failed = True  # Mark as connection failure
         except Exception as e:
             logger.error(
                 "[MQTT] Failed to connect" + " to MQTT broker %s:%d - %s",
@@ -556,6 +561,7 @@ class MqttInterface:
                 e,
             )
             self.enable_mqtt = False
+            self.mqtt_connection_failed = True  # Mark as connection failure
         return False
 
     def __publish(self, topic, payload, qos=0, retain=False):
@@ -625,7 +631,17 @@ class MqttInterface:
         :param topics: Dictionary of topics and their new values
         """
         if not self.enable_mqtt:
-            logger.debug("[MQTT] MQTT is disabled, skipping publish.")
+            if not self.mqtt_config_enabled:
+                logger.debug(
+                    "[MQTT] MQTT is disabled in configuration, skipping publish."
+                )
+            elif self.mqtt_connection_failed:
+                logger.warning(
+                    "[MQTT] MQTT connection to broker %s:%d failed during initialization,"
+                    + " skipping publish. Check broker availability and credentials.",
+                    self.broker,
+                    self.port,
+                )
             return
         for topic, value in topics.items():
             if topic in self.topics_publish:

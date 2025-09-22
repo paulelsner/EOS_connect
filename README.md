@@ -32,6 +32,10 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
     - [2. Install via Home Assistant Add-on](#2-install-via-home-assistant-add-on)
     - [3. Configure](#3-configure)
     - [4. Explore](#4-explore)
+  - [EOS Configuration Requirements](#eos-configuration-requirements)
+    - [Required EOS Prediction Settings](#required-eos-prediction-settings)
+    - [What EOS Connect Handles](#what-eos-connect-handles)
+    - [Troubleshooting](#troubleshooting)
   - [How it Works](#how-it-works)
     - [Base](#base)
     - [Collecting Data](#collecting-data)
@@ -106,6 +110,8 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
   - Supports fast charge, PV charging, and combined modes.
 - **Inverter Interfaces**:
   - OPTION 1: Communicates directly with a Fronius GEN24 to monitor and control energy flows.
+    - `fronius_gen24`: Enhanced interface with firmware-based authentication for all firmware versions
+    - `fronius_gen24_legacy`: Legacy interface for corner cases or troubleshooting
   - OPTION 2: Use the [evcc external battery control](https://docs.evcc.io/docs/integrations/rest-api) to interact with all inverter/ battery systems that [are supported by evcc](https://docs.evcc.io/en/docs/devices/meters) (hint: the dynamic max charge power is currently not supported by evcc external battery control)
   - OPTION 3: using without a direct control interface to get the resulting commands by **EOS connect** MQTT or web API to control within your own environment (e.g. [Integrate inverter e.g. sungrow SH10RT #35](https://github.com/ohAnd/EOS_connect/discussions/35)  )
   - Retrieves real-time data such as grid charge power, discharge power, and battery SOC.
@@ -124,6 +130,18 @@ This project is in its early stages and is actively being developed and enhanced
 - to fullfil both versions there is small hack to identify the connected EOS
 - finally the current version can run with both EOS versions
 
+2025-09-06
+
+- Added **Enhanced Fronius GEN24 Interface** (`fronius_gen24`) with intelligent authentication support:
+  - ✅ **Automatic Firmware Detection**: Detects firmware version and selects optimal authentication method
+  - ✅ **Universal Compatibility**: Works with all firmware versions (< 1.36.5-1, 1.36.5-1 to 1.38.5-x, ≥ 1.38.6-1)
+  - ✅ **Smart Authentication**: MD5 for older firmware, SHA256 with MD5 fallback for newest firmware  
+  - ✅ **Optimized Performance**: Reduces authentication overhead by using firmware-appropriate methods
+  - ✅ **Better Error Handling**: Clear troubleshooting guidance for authentication issues
+  - ✅ **100% Backward Compatibility**: Drop-in replacement for previous interface
+  - **Recommended**: Default interface for all Fronius GEN24 installations
+  - **Legacy Fallback**: Use `fronius_gen24_legacy` for corner cases if needed
+
 ---
 
 ## Quick Start
@@ -136,6 +154,7 @@ Get up and running with EOS Connect in just a few steps!
   *(Or see [Installation and Running](#installation-and-running) for Docker and local options)*
 - **An already running instance of [EOS (Energy Optimization System)](https://github.com/Akkudoktor-EOS/EOS)**  
   EOS Connect acts as a client and requires a reachable EOS server for optimization and control.
+- **Properly configured EOS for prediction** (see [EOS Configuration Requirements](#eos-configuration-requirements) below)
 
 ### 2. Install via Home Assistant Add-on
 
@@ -161,7 +180,46 @@ Get up and running with EOS Connect in just a few steps!
 
 ---
 
-> If you’re new to Home Assistant add-ons, see [the official documentation](https://www.home-assistant.io/addons/) for help.
+## EOS Configuration Requirements
+
+**Important**: EOS Connect requires specific prediction settings in your EOS instance. The default EOS configuration should work out-of-the-box, but verify these settings if you experience issues with forecasting.
+
+### Required EOS Prediction Settings
+
+In your EOS `config.yml`, ensure these prediction parameters are configured:
+
+```yaml
+# EOS config.yml - Prediction and Optimization settings
+prediction:
+  # Prediction horizon (default: 48 hours)
+  # EOS Connect requires at least 48 hours for proper optimization
+  hours_ahead: 48
+  
+optimization:
+  # Optimization horizon (default: 48 hours) 
+  # Should match or be <= prediction hours_ahead
+  hours_ahead: 48
+```
+
+### What EOS Connect Handles
+
+- **Optimization Requests**: EOS Connect sends optimization requests to EOS on a configurable interval (e.g., every 3 minutes)
+- **No EOS Internal Scheduling**: EOS Connect manages all timing - no internal EOS optimization intervals are used
+- **48-Hour Forecasting**: EOS Connect provides 48-hour load and PV forecasts to EOS for optimal decision making
+
+### Troubleshooting
+
+- **Short/No predictions**: Verify `prediction.hours_ahead: 48` in EOS config
+- **Optimization errors**: Ensure `optimization.hours_ahead` is set to 48 or less than prediction horizon
+- **EOS Connect timing**: All optimization scheduling is handled by EOS Connect, not EOS internal timers
+
+The default EOS configuration typically includes these 48-hour settings. If you've customized your EOS config, ensure these values are properly set.
+
+For detailed EOS configuration, refer to the [EOS documentation](https://github.com/Akkudoktor-EOS/EOS#configuration).
+
+---
+
+> If you're new to Home Assistant add-ons, see [the official documentation](https://www.home-assistant.io/addons/) for help.
 
 > **Not using Home Assistant?**  
 > See [Installation and Running](#installation-and-running) for Docker and local installation instructions.
@@ -234,6 +292,9 @@ EOS Connect supports multiple sources for solar (PV) production forecasts. You c
 
 - **Forecast.Solar**  
   Connects to the [Forecast.Solar API](https://doc.forecast.solar/api) for detailed PV production forecasts.
+
+- **EVCC**  
+  Retrieves PV forecasts directly from an existing [EVCC](https://evcc.io/) installation via its API. This option leverages EVCC's built-in solar forecast capabilities, including its automatic scaling feature that adjusts forecasts based on your actual historical PV production data for improved accuracy.
 
 #### Energy Price Forecast
 Energy price forecasts are retrieved from the chosen source (TIBBER or AKKUDOKTOR API). **Note**: Prices for tomorrow are available earliest at 1 PM. Until then, today's prices are used to feed the model.
@@ -397,12 +458,12 @@ EOS Connect publishes a wide range of real-time system data and control states t
 | `battery/soc`                                    | `myhome/eos_connect/battery/soc`                              | Float (%)                     | Battery state of charge                                  |
 | `battery/remaining_energy`                        | `myhome/eos_connect/battery/remaining_energy`                  | Integer (Wh)                  | Usable battery capacity                                  |
 | `battery/dyn_max_charge_power`                    | `myhome/eos_connect/battery/dyn_max_charge_power`              | Integer (W)                   | Dynamic max charge power                                 |
-| `inverter/special/temperature_inverter`           | `myhome/eos_connect/inverter/special/temperature_inverter`     | Float (°C)                    | Inverter temperature (if Fronius)                        |
-| `inverter/special/temperature_ac_module`          | `myhome/eos_connect/inverter/special/temperature_ac_module`    | Float (°C)                    | AC module temperature (if Fronius)                       |
-| `inverter/special/temperature_dc_module`          | `myhome/eos_connect/inverter/special/temperature_dc_module`    | Float (°C)                    | DC module temperature (if Fronius)                       |
-| `inverter/special/temperature_battery_module`     | `myhome/eos_connect/inverter/special/temperature_battery_module`| Float (°C)                   | Battery module temperature (if Fronius)                  |
-| `inverter/special/fan_control_01`                 | `myhome/eos_connect/inverter/special/fan_control_01`           | Integer                       | Fan control 1 (if Fronius)                               |
-| `inverter/special/fan_control_02`                 | `myhome/eos_connect/inverter/special/fan_control_02`           | Integer                       | Fan control 2 (if Fronius)                               |
+| `inverter/special/temperature_inverter`           | `myhome/eos_connect/inverter/special/temperature_inverter`     | Float (°C)                    | Inverter temperature (if Fronius V1/V2)                        |
+| `inverter/special/temperature_ac_module`          | `myhome/eos_connect/inverter/special/temperature_ac_module`    | Float (°C)                    | AC module temperature (if Fronius V1/V2)                       |
+| `inverter/special/temperature_dc_module`          | `myhome/eos_connect/inverter/special/temperature_dc_module`    | Float (°C)                    | DC module temperature (if Fronius V1/V2)                       |
+| `inverter/special/temperature_battery_module`     | `myhome/eos_connect/inverter/special/temperature_battery_module`| Float (°C)                   | Battery module temperature (if Fronius V1/V2)                  |
+| `inverter/special/fan_control_01`                 | `myhome/eos_connect/inverter/special/fan_control_01`           | Integer                       | Fan control 1 (if Fronius V1/V2)                               |
+| `inverter/special/fan_control_02`                 | `myhome/eos_connect/inverter/special/fan_control_02`           | Integer                       | Fan control 2 (if Fronius V1/V2)                               |
 | `evcc`                                            | `myhome/eos_connect/evcc`                                      | JSON object                   | Charging state, mode, and session info (if enabled)      |
 | `status`                                          | `myhome/eos_connect/status`                                    | String (`"online"`)           | Always set to `"online"`                                 |
 | `control/eos_ac_charge_demand`                    | `myhome/eos_connect/control/eos_ac_charge_demand`              | Integer (W)                   | AC charge demand                                         |
@@ -418,7 +479,7 @@ EOS Connect publishes a wide range of real-time system data and control states t
 - **Track optimization runs:**
   - Subscribe to `myhome/eos_connect/optimization/last_run` and `myhome/eos_connect/optimization/next_run` for scheduling info.
 - **Visualize inverter temperatures:**
-  - Subscribe to `myhome/eos_connect/inverter/special/temperature_inverter` (if Fronius inverter is connected).
+  - Subscribe to `myhome/eos_connect/inverter/special/temperature_inverter` (if Fronius V1/V2 inverter is connected).
 - **Check if override is active:**
   - Subscribe to `myhome/eos_connect/control/override_active`.
 

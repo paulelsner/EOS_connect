@@ -99,7 +99,22 @@ class BatteryInterface:
             response = requests.get(openhab_url, timeout=6)
             response.raise_for_status()
             data = response.json()
-            soc = float(data["state"]) * 100
+            raw_state = str(data["state"]).strip()
+            # Take only the first part before any space (handles "90", "90 %", "0.11 %", etc.)
+            cleaned_value = raw_state.split()[0]
+            raw_value = float(cleaned_value)
+
+            # Auto-detect format: if value is <= 1.0, assume it's decimal (0.0-1.0)
+            # if value is > 1.0, assume it's already percentage (0-100)
+            if raw_value <= 1.0:
+                soc = raw_value * 100  # Convert decimal to percentage
+                logger.debug(
+                    "[BATTERY-IF] Detected decimal format (0.0-1.0): %s -> %s%%", raw_value, soc
+                )
+            else:
+                soc = raw_value  # Already in percentage format
+                logger.debug("[BATTERY-IF] Detected percentage format (0-100): %s%%", soc)
+
             logger.info("[BATTERY-IF] successfully fetched SOC = %s %%", soc)
             return round(soc)
         except requests.exceptions.Timeout:

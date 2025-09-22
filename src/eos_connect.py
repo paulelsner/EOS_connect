@@ -19,11 +19,24 @@ from interfaces.base_control import BaseControl
 from interfaces.load_interface import LoadInterface
 from interfaces.battery_interface import BatteryInterface
 from interfaces.inverter_fronius import FroniusWR
+from interfaces.inverter_fronius_v2 import FroniusWRV2
 from interfaces.evcc_interface import EvccInterface
 from interfaces.eos_interface import EosInterface
 from interfaces.price_interface import PriceInterface
 from interfaces.mqtt_interface import MqttInterface
 from interfaces.pv_interface import PvInterface
+from interfaces.port_interface import PortInterface
+
+# Check Python version early
+if sys.version_info < (3, 11):
+    print(
+        (
+            f"ERROR: Python 3.11 or higher is required. "
+            f"You are running Python {sys.version_info.major}.{sys.version_info.minor}"
+        )
+    )
+    print("Please upgrade your Python installation.")
+    sys.exit(1)
 
 EOS_TGT_DURATION = 48
 
@@ -89,7 +102,37 @@ eos_interface = EosInterface(
 base_control = BaseControl(config_manager.config, time_zone)
 # initialize the inverter interface
 inverter_interface = None
-if config_manager.config["inverter"]["type"] == "fronius_gen24":
+
+# Handle backward compatibility for old interface names
+inverter_type = config_manager.config["inverter"]["type"]
+if inverter_type == "fronius_gen24_v2":
+    logger.warning(
+        "[Config] Interface name 'fronius_gen24_v2' is deprecated. "
+        "Please update your config.yaml to use 'fronius_gen24' instead. "
+        "Using enhanced interface for compatibility."
+    )
+    inverter_type = "fronius_gen24"  # Auto-migrate to new name
+
+if inverter_type == "fronius_gen24":
+    # Enhanced V2 interface (default for existing users)
+    logger.info(
+        "[Inverter] Using enhanced Fronius GEN24 interface with firmware-based authentication"
+    )
+    inverter_config = {
+        "address": config_manager.config["inverter"]["address"],
+        "max_grid_charge_rate": config_manager.config["inverter"][
+            "max_grid_charge_rate"
+        ],
+        "max_pv_charge_rate": config_manager.config["inverter"]["max_pv_charge_rate"],
+        "user": config_manager.config["inverter"]["user"],
+        "password": config_manager.config["inverter"]["password"],
+    }
+    inverter_interface = FroniusWRV2(inverter_config)
+elif inverter_type == "fronius_gen24_legacy":
+    # Legacy V1 interface (for corner cases)
+    logger.info(
+        "[Inverter] Using legacy Fronius GEN24 interface (V1) for compatibility"
+    )
     inverter_config = {
         "address": config_manager.config["inverter"]["address"],
         "max_grid_charge_rate": config_manager.config["inverter"][
@@ -100,10 +143,10 @@ if config_manager.config["inverter"]["type"] == "fronius_gen24":
         "password": config_manager.config["inverter"]["password"],
     }
     inverter_interface = FroniusWR(inverter_config)
-elif config_manager.config["inverter"]["type"] == "evcc":
+elif inverter_type == "evcc":
     logger.info(
         "[Inverter] Inverter type %s - using the universal evcc external battery control.",
-        config_manager.config["inverter"]["type"],
+        inverter_type,
     )
 else:
     logger.info(
@@ -208,6 +251,7 @@ price_interface = PriceInterface(config_manager.config["price"])
 pv_interface = PvInterface(
     config_manager.config["pv_forecast_source"],
     config_manager.config["pv_forecast"],
+    config_manager.config.get("evcc", {}),
     config_manager.config.get("time_zone", "UTC"),
 )
 
@@ -218,6 +262,7 @@ time.sleep(init_time)
 
 # pv_interface.test_output()
 # sys.exit(0)  # exit if the interfaces are not initialized correctly
+
 
 # summarize all date
 def create_optimize_request():
@@ -333,6 +378,20 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
         dc_charge_demand_rel (float): The relative DC charge demand.
         discharge_allowed (bool): Whether discharge is allowed (True/False).
     """
+    # Safety check: Prevent AC charging if battery SoC exceeds maximum
+    current_soc = battery_interface.get_current_soc()
+    max_soc = config_manager.config["battery"]["max_soc_percentage"]
+
+    if current_soc >= max_soc and ac_charge_demand_rel > 0:
+        logger.warning(
+            "[Main] EOS requested AC charging (%s) but battery SoC (%s%%)"
+            + " at/above maximum (%s%%) - overriding to 0",
+            ac_charge_demand_rel,
+            current_soc,
+            max_soc,
+        )
+        ac_charge_demand_rel = 0  # Override EOS decision for safety
+
     base_control.set_current_ac_charge_demand(ac_charge_demand_rel)
     base_control.set_current_dc_charge_demand(dc_charge_demand_rel)
     base_control.set_current_discharge_allowed(bool(discharge_allowed))
@@ -608,7 +667,7 @@ class OptimizationScheduler:
         self.__start_update_service_inner_loop()
 
     def __run_inner_loop(self):
-        if config_manager.config["inverter"]["type"] == "fronius_gen24":
+        if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]:
             inverter_interface.fetch_inverter_data()
             mqtt_interface.update_publish_topics(
                 {
@@ -687,7 +746,7 @@ def change_control_state():
     """
     inverter_fronius_en = False
     inverter_evcc_en = False
-    if config_manager.config["inverter"]["type"] == "fronius_gen24":
+    if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]:
         inverter_fronius_en = True
     elif config_manager.config["inverter"]["type"] == "evcc":
         inverter_evcc_en = True
@@ -883,6 +942,28 @@ def get_optimize_response():
         content_type="application/json",
     )
 
+@app.route("/json/optimize_request.test.json", methods=["GET"])
+def get_optimize_request_test():
+    """
+    Retrieves the last optimization request and returns it as a JSON response.
+    """
+    with open(base_path + "/json/optimize_request.test.json", "r", encoding="utf-8") as file:
+        return Response(
+            file.read(),
+            content_type="application/json",
+        )
+
+@app.route("/json/optimize_response.test.json", methods=["GET"])
+def get_optimize_response_test():
+    """
+    Retrieves the last optimization response and returns it as a JSON response.
+    """
+    with open(base_path + "/json/optimize_response.test.json", "r", encoding="utf-8") as file:
+        return Response(
+            file.read(),
+            content_type="application/json",
+        )
+
 
 @app.route("/json/current_controls.json", methods=["GET"])
 def get_controls():
@@ -923,7 +1004,7 @@ def get_controls():
         "inverter": {
             "inverter_special_data": (
                 inverter_interface.get_inverter_current_data()
-                if config_manager.config["inverter"]["type"] == "fronius_gen24"
+                if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]
                 and inverter_interface is not None
                 else None
             )
@@ -1046,25 +1127,54 @@ def handle_mode_override():
 
 
 if __name__ == "__main__":
-    http_server = WSGIServer(
-        ("0.0.0.0", config_manager.config["eos_connect_web_port"]),
-        app,
-        log=None,
-        error_log=logger,
-    )
-
+    http_server = None
     try:
+        # Create web server with port checking
+        HOST = "0.0.0.0"
+        desired_port = config_manager.config["eos_connect_web_port"]
+
+        logger.info("[Main] Initializing EOS Connect web server...")
+        http_server, actual_port = PortInterface.create_web_server_with_port_check(
+            HOST, desired_port, app, logger
+        )
+
+        logger.info(
+            "[Main] EOS Connect web server successfully created on %s:%s",
+            HOST,
+            actual_port,
+        )
+        logger.info(
+            "[Main] Web interface available at: http://localhost:%s", actual_port
+        )
+
+        # Start serving
+        logger.info("[Main] Starting EOS Connect web server...")
         http_server.serve_forever()
+
+    except RuntimeError as e:
+        # PortInterface already provides detailed error messages and solutions
+        logger.error("[Main] %s", str(e))
+        logger.error("[Main] EOS Connect cannot start without its web interface.")
+        sys.exit(1)
+
+    except Exception as e:
+        # Only handle truly unexpected errors (not port-related)
+        logger.error("[Main] Unexpected error: %s", str(e))
+        logger.error("[Main] EOS Connect cannot start. Please check the logs.")
+        sys.exit(1)
+
     except KeyboardInterrupt:
-        logger.info("[Main] Shutting down EOS connect")
+        logger.info("[Main] Shutting down EOS Connect (user requested)")
         optimization_scheduler.shutdown()
         base_control.shutdown()
-        http_server.stop()
-        logger.info("[Main] HTTP server stopped")
+        if http_server:
+            http_server.stop()
+            logger.info("[Main] HTTP server stopped")
 
         # restore the old config
         if (
-            config_manager.config["inverter"]["type"] == "fronius_gen24"
+            config_manager.config["inverter"]["type"]
+            in ["fronius_gen24", "fronius_gen24_v2"]
             and inverter_interface is not None
         ):
             inverter_interface.shutdown()
@@ -1072,7 +1182,7 @@ if __name__ == "__main__":
         mqtt_interface.shutdown()
         evcc_interface.shutdown()
         battery_interface.shutdown()
-        logger.info("[Main] Server stopped")
+        logger.info("[Main] Server stopped gracefully")
     finally:
-        logger.info("[Main] Cleanup complete. Exiting.")
+        logger.info("[Main] Cleanup complete. Goodbye!")
         sys.exit(0)

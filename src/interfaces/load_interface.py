@@ -7,7 +7,9 @@ load profiles based on historical energy consumption data.
 from datetime import datetime, timedelta
 import logging
 from urllib.parse import quote
+import zoneinfo
 import requests
+import pytz
 
 logger = logging.getLogger("__main__")
 logger.info("[LOAD-IF] loading module ")
@@ -23,7 +25,7 @@ class LoadInterface:
     def __init__(
         self,
         config,
-        timezone="UTC",
+        timezone=None,  # Changed default to None
     ):
         self.src = config.get("source", "")
         self.url = config.get("url", "")
@@ -31,7 +33,26 @@ class LoadInterface:
         self.car_charge_load_sensor = config.get("car_charge_load_sensor", "")
         self.additional_load_1_sensor = config.get("additional_load_1_sensor", "")
         self.access_token = config.get("access_token", "")
-        self.time_zone = timezone
+
+        # Handle timezone properly
+        if timezone == "UTC" or timezone is None:
+            self.time_zone = None  # Use local timezone
+        elif isinstance(timezone, str):
+            # Try to convert string timezone to proper timezone object
+            try:
+                self.time_zone = zoneinfo.ZoneInfo(timezone)
+            except ImportError:
+                # Fallback for older Python versions
+                try:
+                    self.time_zone = pytz.timezone(timezone)
+                except ImportError:
+                    logger.warning(
+                        "[LOAD-IF] Cannot parse timezone '%s', using local time",
+                        timezone,
+                    )
+                    self.time_zone = None
+        else:
+            self.time_zone = timezone
 
         self.__check_config()
 
@@ -648,7 +669,7 @@ class LoadInterface:
 
     def __create_load_profile_weekdays(self):
         """
-        Creates a load profile for weekdays based on historical data from Home Assistant.
+        Creates a load profile for weekdays based on historical data.
         This method calculates the average load profile for the same day of the week
         from one and two weeks prior, as well as the following day from one and two weeks prior.
         The resulting load profile is a combination of these averages.
@@ -658,17 +679,23 @@ class LoadInterface:
         Returns:
             list: A list of 48 values representing the combined load profile for the specified days.
         """
-        day_one_week_before = datetime.now(self.time_zone).replace(
+        # Use datetime.now() without timezone or with proper timezone object
+        if self.time_zone is None:
+            now = datetime.now()
+        else:
+            now = datetime.now(self.time_zone)
+
+        day_one_week_before = now.replace(
             hour=0, minute=0, second=0, microsecond=0
         ) - timedelta(days=7)
-        day_two_week_before = datetime.now(self.time_zone).replace(
+        day_two_week_before = now.replace(
             hour=0, minute=0, second=0, microsecond=0
         ) - timedelta(days=14)
 
-        day_tomorrow_one_week_before = datetime.now(self.time_zone).replace(
+        day_tomorrow_one_week_before = now.replace(
             hour=0, minute=0, second=0, microsecond=0
         ) - timedelta(days=6)
-        day_tomorrow_two_week_before = datetime.now(self.time_zone).replace(
+        day_tomorrow_two_week_before = now.replace(
             hour=0, minute=0, second=0, microsecond=0
         ) - timedelta(days=13)
         logger.info(

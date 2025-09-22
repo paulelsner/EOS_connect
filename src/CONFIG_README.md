@@ -19,6 +19,7 @@
   - [Config examples](#config-examples)
     - [Full Config Example (will be generated at first startup)](#full-config-example-will-be-generated-at-first-startup)
     - [Minimal possible Config Example](#minimal-possible-config-example)
+    - [Example: Using EVCC for PV Forecasts](#example-using-evcc-for-pv-forecasts)
 <!-- /TOC -->
 
 # Configuration
@@ -124,7 +125,9 @@ A default config file will be created with the first start, if there is no `conf
   URL for OpenHAB (e.g., `http://<ip>:8080`) or Home Assistant (e.g., `http://<ip>:8123`).
 
 - **`battery.soc_sensor`**:  
-  Item/entity name for the SOC sensor (OpenHAB item/Home Assistant sensor).
+  Item/entity name for the SOC sensor (OpenHAB item/Home Assistant sensor). 
+
+  *Hint for openhab: Supported format is decimal (0-1) or percentage (0 -100) or with UoM ('0 %'- '100 %')*
 
 - **`battery.access_token`**:  
   Access token for Home Assistant (optional).
@@ -166,18 +169,23 @@ This section contains two subsections:
 - `pv_forecast_source`
 - `pv_forecast`
 
+**Important:** All supported PV forecast providers (akkudoktor, openmeteo, openmeteo_local, forecast_solar, evcc) use the same azimuth convention where **0° = South** and **negative values = East**. No conversion is needed when switching between providers.
+
 `pv_forecast_source` section declares the provider of solar forecast that should be used. Available providers are
 - `akkudoktor` - https://api.akkudoktor.net/ - direct request and results
 - `openmeteo` - https://open-meteo.com/en/docs - uses the [open-meteo-solar-forecast](https://github.com/rany2/open-meteo-solar-forecast) (no horizon possible by the lib at this time)
 - `openmeteo_local` - https://open-meteo.com/en/docs - gathering radiation and cloudcover data and calculating locally with an own model - still in dev to improve the calculation
 - `forecast_solar` - https://doc.forecast.solar/api - direct request and results
+- `evcc` - retrieves forecasts from an existing EVCC installation via API - requires EVCC section to be configured
 default is uses akkudoktor
+
+**Temperature Forecasts**: EOS Connect also fetches temperature forecasts to improve optimization accuracy, as temperature affects battery efficiency and energy consumption patterns. When using provider-specific configurations (akkudoktor, openmeteo, etc.), temperature data is automatically retrieved using the same geographical coordinates. When using EVCC, localized temperature forecasts require at least one PV configuration entry with coordinates.
 
 `pv_forecast` section allows you to define multiple PV forecast entries, each distinguished by a user-given name. Below is an example of a default PV forecast configuration:
 
 ```yaml
 pv_forecast_source:
-  source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, forecast_solar, default (default uses akkudoktor)
+  source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local, forecast_solar, evcc, default (default uses akkudoktor)
 pv_forecast:
   - name: myPvInstallation1  # User-defined identifier for the PV installation, must be unique if you use multiple installations
     lat: 47.5  # Latitude for PV forecast @ Akkudoktor API
@@ -201,7 +209,13 @@ pv_forecast:
   Longitude for the PV forecast.
 
 - **`azimuth`**:  
-  Azimuth angle for the PV forecast.
+  Azimuth angle for the PV forecast in degrees. **All supported forecast providers use the same solar/PV industry standard convention:**
+  - **0° = South** (optimal orientation for Northern Hemisphere)
+  - **90° = West**
+  - **180° = North** 
+  - **-90° = East** (negative values for east-facing)
+  
+  **Example orientations:** A south-facing roof would use `azimuth: 0`, while a garage facing southeast would use `azimuth: -45`, and a carport facing west would use `azimuth: 90`. An east-facing installation would use `azimuth: -90`.
 
 - **`tilt`**:  
   Tilt angle for the PV forecast.
@@ -226,18 +240,21 @@ pv_forecast:
 
 - **`inverter.type`**:  
   Specifies the type of inverter. Possible values:  
-  - `fronius_gen24`: Use the Fronius Gen24 inverter.
+  - `fronius_gen24`: Use the Fronius Gen24 inverter (enhanced V2 interface with firmware-based authentication for all firmware versions).
+  - `fronius_gen24_legacy`: Use the Fronius Gen24 inverter (legacy V1 interface for corner cases).
   - `evcc`: Use the universal interface via evcc external battery control (evcc config below has to be valid).
   - `default`: Disable inverter control (only display the target state).
 
 - **`inverter.address`**:  
-  The IP address of the inverter. (only needed for fronius_gen24)
+  The IP address of the inverter. (only needed for fronius_gen24/fronius_gen24_legacy)
 
 - **`inverter.user`**:  
-  The username for the inverter's local portal. (only needed for fronius_gen24)
+  The username for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_legacy)
 
 - **`inverter.password`**:  
-  The password for the inverter's local portal. (only needed for fronius_gen24)
+  The password for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_legacy)
+  
+  **Note for enhanced interface**: The default `fronius_gen24` interface automatically detects your firmware version and uses the appropriate authentication method. If you recently updated your inverter firmware to 1.38.6-1+ or newer, you may need to reset your password in the WebUI (http://your-inverter-ip/) under Settings -> User Management. New firmware versions require password reset after updates to enable the improved encryption method.
 
 - **`inverter.max_grid_charge_rate`**:  
   The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
@@ -251,6 +268,8 @@ pv_forecast:
 
 - **`evcc.url`**:  
   The URL for the EVCC instance (e.g., `http://<ip>:7070`). If not used set to `url: ""` or leave as `url: http://yourEVCCserver:7070`
+
+**Note**: When using `evcc` as the `pv_forecast_source`, this EVCC configuration must be properly configured. EOS Connect will retrieve PV forecasts directly from the EVCC API instead of using individual PV installation configurations. In this case, the `pv_forecast` section can be left empty or minimal, as EVCC provides the aggregated forecast data.
 
 ---
 
@@ -371,10 +390,10 @@ pv_forecast:
     horizon: 10,20,10,15 # Horizon to calculate shading up to 360 values to describe shading situation for your PV.
 # Inverter configuration
 inverter:
-  type: default  # Type of inverter - fronius_gen24, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
-  address: 192.168.1.12 # Address of the inverter (fronius_gen24 only)
-  user: customer # Username for the inverter (fronius_gen24 only)
-  password: abc123 # Password for the inverter (fronius_gen24 only)
+  type: default  # Type of inverter - fronius_gen24, fronius_gen24_legacy, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
+  address: 192.168.1.12 # Address of the inverter (fronius_gen24, fronius_gen24_legacy only)
+  user: customer # Username for the inverter (fronius_gen24, fronius_gen24_legacy only)
+  password: abc123 # Password for the inverter (fronius_gen24, fronius_gen24_legacy only)
   max_grid_charge_rate: 5000 # Max inverter grid charge rate in W - default: 5000
   max_pv_charge_rate: 5000 # Max imverter PV charge rate in W - default: 5000
 # EVCC configuration
@@ -441,7 +460,7 @@ pv_forecast:
     horizon: 10,20,10,15 # Horizon to calculate shading up to 360 values to describe shading situation for your PV.
 # Inverter configuration
 inverter:
-  type: default  # Type of inverter - fronius_gen24, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
+  type: default  # Type of inverter - fronius_gen24, fronius_gen24_legacy, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
   max_grid_charge_rate: 5000 # Max inverter grid charge rate in W - default: 5000
   max_pv_charge_rate: 5000 # Max imverter PV charge rate in W - default: 5000
 # EVCC configuration
@@ -454,3 +473,23 @@ time_zone: Europe/Berlin # Default time zone - default: Europe/Berlin
 eos_connect_web_port: 8081 # Default port for EOS connect server - default: 8081
 log_level: info # Log level for the application : debug, info, warning, error - default: info
 ```
+
+### Example: Using EVCC for PV Forecasts
+
+When using EVCC as your PV forecast source, the configuration is simplified as EVCC provides the aggregated forecast data:
+
+```yaml
+# PV forecast source configuration - using EVCC
+pv_forecast_source:
+  source: evcc # Use EVCC for PV forecasts
+pv_forecast: [] # Can be left empty when using EVCC
+# EVCC configuration - REQUIRED when using evcc as pv_forecast_source
+evcc:
+  url: http://192.168.1.100:7070  # URL to your EVCC installation
+```
+
+In this configuration:
+- EVCC handles all PV installation details and provides aggregated forecasts
+- The `pv_forecast` section can be empty, but adding location coordinates improves temperature forecasts
+- The `evcc.url` must point to a reachable EVCC instance with API access enabled
+- Better temperature forecasts lead to more accurate energy optimization results

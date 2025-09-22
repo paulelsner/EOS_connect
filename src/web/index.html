@@ -267,6 +267,21 @@
         </div>
     </div>
     <script>
+        /*
+         * TIME HANDLING STRATEGY
+         * ======================
+         * 
+         * SERVER TIME: Used for all data processing and calculations (from data_response["timestamp"])
+         * USER TIME: Used for display - chart labels and schedule show in user's local timezone
+         * 
+         * This allows users in different timezones to see when events happen in their local time
+         * while maintaining consistent server-based data processing.
+         */
+        const TEST_MODE = false;
+        if (TEST_MODE) {
+            document.body.style.backgroundColor = 'lightgreen';
+        }
+
         let max_charge_power_w = 0;
         let inverter_mode_num = -1;
         let chartInstance = null;
@@ -370,26 +385,70 @@
         }
 
         function updateChart(data_request, data_response) {
-            const currentHour = new Date().getHours();
+            // Use server timestamp consistently for data processing
+            const serverTime = new Date(data_response["timestamp"]);
+            const currentHour = serverTime.getHours();
 
-            chartInstance.data.labels = Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length }, (_, i) => `${(currentHour + i) % 24}:00`);
-            //chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"].map(value => (value / 1000).toFixed(3));
+            // Create labels in user's local timezone - showing only hours with :00
+            chartInstance.data.labels = Array.from({ length: data_response["result"]["Last_Wh_pro_Stunde"].length },
+                (_, i) => {
+                    // Create a new date object for each hour label in user's timezone
+                    const labelTime = new Date(serverTime.getTime() + (i * 60 * 60 * 1000));
+                    const hour = labelTime.getHours();
+                    return `${hour.toString().padStart(2, '0')}:00`;
+                });
+
+            // Calculate consumption (excluding home appliances)
             chartInstance.data.datasets[0].data = data_response["result"]["Last_Wh_pro_Stunde"].map((value, index) => {
                 const actHomeApplianceValue = data_response["result"]["Home_appliance_wh_per_hour"].map(value => value)
                 return ((value - actHomeApplianceValue[index]) / 1000).toFixed(3);
             });
+
+            // Home appliances
             chartInstance.data.datasets[1].data = data_response["result"]["Home_appliance_wh_per_hour"].map(value => (value / 1000).toFixed(3));
+
+            // PV forecast
             chartInstance.data.datasets[2].data = data_request["ems"]["pv_prognose_wh"].slice(currentHour).concat(data_request["ems"]["pv_prognose_wh"].slice(24, 48)).map(value => (value / 1000).toFixed(3));
-            chartInstance.data.datasets[3].data = data_response["result"]["Netzbezug_Wh_pro_Stunde"].map((value, index) => {
-                const acChargeValue = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map(value => value * max_charge_power_w);
-                return ((value - acChargeValue[index]) / 1000).toFixed(3);
+
+            // Prepare arrays for grid and AC charge with redistribution logic
+            const gridData = [];
+            const acChargeData = [];
+
+            data_response["result"]["Netzbezug_Wh_pro_Stunde"].forEach((value, index) => {
+                const originalAcChargeValue = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48))[index] * max_charge_power_w;
+                let gridValue = (value - originalAcChargeValue) / 1000;
+                let adjustedAcChargeValue = originalAcChargeValue / 1000;
+
+                // Validation for invalid numbers
+                if (isNaN(gridValue) || !isFinite(gridValue)) {
+                    console.warn(`Invalid grid calculation at index ${index}: Netzbezug=${value}, AC_charge=${originalAcChargeValue}, using 0 for grid`);
+                    gridValue = 0;
+                    adjustedAcChargeValue = (value / 1000); // Treat all as AC charge
+                }
+                // If calculated grid value would be negative, show actual grid data and planned AC charge
+                else if (gridValue < 0) {
+                    console.info(`Negative calculated grid at index ${index}: ${gridValue.toFixed(3)}kW, showing actual Netzbezug=${(value / 1000).toFixed(3)}kW and planned AC charge=${(originalAcChargeValue / 1000).toFixed(3)}kW`);
+                    // Show actual grid consumption/feed-in from Netzbezug_Wh_pro_Stunde
+                    gridValue = value / 1000;
+                    // Show planned AC charge
+                    adjustedAcChargeValue = originalAcChargeValue / 1000;
+                }
+
+                gridData.push(gridValue.toFixed(3));
+                acChargeData.push(adjustedAcChargeValue.toFixed(3));
             });
-            chartInstance.data.datasets[4].data = data_response["ac_charge"].slice(currentHour).concat(data_response["ac_charge"].slice(24, 48)).map(value => (value * max_charge_power_w / 1000).toFixed(3));
+
+            // Set the calculated data
+            chartInstance.data.datasets[3].data = gridData; // Grid consumption
+            chartInstance.data.datasets[4].data = acChargeData; // AC charging (adjusted)
+
+            // Rest of the datasets remain unchanged
             chartInstance.data.datasets[5].data = data_response["result"]["akku_soc_pro_stunde"];
             chartInstance.data.datasets[6].data = data_response["result"]["Kosten_Euro_pro_Stunde"];
             chartInstance.data.datasets[7].data = data_response["result"]["Einnahmen_Euro_pro_Stunde"];
             chartInstance.data.datasets[8].data = data_response["result"]["Electricity_price"].map(value => value * 1000);
             chartInstance.data.datasets[9].data = data_response["discharge_allowed"].slice(currentHour).concat(data_response["discharge_allowed"].slice(24, 48));
+
             chartInstance.update('none'); // Update without animation
         }
 
@@ -431,7 +490,7 @@
 
         function setBatteryChargingData(data_response) {
             // planned charging
-            var currentHour = new Date().getHours();
+            var currentHour = new Date(data_response["timestamp"]).getHours(); // ✅ Use server time
             price_data = data_response["result"]["Electricity_price"];
             ac_charge = data_response["ac_charge"];
             //ac_charge = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -563,7 +622,7 @@
             } else {
                 document.getElementById('evcc_state').innerText = "not charging";
             }
-            
+
             let numOfConnectedVehicles = data_controls["evcc"]["current_sessions"].filter(session => session["connected"]).length;
             if (numOfConnectedVehicles > 1) {
                 data_controls["evcc"]["current_sessions"].forEach((session) => {
@@ -574,7 +633,7 @@
 
                         let vehicle_name = session["vehicleName"] || "Unknown Vehicle";
                         vehicle_name = vehicle_name.replace(/[^a-zA-Z0-9_]/g, '_'); // sanitize vehicle name for id
-                        
+
                         let displayName = session["vehicleName"] || "Unknown Vehicle";
                         // reduce vehicle name to 10 characters
                         if (displayName.length > 10)
@@ -890,7 +949,7 @@
             income_data = data_response["result"]["Einnahmen_Euro_pro_Stunde"];
             feed_in_data = data_response["result"]["Netzeinspeisung_Wh_pro_Stunde"];
 
-            let currentHour = new Date().getHours();
+            let currentHour = new Date(data_response["timestamp"]).getHours(); // ✅ Use server time
             let expense_today = expense_data.slice(0, 24 - currentHour).reduce((acc, value) => acc + value, 0).toFixed(2);
             document.getElementById('expense_summary').innerText = expense_today + " €";
             document.getElementById('expense_summary').title = "Expense for the rest of the day";
@@ -909,12 +968,14 @@
 
         function showSchedule(data_request, data_response) {
             //console.log("------- showSchedule -------");
-            var currentHour = new Date(data_response["timestamp"]).getHours();
+            var serverTime = new Date(data_response["timestamp"]);
+            var currentHour = serverTime.getHours();
             var discharge_allowed = data_response["discharge_allowed"];
             var ac_charge = data_response["ac_charge"];
-            // for testing
-            //discharge_allowed = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0];
-            //ac_charge = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
+            // Add timezone indicator to schedule header
+            document.getElementById('load_schedule_header').innerHTML =
+                ` Schedule next 24 hours <small>(Local Time)</small>`;
 
             ac_charge = ac_charge.map((value, index) => value * max_charge_power_w);
             var priceData = data_response["result"]["Electricity_price"];
@@ -945,7 +1006,10 @@
 
                 var cell1 = document.createElement('div');
                 cell1.className = 'table-cell';
-                cell1.innerHTML = ((index + currentHour) % 24) + ":00";
+                // cell1.innerHTML = ((index + currentHour) % 24) + ":00";
+                const labelTime = new Date(serverTime.getTime() + (index * 60 * 60 * 1000));
+                cell1.innerHTML = labelTime.getHours().toString().padStart(2, '0') + ":00";
+                
                 cell1.style.textAlign = "right";
                 row.appendChild(cell1);
 
@@ -1085,10 +1149,18 @@
 
         async function init() {
             // base chart
-            const data_request = await fetch_EOS_Connect_Data("optimize_request.json");
+            if (TEST_MODE) {
+                var data_request = await fetch_EOS_Connect_Data("optimize_request.test.json");
+                var data_response = await fetch_EOS_Connect_Data("optimize_response.test.json");
+            } else {
+                var data_request = await fetch_EOS_Connect_Data("optimize_request.json");
+                var data_response = await fetch_EOS_Connect_Data("optimize_response.json");
+            }
+            // const data_request = await fetch_EOS_Connect_Data("optimize_request.json");
             // max_charge_power_w according to optimize_request api version
             max_charge_power_w = data_request["pv_akku"] && data_request["pv_akku"].hasOwnProperty("max_ladeleistung_w") ? data_request["pv_akku"]["max_ladeleistung_w"] : data_request["pv_akku"] ? data_request["pv_akku"]["max_charge_power_w"] : 0;
-            const data_response = await fetch_EOS_Connect_Data("optimize_response.json");
+
+            // const data_response = await fetch_EOS_Connect_Data("optimize_response.json");
 
             await showCurrentData();
 

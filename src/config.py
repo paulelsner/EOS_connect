@@ -84,7 +84,7 @@ class ConfigManager:
                         "max_charge_power_w": 5000,
                         "min_soc_percentage": 5,
                         "max_soc_percentage": 100,
-                        "price_euro_per_wh_accu": 0.0,  # price for battery in euro/kWh
+                        "price_euro_per_wh_accu": 0.0,  # price for battery in euro/Wh
                         "charging_curve_enabled": True,  # enable charging curve
                     }
                 ),
@@ -254,7 +254,7 @@ class ConfigManager:
             "URL for battery soc in %", "max_soc_percentage"
         )
         config["battery"].yaml_add_eol_comment(
-            "price for battery in euro/kWh - default: 0.0", "price_euro_per_wh_accu"
+            "price for battery in euro/Wh - default: 0.0", "price_euro_per_wh_accu"
         )
         config["battery"].yaml_add_eol_comment(
             "enabling charging curve for controlled charging power"+
@@ -268,7 +268,7 @@ class ConfigManager:
         )
         config["pv_forecast_source"].yaml_add_eol_comment(
             "data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local,"
-            + " forecast_solar, (default uses akkudoktor)",
+            + " forecast_solar, evcc, default (default uses akkudoktor)",
             "source",
         )
         # pv forecast configuration
@@ -317,19 +317,19 @@ class ConfigManager:
             "inverter", before="Inverter configuration"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Type of inverter - fronius_gen24, evcc, default"
+            "Type of inverter - fronius_gen24, fronius_gen24_legacy, evcc, default"
             + " (default will disable inverter control -"
             + " only displaying the target state) - preset: default",
             "type",
         )
         config["inverter"].yaml_add_eol_comment(
-            "Address of the inverter (fronius_gen24 only)", "address"
+            "Address of the inverter (fronius_gen24/fronius_gen24_legacy only)", "address"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Username for the inverter (fronius_gen24 only)", "user"
+            "Username for the inverter (fronius_gen24/fronius_gen24_legacy only)", "user"
         )
         config["inverter"].yaml_add_eol_comment(
-            "Password for the inverter (fronius_gen24 only)", "password"
+            "Password for the inverter (fronius_gen24/fronius_gen24_legacy only)", "password"
         )
         config["inverter"].yaml_add_eol_comment(
             "Max inverter grid charge rate in W - default: 5000", "max_grid_charge_rate"

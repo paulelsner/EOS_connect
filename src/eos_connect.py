@@ -29,13 +29,11 @@ from interfaces.port_interface import PortInterface
 
 # Check Python version early
 if sys.version_info < (3, 11):
-    print(
-        (
-            f"ERROR: Python 3.11 or higher is required. "
-            f"You are running Python {sys.version_info.major}.{sys.version_info.minor}"
-        )
+    sys.stderr.write(
+        f"ERROR: Python 3.11 or higher is required. "
+        f"You are running Python {sys.version_info.major}.{sys.version_info.minor}\n"
     )
-    print("Please upgrade your Python installation.")
+    sys.stderr.write("Please upgrade your Python installation.\n")
     sys.exit(1)
 
 EOS_TGT_DURATION = 48

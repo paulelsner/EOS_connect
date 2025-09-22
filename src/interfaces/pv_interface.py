@@ -857,6 +857,16 @@ class PvInterface:
                 pv_forecast,
             )
             return pv_forecast
+        else:
+            logger.error("[PV-IF] No valid solar forecast data found in EVCC API.")
+            self.pv_forcast_request_error["error"] = "no_valid_data"
+            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
+            self.pv_forcast_request_error["message"] = (
+                "No valid solar forecast data found in EVCC API."
+            )
+            self.pv_forcast_request_error["config_entry"] = pv_config_entry
+            self.pv_forcast_request_error["source"] = "evcc"
+            return []
 
     def test_output(self):
         """

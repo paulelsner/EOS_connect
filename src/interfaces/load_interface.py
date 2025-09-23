@@ -250,13 +250,15 @@ class LoadInterface:
                         + quote((current_time + timedelta(hours=2)).isoformat())
                         + ")"
                     )
-                logger.error(
-                    "[LOAD-IF] Error processing energy ('%s') data"
-                    + " at index %d: %s (next: %s) - %s %s",
-                    debug_sensor if debug_sensor is not None else "",
-                    i,
-                    data["data"][i],
-                    data["data"][i + 1],
+                logger.warning(
+                    "[LOAD-IF] Skipping invalid sensor data for '%s' at %s: state '%s' cannot be"
+                    + " processed (%s). "
+                    "This may indicate missing or corrupted data in the database. %s",
+                    debug_sensor if debug_sensor is not None else "unknown sensor",
+                    datetime.fromisoformat(data["data"][i]["last_updated"]).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    data["data"][i]["state"],
                     str(e),
                     debug_url if debug_url is not None else "",
                 )

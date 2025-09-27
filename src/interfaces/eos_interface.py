@@ -71,7 +71,9 @@ class EosInterface:
         self.last_start_solution = None
         self.home_appliance_released = False
         self.home_appliance_start_hour = None
-        self.eos_version = None
+        self.eos_version = (
+            ">=2025-04-09"  # use as default value in case version check fails
+        )
         self.eos_version = self.__retrieve_eos_version()
 
     # EOS basic API helper
@@ -132,6 +134,7 @@ class EosInterface:
             request_url,
             timeout,
         )
+        response = None  # Initialize response variable
         try:
             start_time = time.time()
             response = requests.post(
@@ -150,22 +153,33 @@ class EosInterface:
         except requests.exceptions.Timeout:
             logger.error("[EOS] OPTIMIZE Request timed out after %s seconds", timeout)
             return {"error": "Request timed out - trying again with next run"}
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.ConnectionError as e:
             logger.error(
-                "[EOS] OPTIMIZE Request failed: %s - response: %s", e, response
+                "[EOS] OPTIMIZE Connection error - EOS server not reachable at %s "
+                + "will try again with next cycle - error: %s",
+                request_url,
+                str(e),
             )
+            return {
+                "error": f"EOS server not reachable at {self.base_url} "
+                + "will try again with next cycle"
+            }
+        except requests.exceptions.RequestException as e:
+            logger.error("[EOS] OPTIMIZE Request failed: %s", e)
+            if response is not None:
+                logger.error("[EOS] OPTIMIZE Response status: %s", response.status_code)
+                logger.debug(
+                    "[EOS] OPTIMIZE ERROR - response of EOS is:"
+                    + "\n---RESPONSE-------------------------------------------------\n %s"
+                    + "\n------------------------------------------------------------",
+                    response.text,
+                )
             logger.debug(
-                "[EOS] OPTIMIZE ERROR - payload for the request was:"+
-                "\n---REQUEST--------------------------------------------------\n %s"+
-                "\n------------------------------------------------------------",
-                payload
+                "[EOS] OPTIMIZE ERROR - payload for the request was:"
+                + "\n---REQUEST--------------------------------------------------\n %s"
+                + "\n------------------------------------------------------------",
+                payload,
             )
-            logger.debug(
-                "[EOS] OPTIMIZE ERROR - response of EOS is:"+
-                "\n---RESPONSE-------------------------------------------------\n %s"+
-                "\n------------------------------------------------------------",
-                 response.text
-            )            
             return {"error": str(e)}
 
     def examine_response_to_control_data(self, optimized_response_in):
@@ -248,7 +262,8 @@ class EosInterface:
             else:
                 self.home_appliance_released = False
             logger.debug(
-                "[EOS] RESPONSE Home appliance - current hour %s:00 - start hour %s - is Released: %s",
+                "[EOS] RESPONSE Home appliance - current hour %s:00"
+                + " - start hour %s - is Released: %s",
                 current_hour,
                 self.home_appliance_start_hour,
                 self.home_appliance_released,
@@ -315,7 +330,7 @@ class EosInterface:
             bool: True if the home appliance is released, False otherwise.
         """
         return self.home_appliance_released
-    
+
     def get_home_appliance_start_hour(self):
         """
         Get the home appliance start hour.
@@ -389,28 +404,42 @@ class EosInterface:
                 return eos_version
             else:
                 logger.error(
-                    "[EOS] HTTP error occurred while getting EOS version: %s", e
+                    "[EOS] HTTP error occurred while getting EOS version"
+                    + " - use preset version: %s : %s - Response: %s",
+                    self.eos_version,
+                    e,
+                    e.response.text if e.response else "No response",
                 )
-            return None
+                return self.eos_version  # return preset version if error occurs
         except requests.exceptions.ConnectTimeout:
             logger.error(
-                "[EOS] Failed to get EOS version - Server not reachable:"+
-                " Connection to %s timed out",
+                "[EOS] Failed to get EOS version  - use preset version: '%s'"
+                + " - Server not reachable: Connection to %s timed out",
+                self.eos_version,
                 self.base_url,
             )
-            return "Server not reachable"
+            return self.eos_version  # return preset version if error occurs
         except requests.exceptions.ConnectionError as e:
             logger.error(
-                "[EOS] Failed to get EOS version - Server not reachable: Connection error: %s",
+                "[EOS] Failed to get EOS version - use preset version: '%s' - Connection error: %s",
+                self.eos_version,
                 e,
             )
-            return "Server not reachable"
+            return self.eos_version  # return preset version if error occurs
         except requests.exceptions.RequestException as e:
-            logger.error("[EOS] Failed to get EOS version - Error: %s", e)
-            return None
+            logger.error(
+                "[EOS] Failed to get EOS version - use preset version: '%s' - Error: %s ",
+                self.eos_version,
+                e,
+            )
+            return self.eos_version  # return preset version if error occurs
         except json.JSONDecodeError as e:
-            logger.error("[EOS] Failed to decode EOS version response: %s", e)
-            return None
+            logger.error(
+                "[EOS] Failed to decode EOS version - use preset version: '%s' - response: %s ",
+                self.eos_version,
+                e,
+            )
+            return self.eos_version  # return preset version if error occurs
 
     def get_eos_version(self):
         """

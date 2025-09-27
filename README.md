@@ -153,12 +153,13 @@ Get up and running with EOS Connect in just a few steps!
 - **Home Assistant** (recommended for most users)  
   *(Or see [Installation and Running](#installation-and-running) for Docker and local options)*
 - **An already running instance of [EOS (Energy Optimization System)](https://github.com/Akkudoktor-EOS/EOS)**  
-  EOS Connect acts as a client and requires a reachable EOS server for optimization and control.
+  EOS Connect acts as a client and requires a reachable EOS server for optimization and control. (Or use the EOS HA addon mentioned in next step.)
 - **Properly configured EOS for prediction** (see [EOS Configuration Requirements](#eos-configuration-requirements) below)
 
 ### 2. Install via Home Assistant Add-on
 
 - Add the [ohAnd/ha_addons](https://github.com/ohAnd/ha_addons) repository to your Home Assistant add-on store.
+- [if needed] Add the [Duetting/ha_eos_addon](https://github.com/Duetting/ha_eos_addon) (or [thecem/ha_eos_addon](https://github.com/thecem/ha_eos_addon)) repository to your Home Assistant add-on store.
 - Install both the **EOS Add-on** and the **EOS Connect Add-on**.
 - Configure both add-ons via the Home Assistant UI.
 - Start both add-ons.  

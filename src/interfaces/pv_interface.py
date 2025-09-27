@@ -178,7 +178,9 @@ class PvInterface:
             # special temp forecast if pv config is not given in detail
             if self.config and self.config[0]:
                 self.temp_forecast_array = self.__get_pv_forecast_akkudoktor_api(
-                    tgt_value="temperature", pv_config_entry=self.config[0], tgt_duration=48
+                    tgt_value="temperature",
+                    pv_config_entry=self.config[0],
+                    tgt_duration=48,
                 )
             else:
                 self.temp_forecast_array = self.__get_default_temperature_forecast()
@@ -800,73 +802,102 @@ class PvInterface:
         """
         if self.config_special.get("url", "") == "":
             logger.error(
-                "[PV-IF] No EVCC URL configured for EVCC PV forecast - using default"
+                "[PV-IF] No EVCC URL configured for EVCC PV forecast - using default PV forecast"
             )
             return self.__get_default_pv_forcast(pv_config_entry.get("power", 200))
 
         url = self.config_special.get("url", "").rstrip("/") + "/api/state"
         logger.debug("[PV-IF] Fetching PV forecast from EVCC API: %s", url)
+
+        # Network request handling
         try:
             response = requests.get(url, timeout=5)
             response.raise_for_status()
-            self.pv_forcast_request_error["error"] = None
         except requests.exceptions.Timeout:
-            logger.error("[PV-IF] EVCC API request timed out.")
-            self.pv_forcast_request_error["error"] = "timeout"
-            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
-            self.pv_forcast_request_error["message"] = "EVCC API request timed out."
-            self.pv_forcast_request_error["config_entry"] = pv_config_entry
-            self.pv_forcast_request_error["source"] = "evcc"
-            return []
+            return self._handle_interface_error(
+                "timeout", "EVCC API request timed out.", pv_config_entry
+            )
         except requests.exceptions.RequestException as e:
-            logger.error("[PV-IF] EVCC API request failed: %s", e)
-            self.pv_forcast_request_error["error"] = "request_failed"
-            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
-            self.pv_forcast_request_error["message"] = f"EVCC API request failed: {e}"
-            self.pv_forcast_request_error["config_entry"] = pv_config_entry
-            self.pv_forcast_request_error["source"] = "evcc"
-            return []
-        data = response.json()
-        # print("raw evcc api data: %s", data)
-        solar_forecast_all = data.get("forecast", []).get("solar", [])
-        solar_forecast_scale = solar_forecast_all.get("scale", "unknown")
-        logger.debug(
-            "[PV-IF] EVCC API solar forecast received with scale: %s",
-            solar_forecast_scale,
-        )
-        solar_forecast = solar_forecast_all.get("timeseries", [])
+            return self._handle_interface_error(
+                "request_failed", f"EVCC API request failed: {e}", pv_config_entry
+            )
 
+        # JSON parsing and data extraction
+        try:
+            data = response.json()
+            solar_forecast_all = data.get("forecast", {}).get("solar", {})
+            solar_forecast_scale = solar_forecast_all.get("scale", "unknown")
+            solar_forecast = solar_forecast_all.get("timeseries", [])
 
-        if solar_forecast and isinstance(solar_forecast, list):
-            # Extract values from the timeseries format
+            logger.debug(
+                "[PV-IF] EVCC API solar forecast received with scale: %s",
+                solar_forecast_scale,
+            )
+
+        except (ValueError, TypeError) as e:
+            return self._handle_interface_error(
+                "invalid_json", f"Invalid JSON response: {e}", pv_config_entry
+            )
+        except (KeyError, AttributeError) as e:
+            return self._handle_interface_error(
+                "parsing_error", f"Error parsing forecast data: {e}", pv_config_entry
+            )
+
+        # Data validation and processing
+        if not solar_forecast or not isinstance(solar_forecast, list):
+            return self._handle_interface_error(
+                "no_valid_data",
+                "No valid solar forecast data found in EVCC API.",
+                pv_config_entry,
+            )
+
+        try:
+            # Extract and process forecast values
             pv_forecast = [item.get("val", 0) for item in solar_forecast[:hours]]
-            # Ensure the list has exactly 'hours' entries
+
+            # Ensure correct array length
             if len(pv_forecast) < hours:
                 pv_forecast.extend([0] * (hours - len(pv_forecast)))
             elif len(pv_forecast) > hours:
                 pv_forecast = pv_forecast[:hours]
 
-            # Scale each value according to the solar_forecast_scale (e.g., 0.5 or 0.75)
+            # Apply scaling factor
             try:
                 scale_factor = float(solar_forecast_scale)
             except (TypeError, ValueError):
                 scale_factor = 1.0
+
             pv_forecast = [val * scale_factor for val in pv_forecast]
+
+            # Clear any previous errors on success
+            self.pv_forcast_request_error["error"] = None
+
             logger.debug(
                 "[PV-IF] EVCC PV forecast for given evcc pv config (Wh): %s",
                 pv_forecast,
             )
             return pv_forecast
-        else:
-            logger.error("[PV-IF] No valid solar forecast data found in EVCC API.")
-            self.pv_forcast_request_error["error"] = "no_valid_data"
-            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
-            self.pv_forcast_request_error["message"] = (
-                "No valid solar forecast data found in EVCC API."
+
+        except (TypeError, ValueError, AttributeError) as e:
+            return self._handle_interface_error(
+                "processing_error",
+                f"Error processing forecast values: {e}",
+                pv_config_entry,
             )
-            self.pv_forcast_request_error["config_entry"] = pv_config_entry
-            self.pv_forcast_request_error["source"] = "evcc"
-            return []
+
+    def _handle_interface_error(self, error_type, message, pv_config_entry):
+        """
+        Centralized error handling for API errors.
+        """
+        logger.error("[PV-IF] %s", message)
+        self.pv_forcast_request_error.update({
+            "error": error_type,
+            "timestamp": datetime.now().isoformat(),
+            "message": message,
+            "config_entry": pv_config_entry,
+            "source": "evcc"
+        })
+        return []
 
     def test_output(self):
         """

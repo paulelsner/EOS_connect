@@ -104,6 +104,12 @@ class PriceInterface:
         self.current_feedin = []
         self.default_prices = [0.0001] * 48  # if external data are not available
 
+        # Add retry mechanism attributes
+        self.last_successful_prices = []
+        self.last_successful_prices_direct = []
+        self.consecutive_failures = 0
+        self.max_failures = 5
+
         self.__check_config()  # Validate configuration parameters
         logger.info(
             "[PRICE-IF] Initialized with"
@@ -254,11 +260,43 @@ class PriceInterface:
             )
 
         if not prices:
-            logger.error(
-                "[PRICE-IF] No prices retrieved. Using default prices (0,10 ct/kWh)."
-            )
-            prices = self.default_prices
-            self.current_prices_direct = self.default_prices.copy()
+            self.consecutive_failures += 1
+
+            if (
+                self.consecutive_failures <= self.max_failures
+                and self.last_successful_prices
+            ):
+                logger.warning(
+                    "[PRICE-IF] No prices retrieved (failure %d/%d). Using last successful prices.",
+                    self.consecutive_failures,
+                    self.max_failures,
+                )
+                prices = self.last_successful_prices[:tgt_duration]
+                self.current_prices_direct = self.last_successful_prices_direct[
+                    :tgt_duration
+                ]
+
+                # Extend if needed
+                if len(prices) < tgt_duration:
+                    remaining_hours = tgt_duration - len(prices)
+                    prices.extend(self.last_successful_prices[:remaining_hours])
+                    self.current_prices_direct.extend(
+                        self.last_successful_prices_direct[:remaining_hours]
+                    )
+            else:
+                logger.error(
+                    "[PRICE-IF] No prices retrieved after %d consecutive failures."
+                    + " Using default prices (0.10 ct/kWh).",
+                    self.consecutive_failures,
+                )
+                prices = self.default_prices[:tgt_duration]
+                self.current_prices_direct = self.default_prices[:tgt_duration].copy()
+        else:
+            # Success - reset failure counter and store successful prices
+            self.consecutive_failures = 0
+            self.last_successful_prices = prices.copy()
+            self.last_successful_prices_direct = self.current_prices_direct.copy()
+            logger.debug("[PRICE-IF] Prices retrieved successfully. Stored as backup.")
 
         return prices
 

@@ -308,10 +308,10 @@ class EvccInterface:
             return None
         # check if there are more than one loadpoints
         loadpoints = data["loadpoints"] if data["loadpoints"] else None
-        logger.debug(
-            "[EVCC] got 1st loadpoint: %s",
-            loadpoints[0].get("title") if loadpoints else "None",
-        )
+        # logger.debug(
+        #     "[EVCC] got 1st loadpoint: %s",
+        #     loadpoints[0].get("title") if loadpoints else "None",
+        # )
 
         vehicles = data.get("vehicles", {})
 
@@ -363,10 +363,10 @@ class EvccInterface:
             ):
                 sum_charging_mode = sum_charging_mode + "+now"
 
-            logger.debug(
-                "[EVCC] No charging loadpoints found."
-                + " Setting charging mode to first connected loadpoint."
-            )
+            # logger.debug(
+            #     "[EVCC] No charging loadpoints found."
+            #     + " Setting charging mode to first connected loadpoint."
+            # )
 
         # Check if the charging state has changed
         if sum_charging_state != self.last_known_charging_state:
@@ -436,7 +436,7 @@ class EvccInterface:
                   or None if the request fails or times out.
         """
         evcc_url = self.url + "/api/state"
-        logger.debug("[EVCC] fetching evcc state with url: %s", evcc_url)
+        # logger.debug("[EVCC] fetching evcc state with url: %s", evcc_url)
         try:
             response = requests.get(evcc_url, timeout=6)
             response.raise_for_status()

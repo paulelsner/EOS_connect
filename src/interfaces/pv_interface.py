@@ -723,7 +723,6 @@ class PvInterface:
                 ]
                 # Ensure the list has 24 values, repeating if necessary
                 horizon = (horizon * (24 // len(horizon) + 1))[:24]
-                # logger.debug("[PV-IF] Horizon values: %s", horizon)
             else:
                 logger.debug(
                     "[PV-IF] No horizon values provided, using default empty list"
@@ -735,66 +734,68 @@ class PvInterface:
             f"?horizon={','.join(map(str, horizon))}"
         )
         logger.debug("[PV-IF] Fetching PV forecast from Forecast.Solar API: %s", url)
+        
+        # Network request handling
         try:
             response = requests.get(url, timeout=5)
             response.raise_for_status()
-            self.pv_forcast_request_error["error"] = None
         except requests.exceptions.Timeout:
-            logger.error("[PV-IF] Forecast.Solar API request timed out.")
-            self.pv_forcast_request_error["error"] = "timeout"
-            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
-            self.pv_forcast_request_error["message"] = (
-                "Forecast.Solar API request timed out."
+            return self._handle_interface_error(
+                "timeout", "Forecast.Solar API request timed out.", pv_config_entry, "forecast_solar"
             )
-            self.pv_forcast_request_error["config_entry"] = pv_config_entry
-            self.pv_forcast_request_error["source"] = "forecast_solar"
-            return []
         except requests.exceptions.RequestException as e:
-            logger.error("[PV-IF] Forecast.Solar API request failed: %s", e)
-            # logger.error("[PV-IF] Forecast.Solar API error response: %s", response.json())
-            self.pv_forcast_request_error["error"] = "request_failed"
-            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
-            self.pv_forcast_request_error["message"] = (
-                f"Forecast.Solar API request failed: {e}"
+            return self._handle_interface_error(
+                "request_failed", f"Forecast.Solar API request failed: {e}", pv_config_entry, "forecast_solar"
             )
-            self.pv_forcast_request_error["config_entry"] = pv_config_entry
-            self.pv_forcast_request_error["source"] = "forecast_solar"
-            return []
-        data = response.json()
-        # logger.debug("[PV-IF] Forecast.Solar API response: %s", data)
-        watt_hours_period = data.get("result", {}).get("watt_hours_period", {})
+        
+        # JSON parsing and data extraction
+        try:
+            data = response.json()
+            watt_hours_period = data.get("result", {}).get("watt_hours_period", {})
+        except (ValueError, TypeError) as e:
+            return self._handle_interface_error(
+                "invalid_json", f"Invalid JSON response: {e}", pv_config_entry, "forecast_solar"
+            )
+        except (KeyError, AttributeError) as e:
+            return self._handle_interface_error(
+                "parsing_error", f"Error parsing forecast data: {e}", pv_config_entry, "forecast_solar"
+            )
 
+        # Data validation
         if not watt_hours_period:
-            logger.error("[PV-IF] No valid watt_hours_period data found.")
-            self.pv_forcast_request_error["error"] = "no_valid_data"
-            self.pv_forcast_request_error["timestamp"] = datetime.now().isoformat()
-            self.pv_forcast_request_error["message"] = (
-                "No valid watt_hours_period data found."
+            return self._handle_interface_error(
+                "no_valid_data", "No valid watt_hours_period data found.", pv_config_entry, "forecast_solar"
             )
-            self.pv_forcast_request_error["config_entry"] = pv_config_entry
-            self.pv_forcast_request_error["source"] = "forecast_solar"
-            return []
 
-        parsed = [
-            (datetime.strptime(ts, "%Y-%m-%d %H:%M:%S"), v)
-            for ts, v in watt_hours_period.items()
-        ]
-        min_time = min(dt for dt, _ in parsed)
-        # Align to midnight of the first day
-        midnight = min_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        # Build list of 48 hourly timestamps
-        hours = [midnight + timedelta(hours=i) for i in range(48)]
-        # Build a lookup dict for fast access
-        lookup = {dt: v for dt, v in parsed}
-        # Fill the forecast array
-        forecast_wh = []
-        for h in hours:
-            # Use value if exact hour exists, else 0
-            forecast_wh.append(lookup.get(h, 0))
+        # Data processing
+        try:
+            parsed = [
+                (datetime.strptime(ts, "%Y-%m-%d %H:%M:%S"), v)
+                for ts, v in watt_hours_period.items()
+            ]
+            min_time = min(dt for dt, _ in parsed)
+            # Align to midnight of the first day
+            midnight = min_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            # Build list of 48 hourly timestamps
+            hours_list = [midnight + timedelta(hours=i) for i in range(48)]
+            # Build a lookup dict for fast access
+            lookup = {dt: v for dt, v in parsed}
+            # Fill the forecast array
+            forecast_wh = []
+            for h in hours_list:
+                # Use value if exact hour exists, else 0
+                forecast_wh.append(lookup.get(h, 0))
 
-        pv_forecast = forecast_wh
-        # logger.debug("[PV-IF] Forecast.Solar PV forecast (Wh): %s", pv_forecast)
-        return pv_forecast
+            # Clear any previous errors on success
+            self.pv_forcast_request_error["error"] = None
+            
+            pv_forecast = forecast_wh
+            return pv_forecast
+            
+        except (ValueError, TypeError, AttributeError) as e:
+            return self._handle_interface_error(
+                "processing_error", f"Error processing forecast data: {e}", pv_config_entry, "forecast_solar"
+            )
 
     def __get_pv_forecast_evcc_api(self, pv_config_entry, hours=48):
         """
@@ -815,7 +816,7 @@ class PvInterface:
             response.raise_for_status()
         except requests.exceptions.Timeout:
             return self._handle_interface_error(
-                "timeout", "EVCC API request timed out.", pv_config_entry
+                "timeout", "EVCC API request timed out.", pv_config_entry, "evcc"
             )
         except requests.exceptions.RequestException as e:
             return self._handle_interface_error(
@@ -885,17 +886,17 @@ class PvInterface:
                 pv_config_entry,
             )
 
-    def _handle_interface_error(self, error_type, message, pv_config_entry):
+    def _handle_interface_error(self, error_type, message, pv_config_entry, source="unknown"):
         """
-        Centralized error handling for API errors.
+        Centralized error handling for all API errors.
         """
-        logger.error("[PV-IF] %s", message)
+        logger.error(f"[PV-IF] {message}")
         self.pv_forcast_request_error.update({
             "error": error_type,
             "timestamp": datetime.now().isoformat(),
             "message": message,
             "config_entry": pv_config_entry,
-            "source": "evcc"
+            "source": source
         })
         return []
 

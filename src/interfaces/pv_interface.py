@@ -317,11 +317,11 @@ class PvInterface:
             )
         elif self.config_source.get("source") == "openmeteo":
             # return self.__get_pv_forecast_openmeteo_api(config_entry, tgt_duration)
-            return self.__get_pv_forecast_openmeteo_lib(config_entry, tgt_duration)
+            return self.__get_pv_forecast_openmeteo_lib(config_entry)
         elif self.config_source.get("source") == "openmeteo_local":
             return self.__get_pv_forecast_openmeteo_api(config_entry, tgt_duration)
         elif self.config_source.get("source") == "forecast_solar":
-            return self.__get_pv_forecast_forecast_solar_api(config_entry, tgt_duration)
+            return self.__get_pv_forecast_forecast_solar_api(config_entry)
         elif self.config_source.get("source") == "evcc":
             return self.__get_pv_forecast_evcc_api(config_entry, tgt_duration)
         elif self.config_source.get("source") == "default":
@@ -361,119 +361,129 @@ class PvInterface:
         power and temperature values for the specified duration starting from the current hour.
         """
         if pv_config_entry is None:
-            logger.error(
-                "[PV-IF][akkudoktor] No PV config entry provided for target: %s",
-                tgt_value,
+            return self._handle_interface_error(
+                "config_error",
+                f"No PV config entry provided for target: {tgt_value}",
+                {},
+                "akkudoktor",
             )
-            return []
+
         forecast_request_payload = self.__create_forecast_request(pv_config_entry)
-        # print(forecast_request_payload)
-        recv_error = False
+
+        # Network request handling
         try:
             response = requests.get(forecast_request_payload, timeout=5)
             response.raise_for_status()
             day_values = response.json()
             day_values = day_values["values"]
         except requests.exceptions.Timeout:
-            logger.error(
-                "[PV-IF][akkudoktor] Request timed out while fetching PV forecast. (%s)",
-                tgt_value,
+            return self._handle_interface_error(
+                "timeout",
+                f"Akkudoktor API request timed out for {tgt_value}.",
+                pv_config_entry,
+                "akkudoktor",
             )
-            recv_error = True
         except requests.exceptions.RequestException as e:
-            logger.error(
-                "[PV-IF][akkudoktor] Request failed while fetching PV forecast (%s): %s",
-                tgt_value,
-                e,
+            return self._handle_interface_error(
+                "request_failed",
+                f"Akkudoktor API request failed for {tgt_value}: {e}",
+                pv_config_entry,
+                "akkudoktor",
             )
-            recv_error = True
-        if recv_error:
-            if tgt_value == "power":
-                logger.info(
-                    "[PV-IF][akkudoktor] Using default PV forecast with max %s W for %s",
-                    pv_config_entry["power"],
-                    pv_config_entry["name"],
-                )
-                # return a default forecast with 0% at night and 100% at noon
-                return self.__get_default_pv_forcast(pv_config_entry["power"])
-            else:
-                logger.info(
-                    "[PV-IF][akkudoktor] Using default temperature forecast for %s",
-                    pv_config_entry["name"],
-                )
-                # return a default temperature forecast with 0% at night and 100% at noon
-                return self.__get_default_temperature_forecast()
+        except (ValueError, TypeError) as e:
+            return self._handle_interface_error(
+                "invalid_json",
+                f"Invalid JSON response for {tgt_value}: {e}",
+                pv_config_entry,
+                "akkudoktor",
+            )
+        except (KeyError, AttributeError) as e:
+            return self._handle_interface_error(
+                "parsing_error",
+                f"Error parsing response structure for {tgt_value}: {e}",
+                pv_config_entry,
+                "akkudoktor",
+            )
 
-        forecast_values = []
-        tz = pytz.timezone(self.time_zone)
-        current_time = tz.localize(
-            datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        )
-        end_time = current_time + timedelta(hours=tgt_duration)
-        # logger.debug(
-        #     "[PV-IF] Fetching %s forecast for %s from %s to %s",
-        #     tgt_value,
-        #     pv_config_entry["name"],
-        #     current_time.isoformat(),
-        #     end_time.isoformat(),
-        # )
+        # Data processing
+        try:
+            forecast_values = []
+            tz = pytz.timezone(self.time_zone)
+            current_time = tz.localize(
+                datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            )
+            end_time = current_time + timedelta(hours=tgt_duration)
 
-        for forecast_entry in day_values:
-            for forecast in forecast_entry:
-                entry_time = datetime.fromisoformat(forecast["datetime"])
-                if entry_time.tzinfo is None:
-                    # If datetime is naive, localize it
-                    entry_time = pytz.timezone(self.time_zone).localize(entry_time)
+            for forecast_entry in day_values:
+                for forecast in forecast_entry:
+                    entry_time = datetime.fromisoformat(forecast["datetime"])
+                    if entry_time.tzinfo is None:
+                        # If datetime is naive, localize it
+                        entry_time = pytz.timezone(self.time_zone).localize(entry_time)
+                    else:
+                        # Convert to configured timezone
+                        entry_time = entry_time.astimezone(
+                            pytz.timezone(self.time_zone)
+                        )
+                    if current_time <= entry_time < end_time:
+                        value = forecast.get(tgt_value, 0)
+                        # if power is negative, set it to 0 (fixing wrong values from api)
+                        if tgt_value == "power" and value < 0:
+                            value = 0
+                        forecast_values.append(value)
+
+            # workaround for wrong time points in the forecast from akkudoktor
+            # remove first entry and append 0 to the end
+            if forecast_values:
+                forecast_values.pop(0)
+                forecast_values.append(0)
+
+            # fix for time changes e.g. western europe then fill or reduce
+            # the array to target duration
+            if len(forecast_values) > tgt_duration:
+                forecast_values = forecast_values[:tgt_duration]
+                logger.debug(
+                    "[PV-IF][akkudoktor] Day of time change - values reduced to %s for %s",
+                    tgt_duration,
+                    pv_config_entry.get("name", "unknown"),
+                )
+            elif len(forecast_values) < tgt_duration:
+                if forecast_values:
+                    forecast_values.extend(
+                        [forecast_values[-1]] * (tgt_duration - len(forecast_values))
+                    )
                 else:
-                    # Convert to configured timezone
-                    entry_time = entry_time.astimezone(pytz.timezone(self.time_zone))
-                if current_time <= entry_time < end_time:
-                    value = forecast.get(tgt_value, 0)
+                    forecast_values = [0] * tgt_duration
+                logger.debug(
+                    "[PV-IF][akkudoktor] Day of time change - values extended to %s for %s",
+                    tgt_duration,
+                    pv_config_entry.get("name", "unknown"),
+                )
 
-                    # logger.debug(
-                    #     "[PV-IF] Processing forecast entry at %s (%s) for value:  %s",
-                    #     entry_time.isoformat(), forecast["datetime"],
-                    #     value,
-                    # )
-                    # if power is negative, set it to 0 (fixing wrong values form api)
-                    if tgt_value == "power" and value < 0:
-                        value = 0
-                    forecast_values.append(value)
-        # workaround for wrong time points in the forecast from akkudoktor
-        # remove first entry and append 0 to the end
-        forecast_values.pop(0)
-        forecast_values.append(0)
+            # Clear any previous errors on success
+            self.pv_forcast_request_error["error"] = None
 
-        request_type = "PV forecast"
-        pv_config_name = "for " + pv_config_entry["name"]
-        if tgt_value == "temperature":
-            request_type = "Temperature forecast"
-            pv_config_name = ""
-        logger.debug(
-            "[PV-IF] %s fetched successfully %s",
-            request_type,
-            pv_config_name,
-        )
-        # fix for time changes e.g. western europe then fill or reduce the array to 48 values
-        if len(forecast_values) > tgt_duration:
-            forecast_values = forecast_values[:tgt_duration]
-            logger.debug(
-                "[PV-IF][akkudoktor] Day of time change %s values reduced to %s for %s",
-                request_type,
-                tgt_duration,
-                pv_config_name,
+            request_type = (
+                "PV forecast" if tgt_value == "power" else "Temperature forecast"
             )
-        elif len(forecast_values) < tgt_duration:
-            forecast_values.extend(
-                [forecast_values[-1]] * (tgt_duration - len(forecast_values))
+            pv_config_name = (
+                f"for {pv_config_entry.get('name', 'unknown')}"
+                if tgt_value == "power"
+                else ""
             )
             logger.debug(
-                "[PV-IF][akkudoktor] Day of time change %s values extended to %s for %s",
-                request_type,
-                tgt_duration,
-                pv_config_name,
+                "[PV-IF] %s fetched successfully %s", request_type, pv_config_name
             )
-        return forecast_values
+
+            return forecast_values
+
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
+            return self._handle_interface_error(
+                "processing_error",
+                f"Error processing {tgt_value} forecast data: {e}",
+                pv_config_entry,
+                "akkudoktor",
+            )
 
     def __get_horizon_elevation(self, sun_azimuth, horizon):
 
@@ -625,17 +635,17 @@ class PvInterface:
 
         return pv_forecast
 
-    def __get_pv_forecast_openmeteo_lib(self, pv_config_entry, hours=48):
+    def __get_pv_forecast_openmeteo_lib(self, pv_config_entry):
         """
         Synchronous wrapper for the async OpenMeteoSolarForecast.
         """
         return asyncio.run(
-            self.__get_pv_forecast_openmeteo_lib_async(pv_config_entry, hours)
+            self.__get_pv_forecast_openmeteo_lib_async(pv_config_entry)
         )
 
-    async def __get_pv_forecast_openmeteo_lib_async(self, pv_config_entry, hours=48):
+    async def __get_pv_forecast_openmeteo_lib_async(self, pv_config_entry):
         """
-        Fetches PV forecast from Forecast.Solar LIB.
+        Fetches PV forecast from OpenMeteo Solar Forecast library.
         """
         try:
             async with OpenMeteoSolarForecast(
@@ -648,59 +658,78 @@ class PvInterface:
             ) as forecast:
                 estimate = await forecast.estimate()
 
-                # Build an array of hourly values from now (hour=0) up
-                # to tomorrow midnight (48 hours)
-                pv_forecast = []
-                # Calculate the number of hours remaining until tomorrow midnight
-                # Use the current time in the forecast's timezone
-                # Always use the start of the current hour in the forecast's timezone
-                now = datetime.now(estimate.timezone).replace(
-                    minute=0, second=0, microsecond=0
-                )
-                # Find tomorrow's midnight in the forecast's timezone
-                tomorrow_midnight = (now + timedelta(days=2)).replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                )
-                hours_until_tomorrow_midnight = int(
-                    (tomorrow_midnight - now).total_seconds() // 3600
-                )
-                hours_from_today_midnight = int(
-                    (
-                        now - now.replace(hour=0, minute=0, second=0, microsecond=0)
-                    ).total_seconds()
-                    // 3600
-                )
-
-                for hour in range(
-                    -1 * hours_from_today_midnight, hours_until_tomorrow_midnight
-                ):
-                    current_hour_energy = 0
-                    for minute in range(59):
-                        current_hour_energy += estimate.power_production_at_time(
-                            now + timedelta(hours=hour, minutes=minute)
-                        )
-                    current_hour_energy = round(current_hour_energy / 60, 1)
-                    # time_point = now + timedelta(hours=hour, minutes=0)
-                    # logger.debug("TEST - : %s - %s", current_hour_energy, time_point)
-                    pv_forecast.append(current_hour_energy)
-
-                logger.debug(
-                    "[PV-IF] Openmeteo Lib PV forecast (Wh) (length: %s): %s",
-                    len(pv_forecast),
-                    pv_forecast,
-                )
-                return pv_forecast
         except (aiohttp.ClientError, ConnectionError) as e:
-            logger.error("[PV-IF] OpenMeteoLib SolarForecast connection error: %s", e)
-            # Return a default or empty forecast to avoid crashing the thread
-            return self.__get_default_pv_forcast(pv_config_entry.get("power", 200))
-        except (ValueError, KeyError, AttributeError, TypeError) as e:
-            logger.error(
-                "[PV-IF] Unexpected error in OpenMeteoLib SolarForecast: %s", e
+            return self._handle_interface_error(
+                "connection_error",
+                f"OpenMeteo Solar Forecast connection error: {e}",
+                pv_config_entry,
+                "openmeteo_lib",
             )
-            return self.__get_default_pv_forcast(pv_config_entry.get("power", 200))
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
+            return self._handle_interface_error(
+                "api_error",
+                f"OpenMeteo Solar Forecast API error: {e}",
+                pv_config_entry,
+                "openmeteo_lib",
+            )
 
-    def __get_pv_forecast_forecast_solar_api(self, pv_config_entry, hours=48):
+        # Data processing
+        try:
+            # Build an array of hourly values from now (hour=0) up
+            # to tomorrow midnight (48 hours)
+            pv_forecast = []
+            # Calculate the number of hours remaining until tomorrow midnight
+            # Use the current time in the forecast's timezone
+            # Always use the start of the current hour in the forecast's timezone
+            now = datetime.now(estimate.timezone).replace(
+                minute=0, second=0, microsecond=0
+            )
+            # Find tomorrow's midnight in the forecast's timezone
+            tomorrow_midnight = (now + timedelta(days=2)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            hours_until_tomorrow_midnight = int(
+                (tomorrow_midnight - now).total_seconds() // 3600
+            )
+            hours_from_today_midnight = int(
+                (
+                    now - now.replace(hour=0, minute=0, second=0, microsecond=0)
+                ).total_seconds()
+                // 3600
+            )
+
+            for hour in range(
+                -1 * hours_from_today_midnight, hours_until_tomorrow_midnight
+            ):
+                current_hour_energy = 0
+                for minute in range(59):
+                    current_hour_energy += estimate.power_production_at_time(
+                        now + timedelta(hours=hour, minutes=minute)
+                    )
+                current_hour_energy = round(current_hour_energy / 60, 1)
+                # time_point = now + timedelta(hours=hour, minutes=0)
+                # logger.debug("TEST - : %s - %s", current_hour_energy, time_point)
+                pv_forecast.append(current_hour_energy)
+
+            # Clear any previous errors on success
+            self.pv_forcast_request_error["error"] = None
+
+            logger.debug(
+                "[PV-IF] OpenMeteo Lib PV forecast (Wh) (length: %s): %s",
+                len(pv_forecast),
+                pv_forecast,
+            )
+            return pv_forecast
+
+        except (ValueError, TypeError, AttributeError) as e:
+            return self._handle_interface_error(
+                "processing_error",
+                f"Error processing OpenMeteo forecast data: {e}",
+                pv_config_entry,
+                "openmeteo_lib",
+            )
+
+    def __get_pv_forecast_forecast_solar_api(self, pv_config_entry):
         """
         Fetches PV forecast from Forecast.Solar API.
         """
@@ -734,37 +763,52 @@ class PvInterface:
             f"?horizon={','.join(map(str, horizon))}"
         )
         logger.debug("[PV-IF] Fetching PV forecast from Forecast.Solar API: %s", url)
-        
+
         # Network request handling
         try:
             response = requests.get(url, timeout=5)
             response.raise_for_status()
         except requests.exceptions.Timeout:
             return self._handle_interface_error(
-                "timeout", "Forecast.Solar API request timed out.", pv_config_entry, "forecast_solar"
+                "timeout",
+                "Forecast.Solar API request timed out.",
+                pv_config_entry,
+                "forecast_solar",
             )
         except requests.exceptions.RequestException as e:
             return self._handle_interface_error(
-                "request_failed", f"Forecast.Solar API request failed: {e}", pv_config_entry, "forecast_solar"
+                "request_failed",
+                f"Forecast.Solar API request failed: {e}",
+                pv_config_entry,
+                "forecast_solar",
             )
-        
+
         # JSON parsing and data extraction
         try:
             data = response.json()
             watt_hours_period = data.get("result", {}).get("watt_hours_period", {})
         except (ValueError, TypeError) as e:
             return self._handle_interface_error(
-                "invalid_json", f"Invalid JSON response: {e}", pv_config_entry, "forecast_solar"
+                "invalid_json",
+                f"Invalid JSON response: {e}",
+                pv_config_entry,
+                "forecast_solar",
             )
         except (KeyError, AttributeError) as e:
             return self._handle_interface_error(
-                "parsing_error", f"Error parsing forecast data: {e}", pv_config_entry, "forecast_solar"
+                "parsing_error",
+                f"Error parsing forecast data: {e}",
+                pv_config_entry,
+                "forecast_solar",
             )
 
         # Data validation
         if not watt_hours_period:
             return self._handle_interface_error(
-                "no_valid_data", "No valid watt_hours_period data found.", pv_config_entry, "forecast_solar"
+                "no_valid_data",
+                "No valid watt_hours_period data found.",
+                pv_config_entry,
+                "forecast_solar",
             )
 
         # Data processing
@@ -788,13 +832,16 @@ class PvInterface:
 
             # Clear any previous errors on success
             self.pv_forcast_request_error["error"] = None
-            
+
             pv_forecast = forecast_wh
             return pv_forecast
-            
+
         except (ValueError, TypeError, AttributeError) as e:
             return self._handle_interface_error(
-                "processing_error", f"Error processing forecast data: {e}", pv_config_entry, "forecast_solar"
+                "processing_error",
+                f"Error processing forecast data: {e}",
+                pv_config_entry,
+                "forecast_solar",
             )
 
     def __get_pv_forecast_evcc_api(self, pv_config_entry, hours=48):
@@ -886,18 +933,22 @@ class PvInterface:
                 pv_config_entry,
             )
 
-    def _handle_interface_error(self, error_type, message, pv_config_entry, source="unknown"):
+    def _handle_interface_error(
+        self, error_type, message, pv_config_entry, source="unknown"
+    ):
         """
         Centralized error handling for all API errors.
         """
-        logger.error(f"[PV-IF] {message}")
-        self.pv_forcast_request_error.update({
-            "error": error_type,
-            "timestamp": datetime.now().isoformat(),
-            "message": message,
-            "config_entry": pv_config_entry,
-            "source": source
-        })
+        logger.error("[PV-IF] %s", message)
+        self.pv_forcast_request_error.update(
+            {
+                "error": error_type,
+                "timestamp": datetime.now().isoformat(),
+                "message": message,
+                "config_entry": pv_config_entry,
+                "source": source,
+            }
+        )
         return []
 
     def test_output(self):

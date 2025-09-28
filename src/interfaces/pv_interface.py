@@ -27,10 +27,10 @@ import threading
 import logging
 import time
 import asyncio
+import math
 import aiohttp
 import pytz
 import requests
-import pvlib
 import pandas as pd
 import numpy as np
 from open_meteo_solar_forecast import OpenMeteoSolarForecast
@@ -560,41 +560,37 @@ class PvInterface:
         radiation = data["hourly"]["shortwave_radiation"][:hours]  # W/m²
         cloudcover = data["hourly"]["cloudcover"][:hours]  # %
 
-        # logger.debug(
-        #     "[PV-IF] Open-Meteo radiation: %s", radiation
-        # )
-
-        # Prepare time index for pvlib
-        times = pd.date_range(
-            start=data["hourly"]["time"][0], periods=hours, freq="h", tz=timezone
+        # Prepare time index - create datetime objects instead of pandas DatetimeIndex
+        start_time = datetime.fromisoformat(
+            data["hourly"]["time"][0].replace("Z", "+00:00")
         )
+        times = [start_time + timedelta(hours=i) for i in range(hours)]
 
-        # Get sun position
-        solpos = pvlib.solarposition.get_solarposition(times, latitude, longitude)
-        logger.debug("[PV-IF] Open-Meteo solar position calculated solpos - %s", solpos)
-
-        # Calculate angle of incidence (AOI)
-        aoi = pvlib.irradiance.aoi(
-            surface_tilt=tilt,
-            surface_azimuth=azimuth,
-            solar_zenith=solpos["apparent_zenith"],
-            solar_azimuth=solpos["azimuth"],
+        # Get sun position using our custom function
+        solpos = self._solar_position(times, latitude, longitude)
+        logger.debug(
+            "[PV-IF] Open-Meteo solar position calculated - first entry: %s", solpos[0]
         )
 
         # Calculate PV forecast
         pv_forecast = []
-        for rad, cc, angle, sun_az, sun_el in zip(
-            radiation,
-            cloudcover,
-            aoi,
-            solpos["azimuth"],
-            90 - solpos["apparent_zenith"],
-        ):
+        for i, (rad, cc) in enumerate(zip(radiation, cloudcover)):
+            # Calculate angle of incidence (AOI) using our custom function
+            aoi = self._angle_of_incidence(
+                surface_tilt=tilt,
+                surface_azimuth=azimuth,
+                solar_zenith=solpos[i]["apparent_zenith"],
+                solar_azimuth=solpos[i]["azimuth"],
+            )
+
+            sun_az = solpos[i]["azimuth"]
+            sun_el = 90 - solpos[i]["apparent_zenith"]
+
             # Adjust radiation for cloud cover
             eff_rad = rad * (1 - cc / 100) + rad * cloud_factor * (cc / 100)
 
             # Project radiation onto panel
-            projection = max(np.cos(np.radians(angle)), 0)
+            projection = max(math.cos(math.radians(aoi)), 0)
 
             # Adjust for panel efficiency (22,5% is a common value)
             eff_rad_panel = eff_rad * projection * 0.225
@@ -602,12 +598,6 @@ class PvInterface:
             # --- Horizon check ---
             horizon_elev = self.__get_horizon_elevation(sun_az, horizon)
             if sun_el < horizon_elev:
-                # logger.debug(
-                #     "[PV-IF] Sun elevation %s° is below horizon elevation %s° at azimuth %s°",
-                #     sun_el,
-                #     horizon_elev,
-                #     sun_az,
-                # )
                 eff_rad_panel = (
                     eff_rad_panel * 0.25
                 )  # Sun is behind local horizon - 25% of radiation
@@ -618,12 +608,6 @@ class PvInterface:
             )  # Assuming 220 W/m² as average panel efficiency for area estimation
             energy_wh = max(0, energy_wh)  # Ensure no negative values
 
-            # logger.debug(
-            #     "[PV-IF] Radiation: %s W/m², Cloud cover: %s%%, AOI: %s°, "
-            #     "Sun azimuth: %s°, Sun elevation: %s° -> Energy output: %s Wh",
-            #     round(rad, 2), round(cc, 2), round(angle, 2),
-            #     round(sun_az, 2), round(sun_el, 2), round(energy_wh, 2)
-            # )
             pv_forecast.append(round(energy_wh, 1))
 
         pv_forecast = [float(x) for x in pv_forecast]
@@ -639,9 +623,7 @@ class PvInterface:
         """
         Synchronous wrapper for the async OpenMeteoSolarForecast.
         """
-        return asyncio.run(
-            self.__get_pv_forecast_openmeteo_lib_async(pv_config_entry)
-        )
+        return asyncio.run(self.__get_pv_forecast_openmeteo_lib_async(pv_config_entry))
 
     async def __get_pv_forecast_openmeteo_lib_async(self, pv_config_entry):
         """
@@ -905,7 +887,9 @@ class PvInterface:
             current_time = datetime.now(tz).replace(minute=0, second=0, microsecond=0)
 
             # Calculate midnight of today
-            midnight_today = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            midnight_today = current_time.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
 
             # Create forecast array for 48 hours starting from midnight today
             forecast_hours = [midnight_today + timedelta(hours=i) for i in range(hours)]
@@ -919,7 +903,7 @@ class PvInterface:
                     ts_str = item.get("ts", "")
                     if ts_str:
                         # Parse ISO format timestamp with timezone
-                        ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                         # Convert to configured timezone
                         ts = ts.astimezone(tz)
                         # Round down to hour
@@ -1024,3 +1008,104 @@ class PvInterface:
         logger.info(
             "[PV-IF] PV forecast test output saved to pv_forecast_test_output_2.csv"
         )
+
+    # Add these helper functions to replace pvlib functionality
+    def _solar_position(self, times, latitude, longitude):
+        """
+        Calculate solar position (zenith and azimuth) for given times and location.
+        Simplified version of pvlib.solarposition.get_solarposition
+        """
+        lat_rad = math.radians(latitude)
+        results = []
+
+        for time in times:
+            # Convert to Julian day number
+            a = (14 - time.month) // 12
+            y = time.year - a
+            m = time.month + 12 * a - 3
+            jdn = (
+                time.day
+                + (153 * m + 2) // 5
+                + 365 * y
+                + y // 4
+                - y // 100
+                + y // 400
+                - 32045
+            )
+
+            # Add fraction of day
+            hour_fraction = (time.hour + time.minute / 60 + time.second / 3600) / 24
+            jd = jdn + hour_fraction - 0.5
+
+            # Number of days since J2000.0
+            n = jd - 2451545.0
+
+            # Mean longitude of sun
+            L = (280.460 + 0.9856474 * n) % 360
+
+            # Mean anomaly of sun
+            g = math.radians((357.528 + 0.9856003 * n) % 360)
+
+            # Ecliptic longitude of sun
+            lambda_sun = math.radians(L + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g))
+
+            # Obliquity of ecliptic
+            epsilon = math.radians(23.439 - 0.0000004 * n)
+
+            # Right ascension and declination
+            alpha = math.atan2(
+                math.cos(epsilon) * math.sin(lambda_sun), math.cos(lambda_sun)
+            )
+            delta = math.asin(math.sin(epsilon) * math.sin(lambda_sun))
+
+            # Greenwich mean sidereal time
+            gmst = (18.697375 + 24.06570982441908 * n) % 24
+
+            # Local sidereal time
+            lst = gmst + longitude / 15
+
+            # Hour angle
+            h = math.radians(15 * (lst - math.degrees(alpha) / 15))
+
+            # Solar zenith and azimuth
+            sin_alt = math.sin(lat_rad) * math.sin(delta) + math.cos(
+                lat_rad
+            ) * math.cos(delta) * math.cos(h)
+            altitude = math.asin(max(-1, min(1, sin_alt)))
+            zenith = math.degrees(math.pi / 2 - altitude)
+
+            cos_az = (math.sin(delta) - math.sin(altitude) * math.sin(lat_rad)) / (
+                math.cos(altitude) * math.cos(lat_rad)
+            )
+            azimuth = math.degrees(math.acos(max(-1, min(1, cos_az))))
+
+            if math.sin(h) > 0:
+                azimuth = 360 - azimuth
+
+            results.append({"apparent_zenith": zenith, "azimuth": azimuth})
+
+        return results
+
+    def _angle_of_incidence(
+        self, surface_tilt, surface_azimuth, solar_zenith, solar_azimuth
+    ):
+        """
+        Calculate angle of incidence between sun and tilted surface.
+        Simplified version of pvlib.irradiance.aoi
+        """
+        # Convert to radians
+        surf_tilt_rad = math.radians(surface_tilt)
+        surf_az_rad = math.radians(surface_azimuth)
+        sun_zen_rad = math.radians(solar_zenith)
+        sun_az_rad = math.radians(solar_azimuth)
+
+        # Calculate angle of incidence
+        cos_aoi = math.sin(sun_zen_rad) * math.sin(surf_tilt_rad) * math.cos(
+            sun_az_rad - surf_az_rad
+        ) + math.cos(sun_zen_rad) * math.cos(surf_tilt_rad)
+
+        # Ensure value is within valid range for acos
+        cos_aoi = max(-1, min(1, cos_aoi))
+        aoi = math.degrees(math.acos(cos_aoi))
+
+        return aoi

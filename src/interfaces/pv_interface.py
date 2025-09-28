@@ -900,14 +900,40 @@ class PvInterface:
             )
 
         try:
-            # Extract and process forecast values
-            pv_forecast = [item.get("val", 0) for item in solar_forecast[:hours]]
+            # Get timezone-aware current time
+            tz = pytz.timezone(self.time_zone)
+            current_time = datetime.now(tz).replace(minute=0, second=0, microsecond=0)
 
-            # Ensure correct array length
-            if len(pv_forecast) < hours:
-                pv_forecast.extend([0] * (hours - len(pv_forecast)))
-            elif len(pv_forecast) > hours:
-                pv_forecast = pv_forecast[:hours]
+            # Calculate midnight of today
+            midnight_today = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # Create forecast array for 48 hours starting from midnight today
+            forecast_hours = [midnight_today + timedelta(hours=i) for i in range(hours)]
+            pv_forecast = [0.0] * hours  # Initialize with zeros
+
+            # Create lookup dictionary from API data
+            forecast_lookup = {}
+            for item in solar_forecast:
+                try:
+                    # Parse timestamp from API
+                    ts_str = item.get("ts", "")
+                    if ts_str:
+                        # Parse ISO format timestamp with timezone
+                        ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        # Convert to configured timezone
+                        ts = ts.astimezone(tz)
+                        # Round down to hour
+                        ts = ts.replace(minute=0, second=0, microsecond=0)
+                        forecast_lookup[ts] = item.get("val", 0)
+                except (ValueError, TypeError) as e:
+                    logger.warning("[PV-IF] Error parsing timestamp %s: %s", ts_str, e)
+                    continue
+
+            # Fill forecast array with values from API or keep zeros for missing hours
+            for i, hour in enumerate(forecast_hours):
+                if hour in forecast_lookup:
+                    pv_forecast[i] = forecast_lookup[hour]
+                # else: keep the initialized zero value
 
             # Apply scaling factor
             try:

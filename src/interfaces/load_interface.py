@@ -4,7 +4,7 @@ from various sources such as OpenHAB and Home Assistant. It also includes method
 load profiles based on historical energy consumption data.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from urllib.parse import quote
 import zoneinfo
@@ -118,8 +118,8 @@ class LoadInterface:
             filtered_data = [
                 {
                     "state": entry["state"],
-                    "last_updated": datetime.utcfromtimestamp(
-                        entry["time"] / 1000
+                    "last_updated": datetime.fromtimestamp(
+                        entry["time"] / 1000, tz=timezone.utc
                     ).isoformat(),
                 }
                 for entry in historical_data

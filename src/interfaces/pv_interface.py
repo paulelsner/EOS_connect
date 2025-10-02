@@ -33,6 +33,7 @@ import pytz
 import requests
 import pandas as pd
 import numpy as np
+import sys
 from open_meteo_solar_forecast import OpenMeteoSolarForecast
 
 logger = logging.getLogger("__main__")
@@ -59,13 +60,10 @@ class PvInterface:
         self.config_source = config_source
         self.config_special = config_special
         logger.debug(
-            "[PV-IF] Initializing with 1st source: %s"
-            # + " and 2nd source: %s"
-            ,
+            "[PV-IF] Initializing with 1st source: %s",
             self.config_source.get("source", "akkudoktor"),
             # self.config_source.get("second_source", "openmeteo"),
         )
-        self.__check_config()  # Validate configuration parameters
 
         self.pv_forcast_array = []
         self.pv_forcast_request_error = {
@@ -79,7 +77,24 @@ class PvInterface:
 
         self._update_thread = None
         self._stop_event = threading.Event()
-        self.update_interval = 15 * 60  # Update 15 minutes (in seconds)
+        # Adjust update interval based on provider
+        if self.config_source.get("source") == "solcast":
+            self.update_interval = (
+                2.5 * 60 * 60
+            )  # 2.5 hours (9.6 calls/day - under the 10 limit)
+            logger.info("[PV-IF] Using extended update interval for Solcast: 2.5 hours")
+        else:
+            self.update_interval = 15 * 60  # Standard 15 minutes
+
+        try:
+            self.__check_config()  # Validate configuration parameters
+            self.configuration_valid = True
+            logger.info("[PV-IF] Configuration validation successful")
+        except ValueError as e:
+            logger.error("[PV-IF] PV Interface configuration error: %s", str(e))
+            logger.error("[PV-IF] We have to exit now ...")
+            sys.exit(1)  # Exit if configuration is invalid
+
         logger.info("[PV-IF] Initialized")
         self.__start_update_service()  # Start the background thread for periodic updates
 
@@ -95,39 +110,82 @@ class PvInterface:
         """
         if not len(self.config) > 0:
             logger.error("[PV-IF] Initialize - No pv entries found")
-        else:
-            logger.debug("[PV-IF] Initialize - pv entries found: %s", len(self.config))
-            for config_entry in self.config:
-                # check for each entries the mandatory params
-                if config_entry.get("name", ""):
-                    logger.debug(
-                        "[PV-IF] Initialize - config entry name: %s",
-                        config_entry.get("name", ""),
+            return
+
+        logger.debug("[PV-IF] Initialize - pv entries found: %s", len(self.config))
+
+        for config_entry in self.config:
+            entry_name = config_entry.get("name", "unnamed")
+            logger.debug("[PV-IF] Initialize - config entry name: %s", entry_name)
+
+            # Check for Solcast-specific requirements
+            if self.config_source.get("source") == "solcast":
+                # Check API key
+                if not self.config_source.get("api_key", "").strip():
+                    logger.error(
+                        "[PV-IF] Solcast API key missing in pv_forecast_source section"
                     )
-                else:
-                    logger.debug("[PV-IF] Init - config entry name not found")
-                if config_entry.get("lat", None) is None:
-                    raise ValueError("[PV-IF] Init - lat not found in config entry")
-                if config_entry.get("lon", None) is None:
-                    raise ValueError("[PV-IF] Init - lon not found in config entry")
-                if config_entry.get("azimuth", None) is None:
-                    raise ValueError("[PV-IF] Init - azimuth not found in config entry")
-                if config_entry.get("tilt", None) is None:
-                    raise ValueError("[PV-IF] Init - tilt not found in config entry")
-                if config_entry.get("power", None) is None:
-                    raise ValueError("[PV-IF] Init - power not found in config entry")
-                if config_entry.get("powerInverter", None) is None:
+                    logger.error(
+                        '[PV-IF] Please add: api_key: "your_solcast_api_key" in config.yaml'
+                    )
                     raise ValueError(
-                        "[PV-IF] Init - powerInverter not found in config entry"
+                        "[PV-IF] Solcast API key required - see CONFIG_README.md for setup instructions"
                     )
-                if config_entry.get("inverterEfficiency", None) is None:
+
+                # Check resource_id
+                if not config_entry.get("resource_id", "").strip():
+                    logger.error(
+                        "[PV-IF] Resource ID missing for '%s' - required for Solcast",
+                        entry_name,
+                    )
+                    logger.error(
+                        '[PV-IF] Please add: resource_id: "your_resource_id" in config.yaml'
+                    )
                     raise ValueError(
-                        "[PV-IF] Init - inverterEfficiency not found in config entry"
+                        f"[PV-IF] Solcast resource_id required for '{entry_name}' - see CONFIG_README.md for setup instructions"
                     )
-                # if config_entry.get("horizon", None) is None:
-                #     config_entry["horizon"] = ""
-                #     logger.debug("[PV-IF] Init - horizon not found in config entry,"+
-                # "using default empty value")
+
+                logger.debug("[PV-IF] Solcast config validated for '%s'", entry_name)
+            else:
+                # Standard parameter validation for other sources
+                missing = []
+                if config_entry.get("lat") is None:
+                    missing.append("lat")
+                if config_entry.get("lon") is None:
+                    missing.append("lon")
+                if config_entry.get("azimuth") is None:
+                    missing.append("azimuth")
+                if config_entry.get("tilt") is None:
+                    missing.append("tilt")
+
+                if missing:
+                    logger.error(
+                        "[PV-IF] Missing parameters for '%s': %s",
+                        entry_name,
+                        ", ".join(missing),
+                    )
+                    raise ValueError(
+                        f"[PV-IF] Missing required parameters for '{entry_name}': {', '.join(missing)}"
+                    )
+
+            # Common parameters for all sources
+            missing_common = []
+            if config_entry.get("power") is None:
+                missing_common.append("power")
+            if config_entry.get("powerInverter") is None:
+                missing_common.append("powerInverter")
+            if config_entry.get("inverterEfficiency") is None:
+                missing_common.append("inverterEfficiency")
+
+            if missing_common:
+                logger.error(
+                    "[PV-IF] Missing common parameters for '%s': %s",
+                    entry_name,
+                    ", ".join(missing_common),
+                )
+                raise ValueError(
+                    f"[PV-IF] Missing required parameters for '{entry_name}': {', '.join(missing_common)}"
+                )
 
     def __start_update_service(self):
         """
@@ -318,7 +376,7 @@ class PvInterface:
 
         Notes:
             - Supported sources: "akkudoktor", "openmeteo", "forecast_solar",
-              "default".
+              "solcast", "default".
             - Logs a warning if the default source is used.
             - Logs an error and falls back to the default forecast if no valid
               source is configured.
@@ -336,6 +394,8 @@ class PvInterface:
             return self.__get_pv_forecast_forecast_solar_api(config_entry)
         elif self.config_source.get("source") == "evcc":
             return self.__get_pv_forecast_evcc_api(config_entry, tgt_duration)
+        elif self.config_source.get("source") == "solcast":
+            return self.__get_pv_forecast_solcast_api(config_entry, tgt_duration)
         elif self.config_source.get("source") == "default":
             logger.warning("[PV-IF] Using default PV forecast source")
             return self.__get_default_pv_forcast(config_entry["power"])
@@ -398,7 +458,7 @@ class PvInterface:
         except requests.exceptions.RequestException as e:
             return self._handle_interface_error(
                 "request_failed",
-                f"Akkudoktor API request failed for {tgt_value}: {e}",
+                f"Akkudtoktor API request failed for {tgt_value}: {e}",
                 pv_config_entry,
                 "akkudoktor",
             )
@@ -953,6 +1013,236 @@ class PvInterface:
                 "processing_error",
                 f"Error processing forecast values: {e}",
                 pv_config_entry,
+            )
+
+    def __get_pv_forecast_solcast_api(self, pv_config_entry, tgt_duration=48):
+        """
+        Fetches PV forecast from Solcast API using resource ID endpoint.
+
+        Args:
+            pv_config_entry (dict): Configuration entry containing resource_id
+            tgt_duration (int): Target duration in hours (default 48)
+
+        Returns:
+            list: PV forecast values in Wh for each hour
+        """
+        api_key = self.config_source.get("api_key")
+        resource_id = pv_config_entry.get("resource_id")
+
+        if not api_key:
+            return self._handle_interface_error(
+                "config_error",
+                "Solcast API key missing from pv_forecast_source configuration",
+                pv_config_entry,
+                "solcast",
+            )
+
+        if not resource_id:
+            return self._handle_interface_error(
+                "config_error",
+                "Resource ID missing from PV configuration for Solcast",
+                pv_config_entry,
+                "solcast",
+            )
+
+        # Solcast API endpoint for resource-based forecasts (free tier compatible)
+        url = f"https://api.solcast.com.au/rooftop_sites/{resource_id}/forecasts"
+
+        # Parameters for the API request
+        params = {
+            "hours": min(tgt_duration, 168),  # Solcast max is 168 hours (7 days)
+            "format": "json",
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        logger.debug(
+            "[PV-IF] Fetching PV forecast from Solcast API for resource: %s (hours: %d)",
+            resource_id,
+            params["hours"],
+        )
+
+        # Network request handling
+        try:
+            response = requests.get(url, params=params, headers=headers, timeout=15)
+
+            # Enhanced error logging for debugging
+            logger.debug(
+                "[PV-IF] Solcast API response status: %d", response.status_code
+            )
+
+            # Check for API-specific error responses
+            if response.status_code == 429:
+                return self._handle_interface_error(
+                    "rate_limit",
+                    "Solcast API rate limit exceeded",
+                    pv_config_entry,
+                    "solcast",
+                )
+            elif response.status_code == 403:
+                logger.error(
+                    "[PV-IF] Solcast API 403 Forbidden - Response: %s",
+                    response.text[:200],
+                )
+                return self._handle_interface_error(
+                    "auth_error",
+                    "Solcast API authentication failed (403) - check API key and "
+                    + "resource ID access. Response: {response.text[:100]}",
+                    pv_config_entry,
+                    "solcast",
+                )
+            elif response.status_code == 404:
+                return self._handle_interface_error(
+                    "not_found",
+                    f"Solcast resource ID '{resource_id}' not found - check resource ID",
+                    pv_config_entry,
+                    "solcast",
+                )
+            elif response.status_code == 400:
+                return self._handle_interface_error(
+                    "bad_request",
+                    "Solcast API bad request - check parameters",
+                    pv_config_entry,
+                    "solcast",
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+        except requests.exceptions.Timeout:
+            return self._handle_interface_error(
+                "timeout",
+                "Solcast API request timed out.",
+                pv_config_entry,
+                "solcast",
+            )
+        except requests.exceptions.RequestException as e:
+            return self._handle_interface_error(
+                "request_failed",
+                f"Solcast API request failed: {e}",
+                pv_config_entry,
+                "solcast",
+            )
+        except (ValueError, TypeError) as e:
+            return self._handle_interface_error(
+                "invalid_json",
+                f"Invalid JSON response from Solcast: {e}",
+                pv_config_entry,
+                "solcast",
+            )
+
+        # Data processing
+        try:
+            forecasts = data.get("forecasts", [])
+            if not forecasts:
+                return self._handle_interface_error(
+                    "no_valid_data",
+                    "No forecast data received from Solcast API",
+                    pv_config_entry,
+                    "solcast",
+                )
+
+            # Get timezone-aware current time
+            tz = pytz.timezone(self.time_zone)
+            current_time = datetime.now(tz).replace(minute=0, second=0, microsecond=0)
+
+            # Calculate midnight of today
+            midnight_today = current_time.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+
+            # Create forecast array for target duration starting from midnight today
+            forecast_hours = [
+                midnight_today + timedelta(hours=i) for i in range(tgt_duration)
+            ]
+            pv_forecast = [0.0] * tgt_duration  # Initialize with zeros
+
+            # Create hourly aggregation dictionary
+            hourly_power = {}
+
+            # Process Solcast data (30-minute intervals)
+            for forecast_item in forecasts:
+                try:
+                    # Parse timestamp from Solcast (ISO format with timezone)
+                    period_end = forecast_item.get("period_end", "")
+                    if not period_end:
+                        continue
+
+                    # Convert to datetime - Solcast uses ISO format
+                    if period_end.endswith("Z"):
+                        forecast_time = datetime.fromisoformat(
+                            period_end.replace("Z", "+00:00")
+                        )
+                    else:
+                        forecast_time = datetime.fromisoformat(period_end)
+
+                    # Convert to configured timezone
+                    forecast_time = forecast_time.astimezone(tz)
+
+                    # IMPORTANT: period_end is the END of a 30-minute period
+                    # We need to map it to the hour it belongs to
+                    # For example: 06:30 period_end belongs to hour 06:00-07:00
+                    # So we subtract 30 minutes to get the start of the period
+                    period_start = forecast_time - timedelta(minutes=30)
+
+                    # Round down to the hour for aggregation
+                    hour_key = period_start.replace(minute=0, second=0, microsecond=0)
+
+                    # Get PV power estimate - Solcast provides kW values for the
+                    # system capacity you configured
+                    pv_estimate_kw = forecast_item.get("pv_estimate", 0)
+
+                    # Convert kW to Wh for 30-minute period
+                    # kW * 0.5 hours = kWh, then * 1000 to get Wh
+                    pv_estimate_wh = (
+                        pv_estimate_kw * 500
+                    )  # kW * 0.5h * 1000W/kW = Wh for 30min
+
+                    # Aggregate 30-minute values into hourly values
+                    if hour_key in hourly_power:
+                        hourly_power[hour_key] += pv_estimate_wh
+                    else:
+                        hourly_power[hour_key] = pv_estimate_wh
+
+                except (ValueError, TypeError, AttributeError) as e:
+                    logger.warning(
+                        "[PV-IF] Error processing Solcast forecast item: %s", e
+                    )
+                    continue
+
+            # Fill forecast array with aggregated hourly values
+            for i, forecast_hour in enumerate(forecast_hours):
+                if forecast_hour in hourly_power:
+                    power_wh = hourly_power[forecast_hour]
+
+                    # Apply inverter efficiency if configured
+                    inverter_efficiency = pv_config_entry.get("inverterEfficiency", 1.0)
+                    power_wh *= inverter_efficiency
+
+                    pv_forecast[i] = round(power_wh, 1)
+
+            # Clear any previous errors on success
+            self.pv_forcast_request_error["error"] = None
+
+            logger.debug(
+                "[PV-IF] Solcast PV forecast for resource '%s' received %d forecast points,"
+                + " first 12h (Wh): %s",
+                resource_id,
+                len(forecasts),
+                pv_forecast[:12],  # Log first 12 hours to avoid spam
+            )
+
+            return pv_forecast
+
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
+            return self._handle_interface_error(
+                "processing_error",
+                f"Error processing Solcast forecast data: {e}",
+                pv_config_entry,
+                "solcast",
             )
 
     def _handle_interface_error(

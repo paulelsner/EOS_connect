@@ -91,14 +91,14 @@ class ConfigManager:
                 "pv_forecast_source": CommentedMap(
                     {
                         # openmeteo, openmeteo_local, forecast_solar, akkudoktor
-                        "source": "akkudoktor",
+                        "source": "akkudoktor",  # akkudoktor, openmeteo, openmeteo_local, forecast_solar, evcc, solcast, default
+                        "api_key": "",  # API key for solcast (required when source is solcast)
                     }
                 ),
                 "pv_forecast": [
                     CommentedMap(
                         {
-                            "name": "myPvInstallation1",  # Placeholder for user-defined
-                            # configuration name
+                            "name": "myPvInstallation1",  # Placeholder for user-defined configuration name
                             "lat": 47.5,  # Latitude for PV forecast
                             "lon": 8.5,  # Longitude for PV forecast
                             "azimuth": 90.0,  # Azimuth for PV forecast
@@ -107,6 +107,7 @@ class ConfigManager:
                             "powerInverter": 5000,  # Inverter Power
                             "inverterEfficiency": 0.9,  # Inverter Efficiency for PV forecast
                             "horizon": "10,20,10,15",  # Horizon to calculate shading
+                            "resource_id": "",  # Resource ID for Solcast (optional, only needed for Solcast)
                         }
                     )
                 ],
@@ -268,8 +269,12 @@ class ConfigManager:
         )
         config["pv_forecast_source"].yaml_add_eol_comment(
             "data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local,"
-            + " forecast_solar, evcc, default (default uses akkudoktor)",
+            + " forecast_solar, evcc, solcast, default (default uses akkudoktor)",
             "source",
+        )
+        config["pv_forecast_source"].yaml_add_eol_comment(
+            "API key for Solcast (required only when source is 'solcast')",
+            "api_key",
         )
         # pv forecast configuration
         config.yaml_set_comment_before_after_key(
@@ -311,6 +316,10 @@ class ConfigManager:
                 "Horizon to calculate shading, up to 360 values"
                 + " to describe the shading situation for your PV.",
                 "horizon",
+            )
+            config["pv_forecast"][index].yaml_add_eol_comment(
+                "Resource ID for Solcast API (optional, only needed when using Solcast provider)",
+                "resource_id",
             )
         # inverter configuration
         config.yaml_set_comment_before_after_key(

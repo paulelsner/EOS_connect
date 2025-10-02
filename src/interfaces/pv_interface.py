@@ -304,7 +304,7 @@ class PvInterface:
 
         Notes:
             - Supported sources: "akkudoktor", "openmeteo", "forecast_solar",
-              "default".
+              "default", "evcc".
             - Logs a warning if the default source is used.
             - Logs an error and falls back to the default forecast if no valid
               source is configured.
@@ -418,13 +418,8 @@ class PvInterface:
 
         for forecast_entry in day_values:
             for forecast in forecast_entry:
-                entry_time = datetime.fromisoformat(forecast["datetime"])
-                if entry_time.tzinfo is None:
-                    # If datetime is naive, localize it
-                    entry_time = pytz.timezone(self.time_zone).localize(entry_time)
-                else:
-                    # Convert to configured timezone
-                    entry_time = entry_time.astimezone(pytz.timezone(self.time_zone))
+                entry_time = self.__parse_iso_time_to_local_time(forecast["datetime"])
+
                 if current_time <= entry_time < end_time:
                     value = forecast.get(tgt_value, 0)
 
@@ -794,6 +789,19 @@ class PvInterface:
         # logger.debug("[PV-IF] Forecast.Solar PV forecast (Wh): %s", pv_forecast)
         return pv_forecast
 
+    def __parse_iso_time_to_local_time(self, timestr):
+        """
+        Parses an ISO 8601 time string and converts it to the configured local timezone.
+        """
+        dt = datetime.fromisoformat(timestr)
+        if dt.tzinfo is None:
+            # If datetime is naive, localize it
+            dt = pytz.timezone(self.time_zone).localize(dt)
+        else:
+            # Convert to configured timezone
+            dt = dt.astimezone(pytz.timezone(self.time_zone))
+        return dt
+
     def __get_pv_forecast_evcc_api(self, pv_config_entry, hours=48):
         """
         Fetches PV forecast from an EVCC instance.
@@ -834,29 +842,32 @@ class PvInterface:
             "[PV-IF] EVCC API solar forecast received with scale: %s",
             solar_forecast_scale,
         )
+        # Scale each value according to the solar_forecast_scale (e.g., 0.5 or 0.75)
+        try:
+            scale_factor = float(solar_forecast_scale)
+            if scale_factor <= 0:
+                scale_factor = 1.0
+        except (TypeError, ValueError):
+            scale_factor = 1.0
+
         solar_forecast = solar_forecast_all.get("timeseries", [])
 
+        pv_forecast = [0] * hours
+        day_start = datetime.now(pytz.timezone(self.time_zone))
+        day_start = day_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_time = day_start + timedelta(hours=hours)
+        for entry in solar_forecast:
+            entry_time = self.__parse_iso_time_to_local_time(entry.get("ts", ""))
+            if day_start <= entry_time < end_time:
+                index = int((entry_time - day_start).total_seconds() / 3600)
+                if 0 <= index < hours:
+                    pv_forecast[index] = entry.get("val", 0) * scale_factor
 
-        if solar_forecast and isinstance(solar_forecast, list):
-            # Extract values from the timeseries format
-            pv_forecast = [item.get("val", 0) for item in solar_forecast[:hours]]
-            # Ensure the list has exactly 'hours' entries
-            if len(pv_forecast) < hours:
-                pv_forecast.extend([0] * (hours - len(pv_forecast)))
-            elif len(pv_forecast) > hours:
-                pv_forecast = pv_forecast[:hours]
-
-            # Scale each value according to the solar_forecast_scale (e.g., 0.5 or 0.75)
-            try:
-                scale_factor = float(solar_forecast_scale)
-            except (TypeError, ValueError):
-                scale_factor = 1.0
-            pv_forecast = [val * scale_factor for val in pv_forecast]
-            logger.debug(
-                "[PV-IF] EVCC PV forecast for given evcc pv config (Wh): %s",
-                pv_forecast,
-            )
-            return pv_forecast
+        logger.debug(
+            "[PV-IF] EVCC PV forecast for given evcc pv config (Wh): %s",
+            pv_forecast,
+        )
+        return pv_forecast
 
     def test_output(self):
         """

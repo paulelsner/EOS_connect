@@ -555,7 +555,7 @@ class PriceInterface:
         for hour in range(24):
             values = hourly.get(hour, [])
             avg = sum(values) / len(values) if values else 0
-            hourly_prices.append(round(avg, 6))
+            hourly_prices.append(round(avg, 9))
 
         # Optionally extend to tgt_duration if needed
         extended_prices = hourly_prices
